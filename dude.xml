@@ -1,0 +1,22 @@
+<Entity name="dude" >
+	<VariableStorageComponent
+		name="also_try_cortex_command"
+		value_string="https://cccp.mod.io/"
+	></VariableStorageComponent>
+	
+	<VariableStorageComponent
+		_tags="free"
+		name="free"
+		value_string=""
+	></VariableStorageComponent>
+	<VariableStorageComponent
+		_tags="free"
+		name="free"
+		value_string=""
+	></VariableStorageComponent>
+	<VariableStorageComponent
+		_tags="free"
+		name="free"
+		value_string=""
+	></VariableStorageComponent>
+</Entity>
