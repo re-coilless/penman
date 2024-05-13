@@ -12,8 +12,6 @@ else
 end
 ]]
 
---put all penman funcs into a global table pnm.[func]
-
 penman_r = penman_r or ModTextFileGetContent
 penman_w = penman_w or ModTextFileSetContent
 function OnWorldPostUpdate()
