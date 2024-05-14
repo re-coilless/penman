@@ -1,18 +1,38 @@
 pen = pen or {}
 
---mrshll
---19a
---Heres Ferrei
---Noita40K
-
+--new herd relations func (get it from Heres Ferrei)
 --make proper edit comp function
---add sfxes, default translations
+--make scripts to save and load entities
+--make former penman stuff better
+
+--reorder and move all the gui stuff to the very bottom
+--cleanup make sure all the funcs reference the right stuff
+
+--transition mrshll to penman
+--add sfxes, default translations + some more assets
 --try putting some of the stuff inside internal lua global tables
---make sure all the funcs reference the right stuff
+--documentation time
 
 --[MATH]
 function pen.b2n( a )
 	return a and 1 or 0
+end
+
+function pen.n2b( a )
+	return a > 0
+end
+
+function pen.is_fucked( value )
+	return ( value ~= value or value == math.inf )
+end
+
+function pen.random_bool( var )
+	SetRandomSeed( GameGetFrameNum(), var )
+	return Random( 1, 2 ) == 1
+end
+
+function pen.random_sign( var )
+	return pen.random_bool( var ) and 1 or -1
 end
 
 function pen.get_sign( a )
@@ -39,6 +59,24 @@ function pen.limiter( value, limit, max_mode )
 	return value
 end
 
+function pen.binsearch( tbl, value )
+	local low = 1
+	local high = #tbl
+		
+	while( high >= low ) do
+		local middle = math.floor(( low + high )/2 + 0.5)
+		if( tbl[middle] < value ) then
+			low = middle + 1
+		elseif( tbl[middle] > value ) then
+			high = middle - 1
+		elseif( tbl[middle] == value ) then
+			return middle
+		end
+	end
+	
+	return nil
+end
+
 function pen.get_angular_delta( a, b, get_max )
 	get_max = get_max or false
 
@@ -60,6 +98,47 @@ function pen.rotate_offset( x, y, angle )
 	return x*math.cos( angle ) - y*math.sin( angle ), x*math.sin( angle ) + y*math.cos( angle )
 end
 
+function pen.rounder( num, degree )
+	degree = degree or 1000
+	return math.floor( degree*num + 0.5 )/degree
+end
+
+--make this a proper anim lib
+-- function magic_trig( value, goal )
+-- 	local a = 2*goal/math.pi
+-- 	return math.sin( value/a )
+-- end
+
+-- function magic_trig_clean( value, goal )
+-- 	return magic_trig( value - 1, goal - 1 )
+-- end
+
+-- function magic_euler( value, goal )
+-- 	return math.log(( math.exp(1) - 1 )*value/goal + 1 )
+-- end
+
+-- function magic_exp( value, goal, base )
+-- 	base = base or math.exp(1)
+	
+-- 	local drift = base^( -goal )
+-- 	return ( base^( value - goal ) - drift )*( drift + 1 )
+-- end
+
+-- function get_camera_shake( hooman ) --make this work using new pointer func
+	-- hooman = hooman or get_player() or 0
+	-- if( hooman == 0 ) then
+		-- return 0, 0
+	-- end
+	
+	-- local m_r_x, m_r_y = ComponentGetValue2( EntityGetFirstComponentIncludingDisabled( hooman, "ControlsComponent" ), "mMousePositionRaw" )
+	-- local m_w_x, m_w_y = ComponentGetValue2( EntityGetFirstComponentIncludingDisabled( hooman, "ControlsComponent" ), "mMousePosition" )
+	-- gimme the actual resolution
+	-- local shit_from_ass = w/( MagicNumbersGetValue( "VIRTUAL_RESOLUTION_X" ) + MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_X" ))
+	
+	-- return 
+-- end
+
+--add screenshake correction
 function pen.world2gui( x, y, not_pos ) --thanks to ImmortalDamned for the fix
 	not_pos = not_pos or false
 	
@@ -150,6 +229,42 @@ function pen.magic_sorter( tbl, func )
     return iter
 end
 
+function pen.fletcher_does_magic( str, is_huge )
+	is_huge = is_huge or false
+	
+	local a, b, c = 0, 0, ( is_huge and 65535 or 4294967295 )
+	for i = 1,#str do
+		a = ( a + string.byte( str, i ))%c
+		b = ( a + b )%c
+	end
+	return ( is_huge and tostring( b*c + a ) or ( b*c + a ))
+end
+
+function pen.seed_gen( values )
+	local metaseed = "msd"..GameGetRealWorldTimeSinceStarted().."."
+	if( #( values or {}) > 0 ) then
+		for i,value in ipairs( values ) do
+			if( type( value ) ~= "boolean" ) then
+				metaseed = metaseed..tostring( value )
+			end
+		end
+	end
+	
+	math.randomseed( pen.fletcher_does_magic( metaseed ))
+	math.random();math.random();math.random()
+	return math.random( 0, 2000000000 )
+end
+
+function pen.seeded_random( event_id, mutator, a, b, bidirectional, seed_container )
+	bidirectional = bidirectional or false
+	seed_container = seed_container or "19_abiding.WHITE_SEED"
+	
+	local seed = tonumber( pen.fletcher_does_magic( ModSettingGetNextValue( seed_container )..tostring( pen.fletcher_does_magic( event_id..tostring( mutator )))))
+	math.randomseed( seed )
+	math.random();math.random();math.random()
+	return bidirectional and ( math.random( a, b*2 ) - b ) or math.random( a, b )
+end
+
 function pen.generic_random( a, b, macro_drift, bidirectional )
 	bidirectional = bidirectional or false
 	
@@ -183,8 +298,80 @@ function pen.uint2color( color )
 	return { bit.band( color, 0xff ), bit.band( bit.rshift( color, 8 ), 0xff ), bit.band( bit.rshift( color, 16 ), 0xff )}
 end
 
+function pen.rgb2hsv( colour )
+	local r, g, b, a = colour[1], colour[2], colour[3], colour[4]
+
+	local h = 0
+	local s = 0
+	local v = math.max( r, g, b )
+	local temp = math.min( r, g, b )
+
+	local d = v - temp
+	if( v == 0 ) then
+		s = 0
+	else
+		s = d/v
+	end
+	
+	if( v == temp ) then
+		h = 0
+	else
+		if( v == r ) then
+			h = ( g - b )/d
+			if( g < b ) then
+				h = h + 6
+			end
+		elseif( v == g ) then
+			h = ( b - r )/d + 2
+		elseif( v == b ) then
+			h = ( r - g )/d + 4
+		end
+		h = h/6
+	end
+	
+	return { h, s, v, a }
+end
+
+function pen.hsv2rgb( colour )
+	local h, s, v, a = colour[1], colour[2], colour[3], colour[4]
+	local r, g, b = 0, 0, 0
+	
+	local i = math.floor( h*6 )
+	local f = h*6 - i
+	local p = v*( 1 - s )
+	local q = v*( 1 - f*s )
+	local t = v*( 1 - ( 1 - f )*s )
+	
+	i = i%6
+	if( i == 0 ) then
+		r, g, b = v, t, p
+	elseif( i == 1 ) then
+		r, g, b = q, v, p
+	elseif( i == 2 ) then
+		r, g, b = p, v, t
+	elseif( i == 3 ) then
+		r, g, b = p, q, v
+	elseif( i == 4 ) then
+		r, g, b = t, p, v
+	elseif( i == 5 ) then
+		r, g, b = v, p, q
+	end
+	
+	return { r, g, b, a }
+end
+
 function pen.debug_dot( x, y, frames )
 	GameCreateSpriteForXFrames( "data/ui_gfx/debug_marker.png", x, y, true, 0, 0, frames or 1, true )
+end
+
+function pen.drop_em_frames( count )
+	local frame_time = count
+	
+	local current_time = GameGetRealWorldTimeSinceStarted()*1000
+	local prev_time = current_time
+	while( current_time - prev_time < frame_time ) do
+		current_time = GameGetRealWorldTimeSinceStarted()*1000
+	end
 end
 
 function pen.table_init( amount, value )
@@ -219,6 +406,16 @@ function pen.add_table( a, b )
 	return a
 end
 
+function pen.add_unique( lst, name )
+	for i,item in ipairs( lst ) do
+		if( item == name ) then
+			return
+		end
+	end
+	
+	table.insert( lst, name )
+end
+
 function pen.get_table_count( tbl, just_checking )
 	tbl = tbl or 0
 	if( type( tbl ) ~= "table" ) then
@@ -233,6 +430,20 @@ function pen.get_table_count( tbl, just_checking )
 		end
 	end
 	return table_count
+end
+
+function pen.get_table_depth( tbl, d )
+	tbl = tbl or 0
+	d = d or 0
+
+	if( type( tbl ) == "table" ) then
+		for n,v in pairs( tbl ) do
+			d = pen.get_table_depth( v, d + 1 )
+			break
+		end
+	end
+
+	return d
 end
 
 function pen.get_most_often( tbl )
@@ -365,6 +576,54 @@ function pen.child_play_full( dude_id, func, params )
 			return pen.child_play_full( child, func, params )
 		end
 	end)
+end
+
+--make this a single func
+function pen.get_matter( matters, id )
+	local max_matter = { 0, 0 }
+	if( #matters > 0 ) then
+		for i,matter in ipairs( matters ) do
+			if( id ~= nil and id == i - 1 ) then
+				return { id, matter }
+			elseif( matter > max_matter[2] ) then
+				max_matter[1] = i - 1
+				max_matter[2] = matter
+			end
+		end
+	end
+	return max_matter
+end
+
+function pen.get_matters( matters )
+	local mttrs = {}
+	local got_some = 0
+	if( #matters > 0 ) then
+		for i,mttr in ipairs( matters ) do
+			if( mttr > 0 ) then
+				table.insert( mttrs, {i-1,mttr})
+				got_some = got_some + mttr
+			end
+		end 
+		table.sort( mttrs, function( a, b )
+			return a[2] > b[2]
+		end)
+	end
+	return got_some, mttrs
+end
+
+function pen.get_killable_stuff( c_x, c_y, r )
+	local stuff = {}
+	return pen.add_table( pen.add_table( stuff, EntityGetInRadiusWithTag( c_x, c_y, r, "hittable" ) or {} ), EntityGetInRadiusWithTag( c_x, c_y, r, "mortal" ) or {} )
+end
+
+function pen.t2l( str )
+	local t = {}
+	
+	for line in string.gmatch( str, "([^\r\n]+)" ) do
+		table.insert( t, line )
+	end
+	
+	return t
 end
 
 function pen.t2w( str )
@@ -516,6 +775,199 @@ function pen.liner( text, length, height, length_k, clean_mode, forced_reverse )
 	return formated
 end
 
+function pen.magic_packer( data, separators )
+	if( data == nil ) then
+		return
+	end
+	separators = separators or { "|", ":", "@", "&" }
+
+	local function XD_packer( data, separators, i )
+		data = data or 0
+		i = ( i or 0 ) + 1
+		local separator = separators[i]
+		if( separator == nil or type( data ) ~= "table" ) then
+			return data
+		end
+		
+		local data_raw = separator
+		for name,value in pairs( data ) do
+			data_raw = data_raw..XD_packer( value, separators, i )..separator
+		end
+		return data_raw
+	end
+	
+	local function XD_extractor( data_raw, separators, i )
+		data_raw = data_raw or 0
+		if( type( data_raw ) ~= "string" ) then
+			return
+		end
+		i = ( i or 0 ) + 1
+		local separator = separators[i]
+		if( separator == nil or string.find( data_raw, separator, 1, true ) == nil ) then
+			local num = tonumber( data_raw )
+			return ( num == nil and data_raw or num )
+		end
+	
+		local data = {}
+		for value in string.gmatch( data_raw, "([^"..separator.."]+)" ) do
+			table.insert( data, XD_extractor( value, separators, i ))
+		end
+		return data
+	end
+
+	local out = nil
+	if( type( data ) == "table" ) then
+		local depth = get_table_depth( data )
+		if( pen.get_table_count( data ) > 0 and #separators >= depth ) then
+			out = XD_packer( data, separators )
+		end
+	elseif( data ~= "" ) then
+		out = XD_extractor( data, separators )
+	end
+	return out
+end
+
+function pen.magic_shooter( who_shot, entity_file, x, y, v_x, v_y, do_thing, proj_mods, custom_values )
+	do_thing = do_thing or false
+	
+	local entity_id = EntityLoad( entity_file, x, y )
+	local herd_id = get_herd_id( who_shot )
+	
+	if( do_thing ) then
+		GameShootProjectile( who_shot, x, y, x + v_x, y + v_y, entity_id, false )
+	end
+	
+	edit_component( entity_id, "ProjectileComponent", function(comp,vars)
+		vars.mWhoShot = who_shot
+		vars.mShooterHerdId = herd_id
+	end)
+	
+	edit_component( entity_id, "VelocityComponent", function(comp,vars)
+		ComponentSetValueVector2( comp, "mVelocity", v_x, v_y )
+	end)
+	
+	if( proj_mods ~= nil ) then
+		proj_mods( entity_id, custom_values )
+	end
+	
+	return entity_id
+end
+
+--make sure that Index's stuff is no better
+function pen.get_xy_matter( x, y, duration )
+	mtr_probe_memo = mtr_probe_memo or {
+		probe = EntityLoad( "mods/white_room/files/props/matter_test.xml", x, y ),
+		delay = duration,
+		mtr_list = {},
+	}
+	if( mtr_probe_memo.delay > 0 ) then
+		local jitter_mag = 0.5
+        EntityApplyTransform( mtr_probe_memo.probe, x + jitter_mag*pen.get_sign( math.random(-1,0)), y + jitter_mag*pen.get_sign( math.random(-1,0)))
+        
+        local dmg_comp = EntityGetFirstComponentIncludingDisabled( mtr_probe_memo.probe, "DamageModelComponent" )
+        local matter = ComponentGetValue2( dmg_comp, "mCollisionMessageMaterials" )
+        local count = ComponentGetValue2( dmg_comp, "mCollisionMessageMaterialCountsThisFrame" )
+        for i,v in ipairs( count ) do
+            if( v > 0 ) then
+                local id = matter[i]
+                mtr_probe_memo.mtr_list[id] = ( mtr_probe_memo.mtr_list[id] or 0 ) + v
+            end
+        end
+		
+		mtr_probe_memo.delay = mtr_probe_memo.delay - 1
+	else
+		local max_id = { 0, 0 }
+        for id,cnt in pairs( mtr_probe_memo.mtr_list ) do
+            if( max_id[2] < cnt ) then
+                max_id[1] = id
+                max_id[2] = cnt
+            end
+        end
+		
+		EntityKill( mtr_probe_memo.probe )
+		mtr_probe_memo = nil
+		
+		return max_id[1]
+	end
+end
+
+--make it more advanced
+function pen.matter_fabricator( em_x, em_y, frames, values )
+	values = values or {}
+	local size = ( values[2] ~= nil and type( values[2] ) == "table" ) and values[2] or { 0, values[2] or 0.5, }
+	local count = ( values[3] ~= nil and type( values[3] ) == "table" ) and values[3] or { values[3] or 1, values[3] or 1, }
+	local delay = ( values[4] ~= nil and type( values[4] ) == "table" ) and values[4] or { values[4] or 1, values[4] or 1, }
+	local lifetime = ( values[5] ~= nil and type( values[5] ) == "table" ) and values[5] or { values[5] or 60, values[5] or 60, }
+	
+	local mtrr = EntityCreateNew( "matterer" )
+	EntitySetTransform( mtrr, em_x, em_y )
+	
+	local comp = EntityAddComponent( mtrr, "ParticleEmitterComponent", {
+		emitted_material_name = values[1] or "blood",
+		emission_interval_min_frames = delay[1],
+		emission_interval_max_frames = delay[2],
+		lifetime_min = lifetime[1],
+		lifetime_max = lifetime[2],
+		create_real_particles = b2n_old( values[6] or true ),
+		emit_real_particles = b2n_old( values[7] or true ),
+		emit_cosmetic_particles = b2n_old( values[8] or false ),
+		render_on_grid = b2n_old( values[9] or true ),
+	})
+	ComponentSetValue2( comp, "count_min", count[1] )
+	ComponentSetValue2( comp, "count_max", count[2] )
+	if( #size < 4 ) then
+		ComponentSetValue2( comp, "area_circle_radius", size[1] or 0.5, size[2] or 0.5 )
+	else
+		ComponentSetValue2( comp, "x_pos_offset_min", size[1] or 0 )
+		ComponentSetValue2( comp, "y_pos_offset_min", size[2] or 0 )
+		ComponentSetValue2( comp, "x_pos_offset_max", size[3] or 0 )
+		ComponentSetValue2( comp, "y_pos_offset_max", size[4] or 0 )
+	end
+	
+	if( frames ~= nil ) then
+		EntityAddComponent( mtrr, "LifetimeComponent", {
+			lifetime = frames,
+		})
+	end
+end
+
+function pen.get_action_with_id( action_id )
+	dofile_once( "data/scripts/gun/gun_enums.lua")
+	dofile_once( "data/scripts/gun/gun_actions.lua" )
+	
+	local action_data = nil
+	for i,action in ipairs( actions ) do
+		if( action.id == action_id ) then
+			action_data = action
+			break
+		end
+	end
+
+	return action_data
+end
+
+function pen.get_spell_id()
+	local man = GetUpdatedEntityID()
+	if( man ~= nil ) then
+		local wand_id = get_active_wand_old( man )
+		if( wand_id ~= 0 and current_action ~= nil and current_action.deck_index ~= nil ) then
+			local index_offset = 1
+			local spells = EntityGetAllChildren( wand_id ) or {}
+			if( #spells > 0 ) then
+				for i,spell_id in ipairs( spells ) do
+					local item_comp = EntityGetFirstComponentIncludingDisabled( spell_id, "ItemComponent" )
+					if( item_comp ~= nil and ComponentGetValue2( item_comp, "permanently_attached" )) then
+						index_offset = index_offset + 1
+					end
+				end
+				return spells[ current_action.deck_index + index_offset ]
+			end
+		end
+	end
+	
+	return nil
+end
+
 --[ECS]
 function pen.get_storage( hooman, name )
 	local comps = EntityGetComponentIncludingDisabled( hooman, "VariableStorageComponent" ) or {}
@@ -586,6 +1038,16 @@ function pen.get_creature_head( entity_id, x, y )
 	end
 	return x, y
 end
+-- function get_head_offset( hooman )
+-- 	local offset_storage = EntityGetFirstComponentIncludingDisabled( hooman, "VariableStorageComponent", "head_offset" )
+-- 	local animal_comp = EntityGetFirstComponentIncludingDisabled( hooman, "AnimalAIComponent" )
+-- 	if( offset_storage ~= nil ) then
+-- 		return ComponentGetValue2( offset_storage, "value_int" )
+-- 	elseif( animal_comp ~= nil ) then
+-- 		return ComponentGetValue2( animal_comp, "eye_offset_y" )
+-- 	end
+-- 	return 0
+-- end
 
 function pen.lua_callback( entity_id, func_names, input )
 	local got_some = false
@@ -645,21 +1107,79 @@ function pen.get_phys_mass( entity_id )
 	return mass
 end
 
-function pen.get_matters( matters )
-	local mttrs = {}
-	local got_some = 0
-	if( #matters > 0 ) then
-		for i,mttr in ipairs( matters ) do
-			if( mttr > 0 ) then
-				table.insert( mttrs, {i-1,mttr})
-				got_some = got_some + mttr
-			end
-		end 
-		table.sort( mttrs, function( a, b )
-			return a[2] > b[2]
-		end)
+function pen.set_transform( entity_id, off_x, off_y, scale_x, scale_y, angle )
+	local trans_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "InheritTransformComponent" )
+	local origs = { ComponentGetValue2( trans_comp, "Transform" )}
+	ComponentSetValue2( trans_comp, "Transform", off_x or origs[1], off_y or origs[2], scale_x or origs[3], scale_y or origs[4], angle or origs[5])
+	return origs
+end
+
+function pen.delayed_kill( entity_id, delay, comp_id )
+	EntityAddComponent( entity_id, "LifetimeComponent", {
+		lifetime = delay + 1,
+	})
+	
+	if( comp_id ~= nil ) then
+		EntityRemoveComponent( entity_id, comp_id )
 	end
-	return got_some, mttrs
+end
+
+function pen.scale_emitter( hooman, emit_comp, advanced )
+	advanced = advanced or false
+	local borders = { 0, 0, 0, 0, }
+	local gonna_update = false
+	
+	local sprite_comp = EntityGetFirstComponentIncludingDisabled( hooman, "SpriteComponent", "character" )
+	local char_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterDataComponent" )
+	if( advanced and sprite_comp ~= nil ) then
+		local offset_x = ComponentGetValue2( sprite_comp, "offset_x" )
+		local offset_y = ComponentGetValue2( sprite_comp, "offset_y" )
+		
+		if( char_comp ~= nil ) then
+			local temp = {}
+			temp[1] = ComponentGetValue2( char_comp, "collision_aabb_min_x" )
+			temp[2] = ComponentGetValue2( char_comp, "collision_aabb_max_x" )
+			temp[3] = ComponentGetValue2( char_comp, "collision_aabb_min_y" )
+			temp[4] = ComponentGetValue2( char_comp, "collision_aabb_max_y" )
+			
+			if( offset_x == 0 ) then
+				offset_x = ( math.abs( temp[1] ) + math.abs( temp[2] ))/2
+			end
+			if( offset_y == 0 ) then
+				offset_y = temp[3]
+			end
+			
+			borders[1] = ( -offset_x + temp[1] )/2
+			borders[2] = ( offset_x + temp[2] )/2
+			borders[3] = ( -offset_y + temp[3] )/2
+			borders[4] = ( offset_y + temp[3] )/2
+		else
+			if( offset_x == 0 ) then
+				offset_x = 3
+			end
+			if( offset_y == 0 ) then
+				offset_y = 3
+			end
+			borders[1] = -offset_x
+			borders[2] = offset_x
+			borders[3] = -offset_y
+			borders[4] = offset_y*0.5
+		end
+		gonna_update = true
+	elseif( char_comp ~= nil ) then
+		borders[1] = ComponentGetValue2( char_comp, "collision_aabb_min_x" )
+		borders[2] = ComponentGetValue2( char_comp, "collision_aabb_max_x" )
+		borders[3] = ComponentGetValue2( char_comp, "collision_aabb_min_y" )
+		borders[4] = ComponentGetValue2( char_comp, "collision_aabb_max_y" )
+		gonna_update = true
+	end
+	
+	if( gonna_update ) then
+		ComponentSetValue2( emit_comp, "x_pos_offset_min", borders[1])
+		ComponentSetValue2( emit_comp, "x_pos_offset_max", borders[2])
+		ComponentSetValue2( emit_comp, "y_pos_offset_min", borders[3])
+		ComponentSetValue2( emit_comp, "y_pos_offset_max", borders[4])
+	end
 end
 
 function pen.active_item_reset( hooman )
@@ -744,7 +1264,450 @@ function pen.get_tinker_state( hooman, x, y )
 	return false
 end
 
+function pen.get_custom_effect( hooman, effect_name, effect_id )
+	local children = EntityGetAllChildren( hooman ) or {}
+	if( #children > 0 ) then
+		if( effect_id ~= nil ) then
+			if( type( effect_id ) == "string" ) then
+				dofile_once( "data/scripts/status_effects/status_list.lua" )
+				for i,effect in ipairs( status_effects ) do
+					if( effect.ui_name == effect_id ) then
+						effect_id = i
+						break
+					end
+				end
+			end
+			
+			for i,child in ipairs( children ) do			
+				local effect_comp = EntityGetFirstComponentIncludingDisabled( child, "GameEffectComponent" )
+				if( effect_comp ~= nil and ( ComponentGetValue2( effect_comp, "effect" ) == effect_name or ComponentGetValue2( effect_comp, "causing_status_effect" ) == effect_id or ComponentGetValue2( effect_comp, "ragdoll_effect" ) == effect_name )) then
+					return child, effect_comp, effect_id
+				end
+			end
+		else
+			for i,child in ipairs( children ) do
+				if( EntityGetName( child ) == effect_name ) then
+					return child
+				end
+			end
+		end
+	end
+end
+
+function pen.access_matter_damage( entity_id, matter, damage )
+	if( damage ~= nil ) then
+		EntitySetDamageFromMaterial( entity_id, matter, damage )
+	else
+		local dmg_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "DamageModelComponent" )
+		local mtrs = ComponentGetValue2( dmg_comp, "materials_that_damage" )
+		local mtrs_dmg = ComponentGetValue2( dmg_comp, "materials_how_much_damage" )
+		
+		local tbl_mtr = {}
+		for mtr in string.gmatch( mtrs, "([^,]+)" ) do
+			table.insert( tbl_mtr, mtr )
+		end
+		local tbl_dmg = {}
+		for mtr_dmg in string.gmatch( mtrs_dmg, "([^,]+)" ) do
+			table.insert( tbl_dmg, mtr_dmg )
+		end
+		
+		local tbl = {}
+		for i,mtr in ipairs( tbl_mtr ) do
+			tbl[mtr] = tbl_dmg[i]
+		end
+	
+		if( matter ~= nil ) then
+			return tonumber( tbl[matter])
+		else
+			return tbl
+		end
+	end
+end
+
+function pen.clone_comp( entity_id, comp_id, mutators )
+	mutators = mutators or {}
+	mutators.obj = mutators.obj or {}
+	
+	local function is_object( field_name )
+		local names = { "gun_config", "gunaction_config", "config", "config_explosion", "damage_by_type", "damage_multipliers", "damage_critical", "laser",
+						"attack_melee_finish_config_explosion", "drug_fx_target", "m_drug_fx_current", "fx_add", "fx_multiply", }
+		
+		for i,name in ipairs( names ) do
+			if( name == field_name ) then
+				return true
+			end
+		end
+		
+		return false
+	end
+	--do support by replacing the unsupported shit with table where [2] si the supported way of doing stuff
+	--[DamageModelComponent] mDamageMaterialsHowMuch, mDamageMaterials, mCollisionMessageMaterials
+	--[MaterialInventoryComponent] count_per_material_type
+	--[PhysicsPickUpComponent] transform
+	--[AttachToEntityComponent] Transform
+	--[InheritTransformComponent] Transform
+	--[ProjectileComponent] mDamagedEntities
+	--[GenomeDataComponent] friend_firemage, friend_thundermage
+	local function is_supported( comp_name, field_name )
+		local unsupported_names = {
+			MaterialInventoryComponent = { "count_per_material_type", },
+			GenomeDataComponent = { "friend_firemage", "friend_thundermage", },
+			BiomeTrackerComponent = { "current_biome", },
+			AttachToEntityComponent = { "Transform", },
+			InheritTransformComponent = { "Transform", },
+			DamageModelComponent = { "mCollisionMessageMaterials", "mDamageMaterialsHowMuch", "mMaterialDamageThisFrame", "mDamageMaterials", "mCollisionMessageMaterialCountsThisFrame", },
+			GameLogComponent = { "mVisitiedBiomes", },
+			StatusEffectDataComponent = { "stain_effects", "effects_previous", "ingestion_effects", "ingestion_effect_causes", "ingestion_effect_causes_many", "mStainEffectsSmoothedForUI", },
+			LuaComponent = { "mLuaManager", "mPersistentValues", },
+			SpriteComponent = { "mRenderList", "mSprite", },
+			ParticleEmitterComponent = { "m_collision_angles", "m_cached_image_animation", },
+			AnimalAIComponent = { "mAiStateStack", "mCurrentJob", },
+			LightComponent = { "mSprite", },
+			PlayerCollisionComponent = { "mPhysicsCollisionHax", },
+			WorldStateComponent = { "pending_portals", "orbs_found_thisrun", "cuts_through_world", "npc_parties", "apparitions_per_level", "lua_globals", },
+			MaterialSuckerComponent = { "randomized_position", },
+			SpriteAnimatorComponent = { "mStates", "mCachedTargetSpriteTag", },
+			PixelSpriteComponent = { "mPixelSprite", },
+			VerletPhysicsComponent = { "sprite", "links", "colors", "materials", },
+			VerletWorldJointComponent = { "mCell", },
+			IngestionComponent = { "m_ingestion_satiation_material_cache", },
+			ExplosionComponent = { "damage_critical", },
+			ExplodeOnDamageComponent = { "delay", "damage_critical", "physics_explosion_power", "impl_position", },
+			PhysicsBodyComponent = { "mLocalPosition", "mBody", "mBodyId", },
+			PhysicsBody2Component = { "mBody", "mBodyId", },
+			PhysicsImageShapeComponent = { "mBody", },
+			ProjectileComponent = { "mTriggers", "mDamagedEntities", "damage_critical", },
+			IKLimbsAnimatorComponent = { "mLimbStates", },
+			IKLimbWalkerComponent = { "mState", },
+			IKLimbAttackerComponent = { "mState", },
+			SpriteStainsComponent = { "mData", "mState", "mTextureHandle", },
+			InventoryGuiComponent = { "imgui", "mLastPurchasedAction", },
+			TeleportComponent = { "state", },
+			PathFindingComponent = { "debug_path", "input", "job_result_receiver", "jump_trajectories", "mFallbackLogic", "mSelectedLogic", "mLogic", "mState", "path", "path_next_node", "path_previous_node", },
+			PathFindingGridMarkerComponent = { "mNode", },
+			PhysicsJointComponent = { "mJoint", },
+			PhysicsJoint2MutatorComponent = { "mBox2DJointId", },
+			PhysicsPickUpComponent = { "leftJoint", "rightJoint", "transform", },
+			GunComponent = { "mLuaManager", },
+		}
+		
+		local fields = unsupported_names[comp_name]
+		if( fields ~= nil ) then
+			for i,name in ipairs( fields ) do
+				if( name == field_name ) then
+					return false
+				end
+			end
+		end
+		
+		return true
+	end
+	
+	local main_values = {
+		_tags = ( mutators.tags or ComponentGetTags( comp_id ))..( mutators.add_tags or "" ),
+	}
+	local object_values = {}
+	local extra_values = {}
+	
+	local comp_name = ComponentGetTypeName( comp_id )
+	local function get_stuff( is_obj )
+		is_obj = is_obj or false
+		
+		local stuff = is_obj and ComponentObjectGetMembers( comp_id, is_obj ) or ComponentGetMembers( comp_id )
+		for field in pairs( stuff ) do
+			if( is_supported( comp_name, field )) then
+				if( is_object( field )) then
+					get_stuff( field )
+				else
+					if( mutators[field] ~= nil ) then
+						if( mutators[field] ~= "[[FUCKTHIS]]" ) then
+							main_values[field] = mutators[field]
+						end
+					else
+						local value = ( is_obj and {ComponentObjectGetValue2( comp_id, is_obj, field )} or {ComponentGetValue2( comp_id, field )}) or {}
+						if( is_obj ) then
+							object_values[is_obj] = object_values[is_obj] or {}
+							object_values[is_obj][field] = value
+						elseif( #value > 0 ) then
+							if( #value == 1 and type( value[1]) ~= "table" ) then
+								value = value[1]
+								-- if( type( value ) == "boolean" ) then
+									-- value = value and 1 or 0
+								-- end
+								main_values[field] = value--tostring( value )
+							else
+								extra_values[field] = value
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	get_stuff()
+	
+	comp_id = EntityAddComponent2( entity_id, comp_name, main_values )
+	for object,values in pairs( object_values ) do
+		for field,value in pairs( values ) do
+			ComponentObjectSetValue2( comp_id, object, field, value[1], value[2], value[3], value[4] )
+		end
+	end
+	for field,value in pairs( extra_values ) do
+		ComponentSetValue2( comp_id, field, value[1], value[2], value[3], value[4] )
+	end
+	
+	return comp_id
+end
+
+function pen.clone_entity( entity_id, x, y, mutators )
+	mutators = mutators or {}
+	mutators[entity_id] = mutators[entity_id] or {}
+
+	local new_id = EntityCreateNew( EntityGetName( entity_id ))
+	EntitySetTransform( new_id, x, y )
+
+	local tags = EntityGetTags( entity_id ) or ""
+	for value in string.gmatch( tags, "([^,]+)" ) do
+		EntityAddTag( new_id, value )
+	end
+	local comps = EntityGetAllComponents( entity_id ) or {}
+	if( #comps > 0 ) then
+		for i,comp in ipairs( comps ) do
+			clone_comp( new_id, comp, mutators[entity_id][comp] or {})
+		end
+	end
+	local children = EntityGetAllChildren( entity_id ) or {}
+	if( #children > 0 ) then
+		for i,child in ipairs( children ) do
+			EntityAddChild( new_id, clone_entity( child, x, y, mutators ))
+		end
+	end
+
+	return new_id
+end
+
+--make it be less HF-related + add a toggle to make it work with friendly stuff
+function pen.rate_creature( enemy_id )
+	local damage_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "DamageModelComponent" )
+	local gene_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "GenomeDataComponent" )
+	
+	if( EntityGetRootEntity( enemy_id ) ~= enemy_id ) then
+		return 0
+	elseif( damage_comp == nil or gene_comp == nil ) then
+		return 0
+	end
+	
+	local hp = EntityHasTag( enemy_id, "sigil_of_sin" ) and ComponentGetValue2( damage_comp, "max_hp" ) or ComponentGetValue2( damage_comp, "hp" )
+	local supremacy = ComponentGetValue2( gene_comp, "food_chain_rank" )
+	
+	local vulnerability = 0
+	local armor_types = { "curse", "drill", "electricity", "explosion", "fire", "ice", "melee", "overeating", "physics_hit", "poison", "projectile", "radioactive", "slice", }
+	for i = 1,#armor_types do
+		vulnerability = vulnerability + ComponentObjectGetValue2( damage_comp, "damage_multipliers", armor_types[i] )
+	end
+	
+	local violence = 0
+	local animal_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "AnimalAIComponent" )
+	if( animal_comp ~= nil ) then
+		if( ComponentGetValue2( animal_comp, "attack_melee_enabled" )) then
+			violence = violence + ( ComponentGetValue2( animal_comp, "attack_melee_damage_min" ) + ComponentGetValue2( animal_comp, "attack_melee_damage_max" ))/2
+		end
+		if( ComponentGetValue2( animal_comp, "attack_ranged_enabled" )) then
+			violence = violence + math.min(( ComponentGetValue2( animal_comp, "attack_ranged_min_distance" ) + ComponentGetValue2( animal_comp, "attack_ranged_max_distance" ))/2, 500 )/200
+			violence = violence + 5/math.max( ComponentGetValue2( animal_comp, "attack_ranged_frames_between" ), 1 )
+			violence = violence*( 1 + 0.5*pen.b2n( ComponentGetValue2( animal_comp, "attack_ranged_predict" )))
+		end
+	end
+	if( EntityHasTag( enemy_id, "boss" ) or EntityHasTag( enemy_id, "miniboss" )) then
+		violence = violence + 5
+	end
+	
+	local overall_speed = 0
+	local platform_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "CharacterPlatformingComponent" )
+	local path_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "PathFindingComponent" )
+	if( platform_comp ~= nil and path_comp ~= nil ) then
+		if( ComponentGetValue2( path_comp, "can_walk" )) then
+			overall_speed = overall_speed + ComponentGetValue2( platform_comp, "run_velocity" )
+			if( ComponentGetValue2( path_comp, "can_fly" )) then
+				overall_speed = overall_speed + math.max( ComponentGetValue2( platform_comp, "fly_velocity_x" )/5, 10 )
+			end
+		elseif( ComponentGetValue2( path_comp, "can_fly" )) then
+			overall_speed = overall_speed + ComponentGetValue2( platform_comp, "fly_velocity_x" ) + 20
+		end
+	end
+	local fish_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "AdvancedFishAIComponent" ) or EntityGetFirstComponentIncludingDisabled( enemy_id, "FishAIComponent" )
+	if( overall_speed == 0 and fish_comp ~= nil and EntityHasTag( enemy_id, "helpless_animal" )) then
+		overall_speed = 300
+	end
+	
+	--hamis at 20m is ~1
+	local f_distance = 1 + 4/2^( 20/10 )
+	local f_speed = ( overall_speed + 0.01 )/10
+	local f_vulner = 0.77 + ( 3 - 0.26 )/( 1 + ( vulnerability/5 )^2.9 )
+	local f_supremacy = math.min( supremacy, 20 )/20
+	local f_violence = violence*10
+	local f_hp = hp*25
+	
+	local main = f_distance*f_speed*f_vulner*f_hp
+	local final_value = 0.25*( 0.08*( main - ( main > f_supremacy and f_supremacy or 0 )) + f_violence )
+	return pen.is_fucked( final_value ) and 0 or final_value
+end
+
+function pen.rate_wand( wand_id, shuffle, can_reload, capacity, reload_time, cast_delay, mana_max, mana_charge, spell_cast, spread )
+	local abil_comp = EntityGetFirstComponentIncludingDisabled( wand_id, "AbilityComponent" )
+	
+	if( shuffle == nil ) then
+		shuffle = b2n_old( ComponentObjectGetValue2( abil_comp, "gun_config", "shuffle_deck_when_empty" ))
+	end
+	if( can_reload == nil ) then
+		can_reload = not( ComponentGetValue2( abil_comp, "never_reload" ))
+	end
+	if( capacity == nil ) then
+		capacity = ComponentObjectGetValue2( abil_comp, "gun_config", "deck_capacity" )
+	end
+	
+	if( reload_time == nil ) then
+		reload_time = ComponentObjectGetValue2( abil_comp, "gun_config", "reload_time" )
+	end
+	if( cast_delay == nil ) then
+		cast_delay = ComponentObjectGetValue2( abil_comp, "gunaction_config", "fire_rate_wait" )
+	end
+	
+	if( mana_max == nil ) then
+		mana_max = ComponentGetValue2( abil_comp, "mana_max" )
+	end
+	if( mana_charge == nil ) then
+		mana_charge = ComponentGetValue2( abil_comp, "mana_charge_speed" )
+	end
+	
+	if( spell_cast == nil ) then
+		spell_cast = ComponentObjectGetValue2( abil_comp, "gun_config", "actions_per_round" )
+	end
+	if( spread == nil ) then
+		spread = ComponentObjectGetValue2( abil_comp, "gunaction_config", "spread_degrees" )
+	end
+	
+	--sollex is 1
+	local f_shuffle = 1 - 0.7*shuffle
+	local f_reloading = 2
+	if( can_reload ) then
+		f_reloading = 2 - ( 0.044/0.024 )*( 1 - math.exp( -0.024*reload_time ))
+	end
+	local f_capacity = 3.47 + ( 0.05 - 3.47 )/( 1 + (( capacity + 3 )/13.67 )^3.05 )
+	local f_delay = 2 - ( 0.044/0.024 )*( 1 - math.exp( -0.024*cast_delay ))
+	local f_mana_max = 1.5 + ( 0.06 - 1.5 )/( 1 + ( mana_max/6074441 )^1.416 )^237023
+	local f_mana_charge = 3.41 + ( 0.07 - 3.41 )/( 1 + ( mana_charge/14641850 )^1.314 )^251693
+	local f_multi = 2.58 + ( 1.017 - 2.58 )/( 1 + ( spell_cast/48023 )^1.63 )^983676
+	local f_spread = math.rad( 45 - spread )
+	
+	local final_value = 1500*f_delay*f_reloading*f_mana_max*f_mana_charge*math.sqrt( f_spread*f_multi )*f_shuffle*f_capacity^1.5
+	return pen.is_fucked( final_value ) and 0 or final_value
+end
+
+function pen.rate_spell( spell_id )
+	if( spell_id == nil or spell_id == "" ) then
+		return 0	
+	end
+	
+	local t_item_comp = EntityGetFirstComponentIncludingDisabled( spell_id, "ItemComponent" )
+	local t_act_comp = EntityGetFirstComponentIncludingDisabled( spell_id, "ItemActionComponent" )
+	local action_data = pen.get_action_with_id( ComponentGetValue2( t_act_comp, "action_id" ))
+	if( action_data == nil ) then
+		return 0
+	end
+	
+	local price = action_data.price
+	local uses_max = action_data.max_uses or -1
+	local mana = math.abs( action_data.mana or 0 )
+	local is_perma = pen.b2n( ComponentGetValue2( t_item_comp, "permanently_attached" ))
+	local uses_left = ComponentGetValue2( t_item_comp, "uses_remaining" )
+	
+	--sparkbolt is 1
+	local f_perma = 1 + 4*is_perma
+	local f_price = price/100
+	local f_uses = uses_left/uses_max
+	if( uses_left < 0 and uses_max > 0 ) then
+		f_uses = 2
+	end
+	local f_mana = 5.4 + ( 0.1 - 5.4 )/( 1 + ( mana/8420.3 )^0.367 )
+	
+	local final_value = 2.5*f_perma*f_price*f_uses*f_mana
+	return pen.is_fucked( final_value ) and 0 or final_value
+end
+
+function pen.rate_projectile( hooman, projectile_id )
+	if( EntityGetRootEntity( projectile_id ) ~= projectile_id ) then
+		return 0
+	end
+	
+	local proj_comp = EntityGetFirstComponentIncludingDisabled( projectile_id, "ProjectileComponent" )
+	local char_x, char_y = EntityGetTransform( hooman )
+	local proj_x, proj_y = EntityGetTransform( projectile_id )
+	
+	local proj_vel_x, proj_vel_y = GameGetVelocityCompVelocity( projectile_id )
+	local char_vel_x, char_vel_y = GameGetVelocityCompVelocity( hooman )
+	local proj_v = math.sqrt(( char_vel_x - proj_vel_x )^2 + ( char_vel_y - proj_vel_y )^2 )
+	
+	local d_x = proj_x - char_x
+	local d_y = proj_y - char_y
+	local direction = math.abs( math.rad( 180 ) - math.abs( math.atan2( proj_vel_x, proj_vel_y ) - math.atan2( d_x, d_y )))
+	local distance = math.sqrt(( d_x )^2 + ( d_y )^ 2 )
+	
+	local is_real = b2n_old( ComponentGetValue2( proj_comp, "collide_with_entities" ))
+	local lifetime = ComponentGetValue2( proj_comp, "lifetime" )
+	if( lifetime < 2 and lifetime > -1 ) then
+		lifetime = 1
+	end
+	
+	local total_damage = 0
+	local damage_types = { "curse", "drill", "electricity", "explosion", "fire", "ice", "melee", "overeating", "physics_hit", "poison", "projectile", "radioactive", "slice", }
+	for i = 1,#damage_types do
+		local dmg = ComponentObjectGetValue2( proj_comp, "damage_by_type", damage_types[i] )
+		if( dmg > 0 ) then
+			total_damage = total_damage + dmg
+		end
+	end
+	total_damage = total_damage + ComponentGetValue2( proj_comp, "damage" )
+	
+	local explosion_dmg = ComponentObjectGetValue2( proj_comp, "config_explosion", "damage" )
+	local explosion_rad = ComponentObjectGetValue2( proj_comp, "config_explosion", "explosion_radius" )
+	if( explosion_dmg > 0 ) then
+		explosion_dmg = explosion_dmg + explosion_rad/25
+		
+		if( distance <= explosion_rad ) then
+			explosion_dmg = explosion_dmg + ( explosion_rad - distance + 1 )/25
+		end
+	end
+	total_damage = total_damage + explosion_dmg
+	
+	--sparkbolt at 20m is ~1
+	local f_distance = 1 + 4/2^( distance/10 )
+	local f_direction = 0.02 + 1.08/2^( direction/0.6 )
+	local f_velocity = 0.1847 + ( 1 - math.exp( -0.0021*proj_v ))
+	local f_lifetime = ( 1.8*( lifetime - 1 )/lifetime + 0.3 )/2
+	local f_is_real = 0.5 + 0.5*is_real
+	local f_damage = total_damage*25
+	
+	local final_value = 0.15*f_distance*f_direction*f_lifetime*f_is_real*f_velocity*f_damage
+	return pen.is_fucked( final_value ) and 0 or final_value
+end
+
 --[FRONTEND]
+function pen.secs_to_time( secs )
+	secs = math.floor( secs )
+	local mins = math.floor( secs/60 )
+	secs = secs - mins*60
+	local hrs = math.floor( mins/60 )
+	mins = mins - hrs*60
+	local t = { hrs, mins, secs }
+
+	local out = tostring( hrs )
+	for i = 2,3 do
+		out = out..":"..string.sub( "0"..t[i], -2 )
+	end
+	return out
+end
+
 function pen.colourer( gui, c_type )
 	if( #c_type == 0 ) then return end
 	local color = { r = 0, g = 0, b = 0 }
@@ -754,6 +1717,37 @@ function pen.colourer( gui, c_type )
 		color.b = c_type[3] or 255
 	end
 	GuiColorSetForNextWidget( gui, color.r/255, color.g/255, color.b/255, 1 )
+end
+
+function pen.play_sound( event, x, y, no_bullshit )
+	if( type( event ) ~= "table" ) then
+		event = { "mods/penman/sfx/penman.bank", event, }
+	end
+	no_bullshit = no_bullshit or false
+	
+	if( not( no_bullshit )) then
+		local sfx_id = tostring( GameGetFrameNum())..event[2]
+		if( sound_played == sfx_id ) then
+			return
+		end
+		sound_played = sfx_id
+	end
+	
+	if( x == nil ) then
+		x, y = GameGetCameraPos()
+	end
+	GamePlaySound( event[1], event[2], x, y )
+end
+
+function pen.play_entity_sound( entity_id, x, y, event_mutator, no_bullshit )
+	local sound_table = {
+		ComponentGetValue2( get_storage( entity_id, "sound_bank" ), "value_string" ),
+		ComponentGetValue2( get_storage( entity_id, "sound_event" ), "value_string" )..( event_mutator or "" ),
+	}
+	if( sound_table[1] == "" ) then
+		return
+	end
+	pen.play_sound( sound_table, x, y, no_bullshit )
 end
 
 function pen.new_text( gui, pic_x, pic_y, pic_z, text, colours )
@@ -810,6 +1804,14 @@ function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic )
 	GuiOptionsAddForNextWidget( gui, 47 ) --NoSound
 	local clicked, r_clicked = GuiImageButton( gui, uid, pic_x, pic_y, "", pic )
 	return uid, clicked, r_clicked
+end
+
+--make it better
+function pen.new_blinker( gui, colour )
+	colour = rgb2hsv( colour )
+	local fancy_index = math.abs( math.cos( math.rad( GameGetFrameNum())))
+	colour = hsv2rgb( { colour[1], fancy_index*colour[2], math.max( colour[3], ( 1 - fancy_index )), colour[3] } )
+	GuiColorSetForNextWidget( gui, colour[1], colour[2], colour[3], colour[4] )
 end
 
 function pen.new_anim( gui, uid, auid, pic_x, pic_y, pic_z, path, amount, delay, s_x, s_y, alpha, interactive )
