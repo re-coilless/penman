@@ -1,17 +1,19 @@
 pen = pen or {}
 
+--https://github.com/LuaLS/lua-language-server/wiki/Annotations
+
 --new herd relations func (get it from Heres Ferrei)
---make proper edit comp function
 --make scripts to save and load entities
---make former penman stuff better
+--port text2func from old penman
 
 --reorder and move all the gui stuff to the very bottom
 --cleanup make sure all the funcs reference the right stuff
 
+--remove penman from index
 --transition mrshll to penman
 --add sfxes, default translations + some more assets
 --try putting some of the stuff inside internal lua global tables
---documentation time
+--add api doc to mnee
 
 --[MATH]
 function pen.b2n( a )
@@ -98,9 +100,13 @@ function pen.rotate_offset( x, y, angle )
 	return x*math.cos( angle ) - y*math.sin( angle ), x*math.sin( angle ) + y*math.cos( angle )
 end
 
-function pen.rounder( num, degree )
-	degree = degree or 1000
-	return math.floor( degree*num + 0.5 )/degree
+function pen.rounder( num, k )
+	k = k or 1000
+	if( k > 0 ) then
+		return math.floor( k*num + 0.5 )/k
+	else
+		return math.ceil( k*num - 0.5 )/k
+	end
 end
 
 --make this a proper anim lib
@@ -124,49 +130,104 @@ end
 -- 	return ( base^( value - goal ) - drift )*( drift + 1 )
 -- end
 
--- function get_camera_shake( hooman ) --make this work using new pointer func
-	-- hooman = hooman or get_player() or 0
-	-- if( hooman == 0 ) then
-		-- return 0, 0
-	-- end
-	
-	-- local m_r_x, m_r_y = ComponentGetValue2( EntityGetFirstComponentIncludingDisabled( hooman, "ControlsComponent" ), "mMousePositionRaw" )
-	-- local m_w_x, m_w_y = ComponentGetValue2( EntityGetFirstComponentIncludingDisabled( hooman, "ControlsComponent" ), "mMousePosition" )
-	-- gimme the actual resolution
-	-- local shit_from_ass = w/( MagicNumbersGetValue( "VIRTUAL_RESOLUTION_X" ) + MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_X" ))
-	
-	-- return 
--- end
-
---add screenshake correction
-function pen.world2gui( x, y, not_pos ) --thanks to ImmortalDamned for the fix
-	not_pos = not_pos or false
-	
+---Returns both GUI grid size and window size (the latter one is hardcoded to 720p for now).
+---@return number w, number h, number real_w, number real_h
+function pen.get_screen_data()
 	local gui = GuiCreate()
 	GuiStartFrame( gui )
-	local w, h = GuiGetScreenDimensions( gui )
-	GuiDestroy( gui )
-	
-	local view_x = ( MagicNumbersGetValue( "VIRTUAL_RESOLUTION_X" ) + MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_X" ))
-	local view_y = ( MagicNumbersGetValue( "VIRTUAL_RESOLUTION_Y" ) + MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_Y" ))
-	local massive_balls_x, massive_balls_y = w/view_x, h/view_y
 
-	local _,_, cancer_x, cancer_y = GameGetCameraBounds()
-	if( cancer_x/cancer_y < 1.7 ) then
-		massive_balls_x, massive_balls_y = massive_balls_x*massive_balls_y, massive_balls_x*massive_balls_y
+	local w, h = GuiGetScreenDimensions( gui )
+	-- GuiOptionsAddForNextWidget( gui, 51 ) --IsExtraDraggable
+	-- GuiOptionsAddForNextWidget( gui, 6 ) --NoPositionTween
+	-- GuiOptionsAddForNextWidget( gui, 4 ) --ClickCancelsDoubleClick
+	-- GuiOptionsAddForNextWidget( gui, 21 ) --DrawNoHoverAnimation
+	-- GuiOptionsAddForNextWidget( gui, 47 ) --NoSound
+	-- GuiZSetForNextWidget( gui, 1 )
+	-- GuiIdPush( gui, 1 )
+	-- GuiImageButton( gui, 1, w, h, "", "data/ui_gfx/empty.png" )
+	-- local _,_,_,_,_,_,_,real_w,real_h = GuiGetPreviousWidgetInfo( gui )
+	local real_w, real_h = 1280, 720 -- thanks Horscht
+
+	GuiDestroy( gui )
+
+	return w, h, real_w, real_h
+end
+
+---Returns delta in GUI units between in-world and on-screen pointer position.
+---@param w? number
+---@param h? number
+---@param real_w? number
+---@param real_h? number
+---@return number delta_x, number delta_y
+function pen.get_camera_shake( w, h, real_w, real_h, k )
+	if( w == nil ) then w, h, real_w, real_h = pen.get_screen_data() end
+	k = k or 1
+
+	local function purify( a, max )
+		return math.min( math.max( pen.rounder( a, -2 ), 0 ), max )
 	end
 
-	if( not( not_pos )) then
+	local x, y = DEBUG_GetMouseWorld()
+	local world_x, world_y, zoom = pen.world2gui( x, y, false, true )
+	world_x, world_y = purify( world_x, w ) + 1, purify( world_y, h )
+	
+	local screen_x, screen_y = InputGetMousePosOnScreen()
+	screen_x, screen_y = purify( w*screen_x/real_w, w ), purify( h*screen_y/real_h, h )
+	if( screen_x < 1 ) then
+		screen_x = 0
+		world_x = 0
+	elseif( screen_x <= 214 ) then
+		screen_x = screen_x - 1
+	elseif( screen_x < 427 ) then
+		screen_x = screen_x - 0.5
+	end
+	if( screen_y >= 296 ) then
+		screen_y = screen_y - 0.5
+	elseif( screen_y <= 147 ) then
+		screen_y = screen_y + 0.5
+	end
+	
+	local delta_x, delta_y = screen_x - world_x, screen_y - world_y
+	if( math.abs( delta_x ) < k and math.abs( delta_y ) < k ) then
+		return 0, 0
+	end
+	return delta_x, delta_y
+end
+
+---Calculates on-screen position from in-world coordinates.
+---@param x number
+---@param y number
+---@param is_raw? boolean
+---@param no_shake? boolean
+---@return number pic_x, number pic_y, table screen_scale
+function pen.world2gui( x, y, is_raw, no_shake ) --thanks to ImmortalDamned for the fix
+	is_raw = is_raw or false
+	no_shake = no_shake or is_raw
+	
+	local w, h, real_w, real_h = pen.get_screen_data()
+	local view_x = MagicNumbersGetValue( "VIRTUAL_RESOLUTION_X" ) + MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_X" )
+	local view_y = MagicNumbersGetValue( "VIRTUAL_RESOLUTION_Y" ) + MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_Y" )
+	local massive_balls_x, massive_balls_y = w/view_x, h/view_y
+	
+	if( not( is_raw )) then
 		local cam_x, cam_y = GameGetCameraPos()
 		x, y = ( x - ( cam_x - view_x/2 )), ( y - ( cam_y - view_y/2 ))
 	end
+	if( not( no_shake )) then
+		local shake_x, shake_y = pen.get_camera_shake( w, h, real_w, real_h, view_x/421 )
+		x, y = x + shake_x, y + shake_y
+	end
+	x, y = massive_balls_x*x, massive_balls_y*y
 	
-	return massive_balls_x*x, massive_balls_y*y, {massive_balls_x,massive_balls_y}
+	return x, y, {massive_balls_x,massive_balls_y}
 end
 
+---Returns on-screen pointer position.
+---@return number pointer_x, number pointer_y
 function pen.get_mouse_pos()
-	local m_x, m_y = DEBUG_GetMouseWorld()
-	return pen.world2gui( m_x, m_y )
+	local w,h,screen_w,screen_h = pen.get_screen_data()
+	local m_x, m_y = InputGetMousePosOnScreen()
+	return w*m_x/screen_w, h*m_y/screen_h
 end
 
 --[TECHNICAL]
@@ -999,6 +1060,30 @@ function pen.get_hooman_child( hooman, tag, ignore_id )
 	return nil
 end
 
+---Universal component-editing utility.
+---@param id entity_id|component_id
+---@param data table
+---@param func? function|value
+---@return any
+function pen.magic_comp( id, data, func )
+	if(( id or 0 ) == 0 ) then return end
+	if( type( data ) ~= "table" ) then data = {data} end
+
+	if( type( func or 0 ) ~= "function" ) then
+		local is_object = data[2] ~= nil
+		if( is_object ) then data[3] = data[2]; data[2] = data[1]; data[1] = data[3] end
+		local method = "Component"..( is_object and "Object" or "" )..( func == nil and "Get" or "Set" ).."Value2"
+		return _G[ method ]( id, data[1], data[2] or func, func )
+	else
+		local comps = EntityGetComponentIncludingDisabled( id, data[1], data[2]) or {}
+		if( #comps > 0 ) then
+			for i,comp in ipairs( comps ) do
+				if( func( comp, ComponentGetIsEnabled( comp ))) then break end
+			end
+		end
+	end
+end
+
 function pen.check_bounds( dot, pos, box )
 	if( box == nil ) then
 		return false
@@ -1790,7 +1875,7 @@ function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, s_x, s_y, alpha, int
 	GuiZSetForNextWidget( gui, pic_z )
 	uid = uid + 1
 	GuiIdPush( gui, uid )
-	GuiImage( gui, uid, pic_x, pic_y, pic, alpha, s_x, s_y, angle )
+	GuiImage( gui, uid, pic_x, pic_y, pic, alpha, s_x, s_y, angle, 2 )
 	return uid
 end
 
