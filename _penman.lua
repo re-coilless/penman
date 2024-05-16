@@ -2,16 +2,15 @@ pen = pen or {}
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---new herd relations func (get it from Heres Ferrei)
 --make scripts to save and load entities
---port text2func from old penman
+--text2func
 
 --reorder and move all the gui stuff to the very bottom
 --cleanup make sure all the funcs reference the right stuff
 
 --remove penman from index
 --transition mrshll to penman
---add sfxes, default translations + some more assets
+--add sfxes (separate banks for prospero, hermes, trigger) + pics
 --try putting some of the stuff inside internal lua global tables
 --add api doc to mnee
 
@@ -24,7 +23,8 @@ function pen.n2b( a )
 	return a > 0
 end
 
-function pen.is_fucked( value )
+--make it work wihth all datatypes
+function pen.is_valid( value )
 	return ( value ~= value or value == math.inf )
 end
 
@@ -572,6 +572,10 @@ function pen.from_tbl_with_id( tbl, id, subtract, custom_key, default )
 	return stuff, tbl_id
 end
 
+function pen.print_table( tbl )
+	print( pen.magic_packer( tbl ))
+end
+
 function pen.closest_getter( x, y, stuff, check_sight, limits, extra_check )
 	check_sight = check_sight or false
 	limits = limits or { 0, 0, }
@@ -706,13 +710,54 @@ function pen.get_translated_line( text )
 	return out
 end
 
-function pen.clean_append( to_file, from_file )
+function pen.magic_append( to_file, from_file )
 	local marker = "%-%-<{> MAGICAL APPEND MARKER <}>%-%-"
 	local line_wrecker = "\n\n\n"
 	
 	local a = ModTextFileGetContent( to_file )
 	local b = ModTextFileGetContent( from_file )
 	ModTextFileSetContent( to_file, string.gsub( a, marker, b..line_wrecker..marker ))
+end
+
+function pen.magic_herder(  )
+	--pass edited csv path, list of herds to override, default value
+
+	-- local vanilla_herd = "data/genome_relations.csv"
+	-- file = pen.t2l( ModTextFileGetContent( vanilla_herd ))
+	-- local _,count = string.gsub( file[1], ",", "" )
+	
+	-- for i,herd in ipairs( herd_relations ) do
+	-- 	file[1] = file[1]..","..herd.name
+	-- 	for e = 2,( count + i ) do
+	-- 		if( e < 37 ) then
+	-- 			file[e] = file[e]..","..herd.vanilla_vertical[ e - 1 ]
+	-- 		elseif( e > count - #herd_relations + i and herd.custom_vertical ~= nil ) then
+	-- 			local value = herd.custom_vertical[ e - ( count + 1 ) ] or herd.default_value
+	-- 			file[e] = file[e]..","..value
+	-- 		else
+	-- 			file[e] = file[e]..","..herd.default_value
+	-- 		end
+	-- 	end
+		
+	-- 	local new_line = herd.name
+	-- 	for e = 1,( count + i ) do
+	-- 		if( e < 36 ) then
+	-- 			new_line = new_line..","..herd.vanilla_horizontal[e]
+	-- 		elseif( e > count - #herd_relations and herd.custom_horizontal ~= nil ) then
+	-- 			local value = herd.custom_horizontal[ e - count ] or herd.default_value
+	-- 			new_line = new_line..","..value
+	-- 		else
+	-- 			new_line = new_line..","..herd.default_value
+	-- 		end
+	-- 	end
+	-- 	table.insert( file, new_line )
+	-- end
+	
+	-- local new_herd = ""
+	-- for i,line in ipairs( file ) do
+	-- 	new_herd = new_herd..line.."\n"
+	-- end
+	-- ModTextFileSetContent( vanilla_herd, new_herd )
 end
 
 function pen.set_translations( path )
@@ -878,7 +923,7 @@ function pen.magic_packer( data, separators )
 
 	local out = nil
 	if( type( data ) == "table" ) then
-		local depth = get_table_depth( data )
+		local depth = pen.get_table_depth( data )
 		if( pen.get_table_count( data ) > 0 and #separators >= depth ) then
 			out = XD_packer( data, separators )
 		end
@@ -1060,6 +1105,7 @@ function pen.get_hooman_child( hooman, tag, ignore_id )
 	return nil
 end
 
+--make this a hybrid documentation like table.insert
 ---Universal component-editing utility.
 ---@param id entity_id|component_id
 ---@param data table
@@ -1071,11 +1117,19 @@ function pen.magic_comp( id, data, func )
 
 	if( type( func or 0 ) ~= "function" ) then
 		local is_object = data[2] ~= nil
-		if( is_object ) then data[3] = data[2]; data[2] = data[1]; data[1] = data[3] end
 		local method = "Component"..( is_object and "Object" or "" )..( func == nil and "Get" or "Set" ).."Value2"
-		return _G[ method ]( id, data[1], data[2] or func, func )
+
+		if( type( func ) ~= "table" ) then func = {func} end
+		for i = 2,1,-1 do
+			if( data[i] ~= nil ) then
+				table.insert( func, 1, data[i])
+			end
+		end
+		table.insert( func, 1, id )
+		
+		return _G[ method ]( unpack( func ))
 	else
-		local comps = EntityGetComponentIncludingDisabled( id, data[1], data[2]) or {}
+		local comps = EntityGetComponentIncludingDisabled( unpack({ id, data[1], data[2]})) or {}
 		if( #comps > 0 ) then
 			for i,comp in ipairs( comps ) do
 				if( func( comp, ComponentGetIsEnabled( comp ))) then break end
@@ -1635,7 +1689,7 @@ function pen.rate_creature( enemy_id )
 	
 	local main = f_distance*f_speed*f_vulner*f_hp
 	local final_value = 0.25*( 0.08*( main - ( main > f_supremacy and f_supremacy or 0 )) + f_violence )
-	return pen.is_fucked( final_value ) and 0 or final_value
+	return pen.is_valid( final_value ) and 0 or final_value
 end
 
 function pen.rate_wand( wand_id, shuffle, can_reload, capacity, reload_time, cast_delay, mana_max, mana_charge, spell_cast, spread )
@@ -1686,7 +1740,7 @@ function pen.rate_wand( wand_id, shuffle, can_reload, capacity, reload_time, cas
 	local f_spread = math.rad( 45 - spread )
 	
 	local final_value = 1500*f_delay*f_reloading*f_mana_max*f_mana_charge*math.sqrt( f_spread*f_multi )*f_shuffle*f_capacity^1.5
-	return pen.is_fucked( final_value ) and 0 or final_value
+	return pen.is_valid( final_value ) and 0 or final_value
 end
 
 function pen.rate_spell( spell_id )
@@ -1717,7 +1771,7 @@ function pen.rate_spell( spell_id )
 	local f_mana = 5.4 + ( 0.1 - 5.4 )/( 1 + ( mana/8420.3 )^0.367 )
 	
 	local final_value = 2.5*f_perma*f_price*f_uses*f_mana
-	return pen.is_fucked( final_value ) and 0 or final_value
+	return pen.is_valid( final_value ) and 0 or final_value
 end
 
 function pen.rate_projectile( hooman, projectile_id )
@@ -1774,7 +1828,7 @@ function pen.rate_projectile( hooman, projectile_id )
 	local f_damage = total_damage*25
 	
 	local final_value = 0.15*f_distance*f_direction*f_lifetime*f_is_real*f_velocity*f_damage
-	return pen.is_fucked( final_value ) and 0 or final_value
+	return pen.is_valid( final_value ) and 0 or final_value
 end
 
 --[FRONTEND]

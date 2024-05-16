@@ -1,0 +1,11 @@
+cvs.lua - https://github.com/geoffleyland/lua-csv
+nxml.lua - https://github.com/zatherz/luanxml
+ser.lua - https://github.com/gvx/Ser
+complex.lua/matrix.lua - https://github.com/davidm/lua-matrix
+stringstore.lua/stringstore_variable.lua - https://github.com/zatherz/StringStore
+EZWand.lua - https://github.com/TheHorscht/EZWand
+
+dialog - https://github.com/TheHorscht/DialogSystem
+parallax - https://github.com/alex-3141/noita-parallax
+gusgui - https://github.com/ofoxsmith/gusgui
+pollnet - https://github.com/probable-basilisk/pollnet
