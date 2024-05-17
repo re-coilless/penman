@@ -4,7 +4,9 @@ pen = pen or {}
 
 --make scripts to save and load entities
 --text2func
+--add func that tests if comp field is accessible view pcall and fix entity cloning using it
 
+--update dialogsystem
 --reorder and move all the gui stuff to the very bottom
 --cleanup make sure all the funcs reference the right stuff
 
