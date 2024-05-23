@@ -1,16 +1,20 @@
+dofile_once( "data/scripts/lib/utilities.lua" )
+
 pen = pen or {}
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
+--penman set content functionality must be restored to fix pen.text2func
+--magic_packer does not work with string indexed stuff correctly + handle functions
 --make scripts to save and load entities
---text2func
---add func that tests if comp field is accessible view pcall and fix entity cloning using it
+--fix entity cloning using pen.catch
 
 --update dialogsystem
 --reorder and move all the gui stuff to the very bottom
 --cleanup make sure all the funcs reference the right stuff
+--make sure that all returned id values are 0 and not nil
 
---remove penman from index
+--remove old penman from index
 --transition mrshll to penman
 --add sfxes (separate banks for prospero, hermes, trigger) + pics
 --try putting some of the stuff inside internal lua global tables
@@ -25,9 +29,9 @@ function pen.n2b( a )
 	return a > 0
 end
 
---make it work wihth all datatypes
+--make it work with all datatypes
 function pen.is_valid( value )
-	return ( value ~= value or value == math.inf )
+	return not( value ~= value or value == math.inf )
 end
 
 function pen.random_bool( var )
@@ -234,13 +238,30 @@ end
 
 --[TECHNICAL]
 function pen.catch( f, input, fallback )
-	local is_good,stuff,oa,ob,oc,od,oe,of,og,oh = pcall(f, unpack( input or {}))
-	if( not( is_good )) then
-		print( stuff )
+	local out = { pcall(f, unpack( input or {}))}
+	if( not( out[1])) then
+		print( out[2])
 		return unpack( fallback or {false})
 	else
-		return stuff,oa,ob,oc,od,oe,of,og,oh
+		table.remove( out, 1 )
+		return unpack( out )
 	end
+end
+
+function pen.chrono( f, input, storage_comp, name )
+	local check = GameGetRealWorldTimeSinceStarted()*1000
+	local out = { f( unpack( input or {}))}
+	check = GameGetRealWorldTimeSinceStarted()*1000 - check
+
+	if( dump_id == nil ) then
+		print( check.."ms" )
+	else
+		pen.magic_comp( storage_comp, { value_string = function( old_val )
+			return old_val..name.."&"..check.."&"
+		end})
+	end
+
+	return unpack( out )
 end
 
 function pen.get_hybrid_function( func, input )
@@ -354,6 +375,19 @@ function pen.gui_killer( gui )
 	if( gui ~= nil ) then
 		GuiDestroy( gui )
 	end
+end
+
+function pen.text2func( name, text )
+	if( pen[ name ] == nil ) then
+		local top_g = "PENMAN_VIRTUAL_INDEX"
+		local num = GlobalsGetValue( top_g, 0 )
+		local path = "data/debug/vpn"..tonumber( num )..".lua"
+		
+		ModTextFileSetContent( path, "return "..text )
+		pen[ name ] = dofile( path )
+	end
+
+	return pen[ name ]
 end
 
 --[UTILS]
@@ -961,7 +995,6 @@ function pen.magic_shooter( who_shot, entity_file, x, y, v_x, v_y, do_thing, pro
 	return entity_id
 end
 
---make sure that Index's stuff is no better
 function pen.get_xy_matter( x, y, duration )
 	mtr_probe_memo = mtr_probe_memo or {
 		probe = EntityLoad( "mods/white_room/files/props/matter_test.xml", x, y ),
@@ -1077,17 +1110,34 @@ function pen.get_spell_id()
 end
 
 --[ECS]
-function pen.get_storage( hooman, name )
+function pen.get_storage( hooman, name, field, value )
+	local out = 0
+
 	local comps = EntityGetComponentIncludingDisabled( hooman, "VariableStorageComponent" ) or {}
 	if( #comps > 0 ) then
 		for i,comp in ipairs( comps ) do
 			if( ComponentGetValue2( comp, "name" ) == name ) then
-				return comp
+				out = comp
+				break
 			end
 		end
 	end
 	
-	return nil
+	if( out > 0 and field ~= nil ) then
+		if( value == nil ) then
+			out = { pen.magic_comp( out, field )}
+			return unpack( out )
+		else
+			pen.magic_comp( out, field, value )
+		end
+	end
+
+	return out
+end
+
+function pen.get_hooman()
+	local cam_x, cam_y = GameGetCameraPos()
+	return EntityGetClosestWithTag( cam_x, cam_y, "player_unit" ) or 0
 end
 
 function pen.get_hooman_child( hooman, tag, ignore_id )
@@ -1110,14 +1160,26 @@ end
 --make this a hybrid documentation like table.insert
 ---Universal component-editing utility.
 ---@param id entity_id|component_id
----@param data table
+---@param data table|string
 ---@param func? function|value
 ---@return any
 function pen.magic_comp( id, data, func )
 	if(( id or 0 ) == 0 ) then return end
 	if( type( data ) ~= "table" ) then data = {data} end
 
-	if( type( func or 0 ) ~= "function" ) then
+	if( #data == 0 ) then
+		for field,val in pairs( data ) do
+			local v = val
+			if( type( v ) == "function" ) then
+				v = { v( unpack({ComponentGetValue2( id, field )}))}
+			elseif( type( v ) ~= "table" ) then
+				v = { v }
+			end
+			table.insert( v, 1, field )
+			table.insert( v, 1, id )
+			ComponentSetValue2( unpack( v ))
+		end
+	elseif( type( func or 0 ) ~= "function" ) then
 		local is_object = data[2] ~= nil
 		local method = "Component"..( is_object and "Object" or "" )..( func == nil and "Get" or "Set" ).."Value2"
 
@@ -1403,6 +1465,18 @@ function pen.get_tinker_state( hooman, x, y )
 	end
 
 	return false
+end
+
+function pen.is_inv_active( hooman )
+	hooman = hooman or pen.get_hooman()
+	
+	local is_going = false
+	if( hooman > 0 ) then
+		pen.magic_comp( hooman, "InventoryGuiComponent", function( comp_id, is_enabled )
+			is_going = pen.magic_comp( comp_id, "mActive" )
+		end)
+	end
+	return is_going
 end
 
 function pen.get_custom_effect( hooman, effect_name, effect_id )
