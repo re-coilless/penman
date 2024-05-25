@@ -2,16 +2,34 @@ dofile_once( "data/scripts/lib/utilities.lua" )
 
 pen = pen or {}
 
+--[GLOBALS]
+pen.AI_CHECK = {
+	"AIAttackComponent",
+	"AdvancedFishAIComponent",
+	"AnimalAIComponent",
+	"BossDragonComponent",
+	"ControllerGoombaAIComponent",
+	"CrawlerAnimalComponent",
+	"FishAIComponent",
+	"PhysicsAIComponent",
+	"WormAIComponent",
+}
+
+pen.DIV_0 = "@"
+pen.DIV_1 = "&"
+pen.DIV_2 = "|"
+pen.DIV_3 = "!"
+pen.DIV_4 = ":"
+
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---penman set content functionality must be restored to fix pen.text2func
---magic_packer does not work with string indexed stuff correctly + handle functions
---make scripts to save and load entities
+--magic_parse does not work with string indexed stuff correctly + handle functions
 --fix entity cloning using pen.catch
+--make scripts to save and load entities
 
 --update dialogsystem
 --reorder and move all the gui stuff to the very bottom
---cleanup make sure all the funcs reference the right stuff
+--cleanup, make sure all the funcs reference the right stuff
 --make sure that all returned id values are 0 and not nil
 
 --remove old penman from index
@@ -257,7 +275,7 @@ function pen.chrono( f, input, storage_comp, name )
 		print( check.."ms" )
 	else
 		pen.magic_comp( storage_comp, { value_string = function( old_val )
-			return old_val..name.."&"..check.."&"
+			return old_val..name..pen.DIV_1..check..pen.DIV_1
 		end})
 	end
 
@@ -375,19 +393,6 @@ function pen.gui_killer( gui )
 	if( gui ~= nil ) then
 		GuiDestroy( gui )
 	end
-end
-
-function pen.text2func( name, text )
-	if( pen[ name ] == nil ) then
-		local top_g = "PENMAN_VIRTUAL_INDEX"
-		local num = GlobalsGetValue( top_g, 0 )
-		local path = "data/debug/vpn"..tonumber( num )..".lua"
-		
-		ModTextFileSetContent( path, "return "..text )
-		pen[ name ] = dofile( path )
-	end
-
-	return pen[ name ]
 end
 
 --[UTILS]
@@ -513,6 +518,16 @@ function pen.add_unique( lst, name )
 	table.insert( lst, name )
 end
 
+function pen.add_dynamic_fields( tbl, fields ) --thanks to ImmortalDamned
+    setmetatable( tbl, {
+        __index = function( _, k )
+            local f = fields[k]
+            return f and f()
+        end
+    })
+    return tbl
+end
+
 function pen.get_table_count( tbl, just_checking )
 	tbl = tbl or 0
 	if( type( tbl ) ~= "table" ) then
@@ -558,6 +573,10 @@ function pen.get_most_often( tbl )
 end
 
 function pen.from_tbl_with_id( tbl, id, subtract, custom_key, default )
+	if( tbl == nil ) then
+		return {}
+	end
+	
 	local stuff = default or 0
 	local tbl_id = nil
 	
@@ -609,7 +628,7 @@ function pen.from_tbl_with_id( tbl, id, subtract, custom_key, default )
 end
 
 function pen.print_table( tbl )
-	print( pen.magic_packer( tbl ))
+	print( pen.magic_parse( tbl ))
 end
 
 function pen.closest_getter( x, y, stuff, check_sight, limits, extra_check )
@@ -801,6 +820,10 @@ function pen.set_translations( path )
 	ModTextFileSetContent( main, ModTextFileGetContent( main )..string.gsub( file, "^[^\n]*\n", "" ))
 end
 
+function pen.ptrn( id )
+	return "([^"..pen[ "DIV_"..( id or 1 )].."]+)"
+end
+
 function pen.liner( text, length, height, length_k, clean_mode, forced_reverse )
 	local formated = {}
 	if( text ~= nil and text ~= "" ) then
@@ -811,8 +834,8 @@ function pen.liner( text, length, height, length_k, clean_mode, forced_reverse )
 			height = math.floor( height/9 )
 			local height_counter = 1
 			
-			local full_text = "@"..text.."@"
-			for line in string.gmatch( full_text, "([^@]+)" ) do
+			local full_text = pen.DIV_0..text..pen.DIV_0
+			for line in string.gmatch( full_text, pen.ptrn( 0 )) do
 				local rest = ""
 				local buffer = ""
 				local dont_touch = false
@@ -917,11 +940,11 @@ function pen.liner( text, length, height, length_k, clean_mode, forced_reverse )
 	return formated
 end
 
-function pen.magic_packer( data, separators )
+function pen.magic_parse( data, separators )
 	if( data == nil ) then
 		return
 	end
-	separators = separators or { "|", ":", "@", "&" }
+	separators = separators or { pen.DIV_1, pen.DIV_2, pen.DIV_3, pen.DIV_4 }
 
 	local function XD_packer( data, separators, i )
 		data = data or 0
