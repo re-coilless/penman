@@ -41,4 +41,6 @@ function lib.text2func( name, text )
 	return pen[ name ]
 end
 
+--make scripts to save(convert to nxml tbl) and load(via nxml tbl) entities
+
 pen.lib = lib

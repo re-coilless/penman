@@ -23,14 +23,13 @@ pen.DIV_4 = ":"
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---magic_parse does not work with string indexed stuff correctly + handle functions
---fix entity cloning using pen.catch
---make scripts to save and load entities
+--swap all 0/nil/"" checkign with proper pen.is_valid
 
 --update dialogsystem
 --reorder and move all the gui stuff to the very bottom
 --cleanup, make sure all the funcs reference the right stuff
 --make sure that all returned id values are 0 and not nil
+--actually test all the stuff
 
 --remove old penman from index
 --transition mrshll to penman
@@ -258,8 +257,12 @@ end
 function pen.catch( f, input, fallback )
 	local out = { pcall(f, unpack( input or {}))}
 	if( not( out[1])) then
-		print( out[2])
-		return unpack( fallback or {false})
+		if( not( pen.silent_catch )) then
+			print( out[2])
+		end
+		if( fallback ~= nil ) then
+			return unpack( fallback )
+		end
 	else
 		table.remove( out, 1 )
 		return unpack( out )
@@ -951,11 +954,13 @@ function pen.magic_parse( data, separators )
 		i = ( i or 0 ) + 1
 		local separator = separators[i]
 		if( separator == nil or type( data ) ~= "table" ) then
-			return data
+			return tostring( data )
 		end
-		
+
 		local data_raw = separator
+		local is_weird = pen.get_table_count( data, true ) > 0 and #data == 0
 		for name,value in pairs( data ) do
+			if( is_weird ) then data_raw = data_raw..name..separator end
 			data_raw = data_raw..XD_packer( value, separators, i )..separator
 		end
 		return data_raw
@@ -1562,23 +1567,57 @@ function pen.access_matter_damage( entity_id, matter, damage )
 	end
 end
 
-function pen.clone_comp( entity_id, comp_id, mutators )
+--worst case: cache all the is_supported/is_object data to get the spam only once
+function pen.clone_comp( entity_id, comp_id, mutators ) --mutators for objects
+	if( comp_id == nil ) then
+		return
+	end
+	
 	mutators = mutators or {}
 	mutators.obj = mutators.obj or {}
-	
+	pen.silent_catch = true
+
+	local comp_name = ComponentGetTypeName( comp_id )
+	local main_values = {
+		_tags = ( mutators._tags or ComponentGetTags( comp_id ))..( mutators.add_tags or "" ),
+	}
+	local object_values = {}
+	local extra_values = {}
+
 	local function is_object( field_name )
-		local names = { "gun_config", "gunaction_config", "config", "config_explosion", "damage_by_type", "damage_multipliers", "damage_critical", "laser",
-						"attack_melee_finish_config_explosion", "drug_fx_target", "m_drug_fx_current", "fx_add", "fx_multiply", }
+		return pen.catch( ComponentObjectGetMembers, { comp_id, field_name }) ~= nil
+	end
+	local function is_supported( field_name )
+		return pen.catch( ComponentGetValue2, { comp_id, field_name }) ~= nil
+	end
+	local function get_stuff( is_obj )
+		is_obj = is_obj or false
 		
-		for i,name in ipairs( names ) do
-			if( name == field_name ) then
-				return true
+		local stuff = is_obj and ComponentObjectGetMembers( comp_id, is_obj ) or ComponentGetMembers( comp_id )
+		for field in pairs( stuff ) do
+			if( is_object( field )) then
+				get_stuff( field )
+			elseif( is_supported( field )) then
+				if( mutators[field] == nil ) then
+					local value = ( is_obj and {ComponentObjectGetValue2( comp_id, is_obj, field )} or {ComponentGetValue2( comp_id, field )}) or {}
+					if( is_obj ) then
+						object_values[is_obj] = object_values[is_obj] or {}
+						object_values[is_obj][field] = value
+					elseif( #value > 0 ) then
+						if( #value == 1 and type( value[1]) ~= "table" ) then
+							main_values[field] = value[1]
+						else
+							extra_values[field] = value
+						end
+					end
+				elseif( mutators[field] ~= "[NOPE]" ) then
+					main_values[field] = mutators[field]
+				end
 			end
 		end
-		
-		return false
 	end
-	--do support by replacing the unsupported shit with table where [2] si the supported way of doing stuff
+	get_stuff()
+	
 	--[DamageModelComponent] mDamageMaterialsHowMuch, mDamageMaterials, mCollisionMessageMaterials
 	--[MaterialInventoryComponent] count_per_material_type
 	--[PhysicsPickUpComponent] transform
@@ -1586,114 +1625,23 @@ function pen.clone_comp( entity_id, comp_id, mutators )
 	--[InheritTransformComponent] Transform
 	--[ProjectileComponent] mDamagedEntities
 	--[GenomeDataComponent] friend_firemage, friend_thundermage
-	local function is_supported( comp_name, field_name )
-		local unsupported_names = {
-			MaterialInventoryComponent = { "count_per_material_type", },
-			GenomeDataComponent = { "friend_firemage", "friend_thundermage", },
-			BiomeTrackerComponent = { "current_biome", },
-			AttachToEntityComponent = { "Transform", },
-			InheritTransformComponent = { "Transform", },
-			DamageModelComponent = { "mCollisionMessageMaterials", "mDamageMaterialsHowMuch", "mMaterialDamageThisFrame", "mDamageMaterials", "mCollisionMessageMaterialCountsThisFrame", },
-			GameLogComponent = { "mVisitiedBiomes", },
-			StatusEffectDataComponent = { "stain_effects", "effects_previous", "ingestion_effects", "ingestion_effect_causes", "ingestion_effect_causes_many", "mStainEffectsSmoothedForUI", },
-			LuaComponent = { "mLuaManager", "mPersistentValues", },
-			SpriteComponent = { "mRenderList", "mSprite", },
-			ParticleEmitterComponent = { "m_collision_angles", "m_cached_image_animation", },
-			AnimalAIComponent = { "mAiStateStack", "mCurrentJob", },
-			LightComponent = { "mSprite", },
-			PlayerCollisionComponent = { "mPhysicsCollisionHax", },
-			WorldStateComponent = { "pending_portals", "orbs_found_thisrun", "cuts_through_world", "npc_parties", "apparitions_per_level", "lua_globals", },
-			MaterialSuckerComponent = { "randomized_position", },
-			SpriteAnimatorComponent = { "mStates", "mCachedTargetSpriteTag", },
-			PixelSpriteComponent = { "mPixelSprite", },
-			VerletPhysicsComponent = { "sprite", "links", "colors", "materials", },
-			VerletWorldJointComponent = { "mCell", },
-			IngestionComponent = { "m_ingestion_satiation_material_cache", },
-			ExplosionComponent = { "damage_critical", },
-			ExplodeOnDamageComponent = { "delay", "damage_critical", "physics_explosion_power", "impl_position", },
-			PhysicsBodyComponent = { "mLocalPosition", "mBody", "mBodyId", },
-			PhysicsBody2Component = { "mBody", "mBodyId", },
-			PhysicsImageShapeComponent = { "mBody", },
-			ProjectileComponent = { "mTriggers", "mDamagedEntities", "damage_critical", },
-			IKLimbsAnimatorComponent = { "mLimbStates", },
-			IKLimbWalkerComponent = { "mState", },
-			IKLimbAttackerComponent = { "mState", },
-			SpriteStainsComponent = { "mData", "mState", "mTextureHandle", },
-			InventoryGuiComponent = { "imgui", "mLastPurchasedAction", },
-			TeleportComponent = { "state", },
-			PathFindingComponent = { "debug_path", "input", "job_result_receiver", "jump_trajectories", "mFallbackLogic", "mSelectedLogic", "mLogic", "mState", "path", "path_next_node", "path_previous_node", },
-			PathFindingGridMarkerComponent = { "mNode", },
-			PhysicsJointComponent = { "mJoint", },
-			PhysicsJoint2MutatorComponent = { "mBox2DJointId", },
-			PhysicsPickUpComponent = { "leftJoint", "rightJoint", "transform", },
-			GunComponent = { "mLuaManager", },
-		}
-		
-		local fields = unsupported_names[comp_name]
-		if( fields ~= nil ) then
-			for i,name in ipairs( fields ) do
-				if( name == field_name ) then
-					return false
-				end
-			end
-		end
-		
-		return true
-	end
-	
-	local main_values = {
-		_tags = ( mutators.tags or ComponentGetTags( comp_id ))..( mutators.add_tags or "" ),
-	}
-	local object_values = {}
-	local extra_values = {}
-	
-	local comp_name = ComponentGetTypeName( comp_id )
-	local function get_stuff( is_obj )
-		is_obj = is_obj or false
-		
-		local stuff = is_obj and ComponentObjectGetMembers( comp_id, is_obj ) or ComponentGetMembers( comp_id )
-		for field in pairs( stuff ) do
-			if( is_supported( comp_name, field )) then
-				if( is_object( field )) then
-					get_stuff( field )
-				else
-					if( mutators[field] ~= nil ) then
-						if( mutators[field] ~= "[[FUCKTHIS]]" ) then
-							main_values[field] = mutators[field]
-						end
-					else
-						local value = ( is_obj and {ComponentObjectGetValue2( comp_id, is_obj, field )} or {ComponentGetValue2( comp_id, field )}) or {}
-						if( is_obj ) then
-							object_values[is_obj] = object_values[is_obj] or {}
-							object_values[is_obj][field] = value
-						elseif( #value > 0 ) then
-							if( #value == 1 and type( value[1]) ~= "table" ) then
-								value = value[1]
-								-- if( type( value ) == "boolean" ) then
-									-- value = value and 1 or 0
-								-- end
-								main_values[field] = value--tostring( value )
-							else
-								extra_values[field] = value
-							end
-						end
-					end
-				end
-			end
-		end
-	end
-	get_stuff()
 	
 	comp_id = EntityAddComponent2( entity_id, comp_name, main_values )
 	for object,values in pairs( object_values ) do
 		for field,value in pairs( values ) do
-			ComponentObjectSetValue2( comp_id, object, field, value[1], value[2], value[3], value[4] )
+			table.insert( value, 1, field )
+			table.insert( value, 1, object )
+			table.insert( value, 1, comp_id )
+			ComponentObjectSetValue2( unpack( value ))
 		end
 	end
 	for field,value in pairs( extra_values ) do
-		ComponentSetValue2( comp_id, field, value[1], value[2], value[3], value[4] )
+		table.insert( value, 1, field )
+		table.insert( value, 1, comp_id )
+		ComponentSetValue2( unpack( value ))
 	end
 	
+	pen.silent_catch = nil
 	return comp_id
 end
 
