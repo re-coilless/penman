@@ -36,5 +36,5 @@ function OnWorldPostUpdate()
 		ComponentSetValue2( storage_request, "value_string", pen.DIV_1 )
 	end
 	
-	dofile( "mods/penman/extra/check_em.lua" )
+	-- dofile( "mods/penman/extra/check_em.lua" )
 end
