@@ -2,29 +2,17 @@ dofile_once( "data/scripts/lib/utilities.lua" )
 
 pen = pen or {}
 
---[GLOBALS]
-pen.AI_CHECK = {
-	"AIAttackComponent",
-	"AdvancedFishAIComponent",
-	"AnimalAIComponent",
-	"BossDragonComponent",
-	"ControllerGoombaAIComponent",
-	"CrawlerAnimalComponent",
-	"FishAIComponent",
-	"PhysicsAIComponent",
-	"WormAIComponent",
-}
-
-pen.DIV_0 = "@"
-pen.DIV_1 = "&"
-pen.DIV_2 = "|"
-pen.DIV_3 = "!"
-pen.DIV_4 = ":"
-
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
+
+-- add custom field handling funcs to clone_comp
+-- matter_fabricator
+-- rate_creature
+-- from_tbl_with_id
+-- magic_herder
 
 --interpolation lib
 --new font system
+--lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
 
 --update dialogsystem
 --reorder and move all the gui stuff to the very bottom
@@ -311,6 +299,18 @@ function pen.get_hybrid_function( func, input )
 		return pen.catch( func, input )
 	else
 		return func
+	end
+end
+
+function pen.get_hybrid_table( table )
+	if( not( pen.vld( table ))) then
+		return
+	end
+	
+	if( type( table ) == "table" ) then
+		return table
+	else
+		return {table}
 	end
 end
 
@@ -762,16 +762,19 @@ function pen.get_killable_stuff( c_x, c_y, r )
 	return pen.add_table( pen.add_table( stuff, EntityGetInRadiusWithTag( c_x, c_y, r, "hittable" ) or {} ), EntityGetInRadiusWithTag( c_x, c_y, r, "mortal" ) or {} )
 end
 
---more cleaning
 function pen.t2t( str )
 	return string.gsub( str, "\r\n", "\n" )
 end
 
-function pen.t2l( str )
+function pen.t2l( str, string_indexed )
 	local t = {}
 	
 	for line in string.gmatch( pen.t2t( str ), "([^\n]+)" ) do
-		table.insert( t, line )
+		if( string_indexed ) then
+			t[ line ] = 1
+		else
+			table.insert( t, line )
+		end
 	end
 	
 	return t
@@ -1214,20 +1217,23 @@ function pen.get_hooman_child( hooman, tag, ignore_id )
 	return nil
 end
 
---make this a hybrid documentation like table.insert
----Universal component-editing utility.
----@param id entity_id|component_id
+---Universal component-getting utility.
+---@param id entity_id
 ---@param data table|string
----@param func? function|value
+---@param func? value
+---@return any
+function pen.magic_comp( id, data, func ) end
+---Universal component-editing utility.
+---@param id component_id
+---@param data table|string
+---@param func? value
 ---@return any
 function pen.magic_comp( id, data, func )
 	if( not( pen.vld( id, true ))) then
 		return
 	end
-	if( type( data ) ~= "table" ) then
-		data = {data}
-	end
-
+	data = pen.get_hybrid_table( data )
+	
 	if( #data == 0 ) then
 		for field,val in pairs( data ) do
 			local v = val
@@ -1257,7 +1263,9 @@ function pen.magic_comp( id, data, func )
 		local comps = EntityGetComponentIncludingDisabled( unpack({ id, data[1], data[2]}))
 		if( pen.vld( comps )) then
 			for i,comp in ipairs( comps ) do
-				if( func( comp, ComponentGetIsEnabled( comp ))) then break end
+				if( func( comp, ComponentGetIsEnabled( comp ))) then
+					return comp
+				end
 			end
 		end
 	end
@@ -1599,98 +1607,135 @@ function pen.access_matter_damage( entity_id, matter, damage )
 	end
 end
 
-function pen.clone_comp( entity_id, comp_id, mutators ) --mutators for objects
+function pen.catch_comp( comp_name, field_name, index, func, args, will_set )
+	will_set = will_set or false
+	pen.catch_comp_cache = pen.catch_comp_cache or {}
+	pen.catch_comp_cache[ comp_name ] = pen.catch_comp_cache[ comp_name ] or {}
+	pen.catch_comp_cache[ comp_name ][ field_name ] = pen.catch_comp_cache[ comp_name ][ field_name ] or {}
+
+	local v = pen.catch_comp_cache[ comp_name ][ field_name ][ index ]
+	local check_val = 0
+	if( pen.CANCER_COMPS[ comp_name ] ~= nil ) then
+		if( index == 2 ) then
+			check_val = pen.CANCER_COMPS[ comp_name ][ field_name ] or -2
+		else
+			check_val = pen.CANCER_COMPS[ comp_name ][ field_name ] or check_val
+		end
+	end
+	if( check_val < 0 and index == 2 ) then
+		v = check_val == -1
+	elseif( check_val > 0 and ( check_val > 2 or not( will_set ))) then
+		v = check_val == 2
+	end
+
+	if( not( pen.vld( v ))) then
+		pen.silent_catch = true
+		v = pen.catch( func, args ) ~= nil
+		pen.catch_comp_cache[ comp_name ][ field_name ][ index ] = v or will_set --cannot check write
+		pen.silent_catch = nil
+	end
+
+	return v
+end
+
+function pen.clone_comp( entity_id, comp_id, mutators )
 	if( not( pen.vld( comp_id, true ))) then
 		return
 	end
 	
 	mutators = mutators or {}
-	mutators.obj = mutators.obj or {}
-
+	
 	local comp_name = ComponentGetTypeName( comp_id )
 	local main_values = {
+		_enabled = ComponentGetIsEnabled( comp_id ),
 		_tags = ( mutators._tags or ComponentGetTags( comp_id ))..( mutators.add_tags or "" ),
 	}
 	local object_values = {}
 	local extra_values = {}
 
-	pen.clone_comp_cache = pen.clone_comp_cache or {}
-	pen.clone_comp_cache[ comp_name ] = pen.clone_comp_cache[ comp_name ] or {}
-	pen.silent_catch = true
-
 	local function is_supported( field_name, is_obj )
-		pen.clone_comp_cache[ comp_name ][ field_name ] = pen.clone_comp_cache[ comp_name ][ field_name ] or {}
-		is_obj = is_obj or false
-
-		local v = pen.clone_comp_cache[ comp_name ][ field_name ][ 1 + pen.b2n( is_obj )]
-		if( not( pen.vld( v ))) then
-			v = pen.catch( is_obj and ComponentObjectGetMembers or ComponentGetValue2, { comp_id, field_name }) ~= nil
-			pen.clone_comp_cache[ comp_name ][ field_name ][ 1 + pen.b2n( is_obj )] = v
+		local f = ComponentGetValue2
+		local input = { comp_id, field_name }
+		if( type( is_obj or false ) == "string" ) then
+			field_name = is_obj..field_name
+			table.insert( input, input[2])
+			input[2] = is_obj
+			is_obj = false
+			f = ComponentObjectGetValue2
+		elseif( is_obj ) then
+			f = ComponentObjectGetMembers
 		end
-		return v
+
+		return pen.catch_comp( comp_name, field_name, 1 + pen.b2n( is_obj ), f, input )
 	end
-	local function get_stuff( is_obj )
-		is_obj = is_obj or false
+	local function set_stuff( field, value )
+		if( #value == 1 ) then
+			main_values[field] = value[1]
+		elseif( type( value[1]) ~= "table" ) then
+			extra_values[field] = value
+		end
+	end
+	local function get_stuff( obj )
+		obj = obj or false
+		local nomarker = "[NOPE]"
 		
-		local stuff = is_obj and ComponentObjectGetMembers( comp_id, is_obj ) or ComponentGetMembers( comp_id )
+		local stuff = obj and ComponentObjectGetMembers( comp_id, obj ) or ComponentGetMembers( comp_id )
 		for field in pairs( stuff ) do
-			if( is_supported( field, true )) then
+			if( not( obj ) and is_supported( field, true )) then
 				get_stuff( field )
-			elseif( is_supported( field )) then
-				if( mutators[field] == nil ) then
-					local value = ( is_obj and {ComponentObjectGetValue2( comp_id, is_obj, field )} or {ComponentGetValue2( comp_id, field )}) or {}
-					if( is_obj ) then
-						object_values[is_obj] = object_values[is_obj] or {}
-						object_values[is_obj][field] = value
-					elseif( #value > 0 ) then
-						if( #value == 1 and type( value[1]) ~= "table" ) then
-							main_values[field] = value[1]
-						else
-							extra_values[field] = value
+			elseif( is_supported( field, obj )) then
+				if( obj or not( pen.vld( mutators[field]))) then
+					local value = obj and {ComponentObjectGetValue2( comp_id, obj, field )} or {ComponentGetValue2( comp_id, field )}
+					if( obj ) then
+						object_values[obj] = object_values[obj] or {}
+						if( not( pen.vld( mutators[obj])) or not( pen.vld( mutators[obj][field]))) then
+							if( pen.vld( value )) then
+								object_values[obj][field] = value
+							end
+						elseif( mutators[obj][field] ~= nomarker ) then
+							object_values[obj][field] = pen.get_hybrid_table( mutators[obj][field])
 						end
+					elseif( pen.vld( value )) then
+						set_stuff( field, value )
 					end
-				elseif( mutators[field] ~= "[NOPE]" ) then
-					main_values[field] = mutators[field]
+				elseif( mutators[field] ~= nomarker ) then
+					set_stuff( field, pen.get_hybrid_table( mutators[field]))
 				end
 			end
 		end
 	end
+
+	if( pen.clone_comp_debug ) then
+		print( comp_name )
+	end
 	get_stuff()
-	
-	--[DamageModelComponent] mDamageMaterialsHowMuch, mDamageMaterials, mCollisionMessageMaterials
-	--[MaterialInventoryComponent] count_per_material_type
-	--[PhysicsPickUpComponent] transform
-	--[AttachToEntityComponent] Transform
-	--[InheritTransformComponent] Transform
-	--[ProjectileComponent] mDamagedEntities
-	--[GenomeDataComponent] friend_firemage, friend_thundermage
-	
-	comp_id = EntityAddComponent2( entity_id, comp_name, main_values )
-	for object,values in pairs( object_values ) do
-		for field,value in pairs( values ) do
+	if(( pen.clone_comp_debug or 1 ) == 1 ) then
+		comp_id = EntityAddComponent2( entity_id, comp_name, main_values )
+		for object,values in pairs( object_values ) do
+			for field,value in pairs( values ) do
+				table.insert( value, 1, field )
+				table.insert( value, 1, object )
+				table.insert( value, 1, comp_id )
+				pen.catch_comp( comp_name, object..field, 3, ComponentObjectSetValue2, value, true )
+			end
+		end
+		for field,value in pairs( extra_values ) do
 			table.insert( value, 1, field )
-			table.insert( value, 1, object )
 			table.insert( value, 1, comp_id )
-			ComponentObjectSetValue2( unpack( value ))
+			pen.catch_comp( comp_name, field, 3, ComponentSetValue2, value, true )
 		end
 	end
-	for field,value in pairs( extra_values ) do
-		table.insert( value, 1, field )
-		table.insert( value, 1, comp_id )
-		ComponentSetValue2( unpack( value ))
-	end
 	
-	pen.silent_catch = nil
 	return comp_id
 end
 
 function pen.clone_entity( entity_id, x, y, mutators )
 	mutators = mutators or {}
-	mutators[entity_id] = mutators[entity_id] or {}
+	mutators[entity_id] = mutators[entity_id] or mutators
 
 	local new_id = EntityCreateNew( EntityGetName( entity_id ))
 	EntitySetTransform( new_id, x, y )
-
+	
 	local tags = EntityGetTags( entity_id ) or ""
 	for value in string.gmatch( tags, "([^,]+)" ) do
 		EntityAddTag( new_id, value )
@@ -1698,13 +1743,28 @@ function pen.clone_entity( entity_id, x, y, mutators )
 	local comps = EntityGetAllComponents( entity_id )
 	if( pen.vld( comps )) then
 		for i,comp in ipairs( comps ) do
-			clone_comp( new_id, comp, mutators[entity_id][comp] or {})
+			local comp_name = ComponentGetTypeName( comp )
+			pen.catch( pen.clone_comp, { new_id, comp, mutators[entity_id][comp] or mutators[entity_id][comp_name]})
 		end
 	end
 	local children = EntityGetAllChildren( entity_id )
 	if( pen.vld( children )) then
 		for i,child in ipairs( children ) do
 			EntityAddChild( new_id, clone_entity( child, x, y, mutators ))
+		end
+	end
+	
+	if( pen.clone_comp_debug == true ) then
+		for name,fields in pen.magic_sorter( pen.catch_comp_cache ) do
+			print( "**************"..name )
+			for field,tbl in pen.magic_sorter( fields ) do
+				if( tbl[1] == false ) then
+					print( field )
+				end
+				if( tbl[2] == true ) then
+					print( "OBJECT: "..field )
+				end
+			end
 		end
 	end
 
@@ -2073,3 +2133,358 @@ function pen.new_cutout( gui, uid, pic_x, pic_y, size_x, size_y, func, v )
 
 	return uid
 end
+
+--[GLOBALS]
+pen.DIV_0 = "@"
+pen.DIV_1 = "&"
+pen.DIV_2 = "|"
+pen.DIV_3 = "!"
+pen.DIV_4 = ":"
+
+pen.AI_COMPS = {
+	AIAttackComponent = 1,
+	AdvancedFishAIComponent = 1,
+	AnimalAIComponent = 1,
+	BossDragonComponent = 1,
+	ControllerGoombaAIComponent = 1,
+	CrawlerAnimalComponent = 1,
+	FishAIComponent = 1,
+	PhysicsAIComponent = 1,
+	WormAIComponent = 1,
+}
+
+pen.CANCER_COMPS = {
+	-- -1 is an object; -2 is not an object (defaults to -2 if the component table is empty, else checks)
+	-- on nil will check, 1 is an invalid write with checked read, 2 is a fully valid field, 3 is a fully invalid field
+
+	--[DamageModelComponent] mDamageMaterialsHowMuch, mDamageMaterials, mCollisionMessageMaterials
+	--[MaterialInventoryComponent] count_per_material_type
+	--[PhysicsPickUpComponent] transform
+	--[AttachToEntityComponent] Transform
+	--[InheritTransformComponent] Transform
+	--[ProjectileComponent] mDamagedEntities
+	--[GenomeDataComponent] friend_firemage, friend_thundermage
+
+	AIAttackComponent = {},
+	AIComponent = {
+		data = 3,
+	},
+	AbilityComponent = {
+		gun_config = -1,
+		gunaction_config = -1,
+	},
+	AdvancedFishAIComponent = {},
+	AltarComponent = {
+		m_recognized_entity_tags = 3,
+		m_current_entity_tags = 3,
+	},
+	AnimalAIComponent = {
+		attack_melee_finish_config_explosion = -1,
+		attack_melee_finish_config_explosiondamage_critical = 3,
+		mCurrentJob = 3,
+		mAiStateStack = 3,
+	},
+	ArcComponent = {},
+	AreaDamageComponent = {},
+	AttachToEntityComponent = {},
+	AudioComponent = {},
+	AudioListenerComponent = {},
+	AudioLoopComponent = {},
+	BiomeTrackerComponent = {
+		current_biome = 3,
+	},
+	BlackHoleComponent = {},
+	BookComponent = {},
+	BossDragonComponent = {},
+	CameraBoundComponent = {},
+	CardinalMovementComponent = {},
+	CellEaterComponent = {
+		materials = 1,
+	},
+	CharacterCollisionComponent = {},
+	CharacterDataComponent = {},
+	CharacterPlatformingComponent = {},
+	CharacterStatsComponent = {
+		stats = 3,
+	},
+	CollisionTriggerComponent = {},
+	ConsumableTeleportComponent = {},
+	ControllerGoombaAIComponent = {},
+	ControlsComponent = {},
+	CrawlerAnimalComponent = {},
+	CutThroughWorldDoneHereComponent = {},
+	DamageModelComponent = {
+		damage_multipliers = -1,
+		mCollisionMessageMaterials = 1,
+		mDamageMaterialsHowMuch = 1,
+		mDamageMaterials = 1,
+		mMaterialDamageThisFrame = 1,
+		mCollisionMessageMaterialCountsThisFrame = 1,
+	},
+	DamageNearbyEntitiesComponent = {},
+	DebugFollowMouseComponent = {},
+	DebugLogMessagesComponent = {},
+	DebugSpatialVisualizerComponent = {},
+	DieIfSpeedBelowComponent = {},
+	DroneLauncherComponent = {},
+	DrugEffectComponent = {
+		drug_fx_target = -1,
+		m_drug_fx_current = -1,
+	},
+	DrugEffectModifierComponent = {
+		fx_add = -1,
+		fx_multiply = -1,
+	},
+	ElectricChargeComponent = {},
+	ElectricityReceiverComponent = {},
+	ElectricitySourceComponent = {},
+	EndingMcGuffinComponent = {},
+	EnergyShieldComponent = {},
+	ExplodeOnDamageComponent = {
+		config_explosion = -1,
+		config_explosiondamage_critical = 3,
+	},
+	ExplosionComponent = {
+		config_explosion = -1,
+		config_explosiondamage_critical = 3,
+	},
+	FishAIComponent = {},
+	FlyingComponent = {},
+	FogOfWarRadiusComponent = {},
+	FogOfWarRemoverComponent = {},
+	GameAreaEffectComponent = {
+		game_effect_entitities = 1,
+		mEntitiesAppliedOutTo = 1,
+		mEntitiesAppliedFrame = 1,
+	},
+	GameEffectComponent = {},
+	GameLogComponent = {
+		mVisitiedBiomes = 1,
+	},
+	GameStatsComponent = {},
+	GasBubbleComponent = {},
+	GenomeDataComponent = {
+		friend_firemage = 1,
+		friend_thundermage = 1,
+	},
+	GhostComponent = {},
+	GodInfoComponent = {
+		god_entity = 3,
+	},
+	GunComponent = {
+		mLuaManager = 3,
+	},
+	HealthBarComponent = {},
+	HitEffectComponent = {},
+	HitboxComponent = {},
+	HomingComponent = {},
+	HotspotComponent = {},
+	IKLimbAttackerComponent = {
+		mState = 3,
+	},
+	IKLimbComponent = {},
+	IKLimbWalkerComponent = {},
+	IKLimbsAnimatorComponent = {
+		mLimbStates = 3,
+	},
+	IngestionComponent = {
+		m_ingestion_satiation_material_cache = 3,
+	},
+	InheritTransformComponent = {},
+	InteractableComponent = {},
+	Inventory2Component = {},
+	InventoryComponent = {
+		items = 3,
+		update_listener = 3,
+	},
+	InventoryGuiComponent = {
+		imgui = 3,
+		mLastPurchasedAction = 3,
+	},
+	ItemAIKnowledgeComponent = {},
+	ItemActionComponent = {},
+	ItemAlchemyComponent = {},
+	ItemChestComponent = {},
+	ItemComponent = {},
+	ItemCostComponent = {},
+	ItemPickUpperComponent = {},
+	ItemRechargeNearGroundComponent = {},
+	ItemStashComponent = {},
+	KickComponent = {},
+	LaserEmitterComponent = {
+		laser = -1,
+	},
+	LevitationComponent = {},
+	LifetimeComponent = {},
+	LightComponent = {
+		mSprite = 3,
+	},
+	LightningComponent = {
+		config_explosion = -1,
+		config_explosiondamage_critical = 3,
+	},
+	LimbBossComponent = {},
+	LiquidDisplacerComponent = {},
+	LoadEntitiesComponent = {},
+	LocationMarkerComponent = {},
+	LooseGroundComponent = {},
+	LuaComponent = {
+		mPersistentValues = 3,
+		mLuaManager = 3,
+	},
+	MagicConvertMaterialComponent = {
+		mFromMaterialArray = 1,
+		mToMaterialArray = 1,
+	},
+	ManaReloaderComponent = {},
+	MaterialAreaCheckerComponent = {},
+	MaterialInventoryComponent = {
+		count_per_material_type = 1,
+	},
+	MaterialSeaSpawnerComponent = {},
+	MaterialSuckerComponent = {},
+	MoveToSurfaceOnCreateComponent = {},
+	MusicEnergyAffectorComponent = {},
+	NinjaRopeComponent = {
+		mSegments = 3,
+	},
+	NullDamageComponent = {},
+	OrbComponent = {},
+	ParticleEmitterComponent = {
+		m_collision_angles = 3,
+		m_cached_image_animation = 3,
+	},
+	PathFindingComponent = {
+		mFallbackLogic = 3,
+		path_next_node = 3,
+		mState = 3,
+		input = 3,
+		jump_trajectories = 3,
+		path_previous_node = 3,
+		debug_path = 3,
+		job_result_receiver = 3,
+		mSelectedLogic = 3,
+		mLogic = 3,
+		path = 3,
+	},
+	PathFindingGridMarkerComponent = {
+		mNode = 3,
+	},
+	PhysicsAIComponent = {},
+	PhysicsBody2Component = {
+		mBody = 3,
+		mBodyId = 3,
+	},
+	PhysicsBodyCollisionDamageComponent = {},
+	PhysicsBodyComponent = {
+		mBody = 3,
+		mBodyId = 3,
+		mLocalPosition = 3,
+	},
+	PhysicsImageShapeComponent = {
+		mBody = 3,
+	},
+	PhysicsJoint2Component = {},
+	PhysicsJoint2MutatorComponent = {
+		mBox2DJointId = 3,
+	},
+	PhysicsJointComponent = {
+		mJoint = 3,
+	},
+	PhysicsKeepInWorldComponent = {},
+	PhysicsPickUpComponent = {
+		leftJoint = 3,
+		rightJoint = 3,
+	},
+	PhysicsRagdollComponent = {
+		bodies = 3,
+	},
+	PhysicsShapeComponent = {},
+	PhysicsThrowableComponent = {},
+	PixelSceneComponent = {},
+	PixelSpriteComponent = {
+		mPixelSprite = 3,
+	},
+	PlatformShooterPlayerComponent = {
+		mTeleBoltFramesDuringLastSecond = 3,
+	},
+	PlayerCollisionComponent = {
+		mPhysicsCollisionHax = 3,
+	},
+	PlayerStatsComponent = {},
+	PositionSeedComponent = {},
+	PotionComponent = {},
+	PressurePlateComponent = {},
+	ProjectileComponent = {
+		config = -1,
+		config_explosion = -1,
+		damage_by_type = -1,
+		damage_critical = -1,
+		config_explosiondamage_critical = 3,
+		mTriggers = 3,
+		mDamagedEntities = 1,
+	},
+	RotateTowardsComponent = {},
+	SetLightAlphaFromVelocityComponent = {},
+	SetStartVelocityComponent = {},
+	ShotEffectComponent = {},
+	SimplePhysicsComponent = {},
+	SineWaveComponent = {},
+	SpriteAnimatorComponent = {
+		mCachedTargetSpriteTag = 3,
+		mStates = 3,
+	},
+	SpriteComponent = {
+		mRenderList = 3,
+		mSprite = 3,
+	},
+	SpriteOffsetAnimatorComponent = {},
+	SpriteParticleEmitterComponent = {},
+	SpriteStainsComponent = {
+		mTextureHandle = 3,
+		mData = 3,
+		mState = 3,
+	},
+	StatusEffectDataComponent = {
+		stain_effect_cooldowns = 1,
+		ingestion_effect_causes_many = 1,
+		ingestion_effect_causes = 1,
+		mStainEffectsSmoothedForUI = 1,
+		stain_effects = 1,
+		effects_previous = 1,
+		ingestion_effects = 1,
+	},
+	StreamingKeepAliveComponent = {},
+	TelekinesisComponent = {
+		mBodyID = 3,
+	},
+	TeleportComponent = {
+		state = 3,
+		teleported_entities = 1,
+	},
+	TeleportProjectileComponent = {},
+	TextLogComponent = {},
+	TorchComponent = {},
+	UIIconComponent = {},
+	UIInfoComponent = {},
+	VariableStorageComponent = {},
+	VelocityComponent = {},
+	VerletPhysicsComponent = {
+		links = 3,
+		sprite = 3,
+		colors = 3,
+		materials = 3,
+	},
+	VerletWeaponComponent = {},
+	VerletWorldJointComponent = {
+		mCell = 3,
+	},
+	WalletComponent = {},
+	WalletValuableComponent = {},
+	WormAIComponent = {},
+	WormAttractorComponent = {},
+	WormComponent = {
+		mPrevPositions = 3,
+	},
+	WormPlayerComponent = {},
+}

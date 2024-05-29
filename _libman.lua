@@ -12,7 +12,7 @@ function lib.magic_write( path, file )
 	ComponentSetValue2( storage_request, "value_string", request..pen.DIV_2..path..pen.DIV_2.."file"..id..pen.DIV_2..pen.DIV_1 )
 
     local storage_new = pen.get_storage( ctrl_body, "free" )
-    if( storage_new == 0 ) then
+    if( not( pen.vld( storage_new ))) then
         storage_new = EntityAddComponent( ctrl_body, "VariableStorageComponent", 
 		{
 			name = "free",
@@ -43,4 +43,13 @@ end
 
 --make scripts to save(convert to nxml tbl) and load(via nxml tbl) entities
 
-pen.lib = lib
+if( io == nil ) then
+    pen.lib = pen.lib or lib
+    return
+end
+
+--[UNSAFE]
+
+
+
+pen.lib = pen.lib or lib
