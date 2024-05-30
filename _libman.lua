@@ -23,7 +23,7 @@ function lib.magic_write( path, file )
     ComponentSetValue2( storage_new, "value_string", tostring( string.gsub( string.gsub( file, "\n", "\\n" ), "\t", "\\t" )))
 end
 
-function lib.text2func( name, text )
+function lib.t2f( name, text )
 	if( pen[ name ] == nil ) then
         if( pen[ name.."_memo" ] ~= nil ) then
             pen[ name ] = dofile( pen[ name.."_memo" ])

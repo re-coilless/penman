@@ -1,55 +1,85 @@
 dofile_once( "mods/penman/_libman.lua" )
 
-local dummy = EntityGetWithName( "penman_dummy" ) or 0
+dummy = EntityGetWithName( "penman_dummy" ) or 0
 if( dummy == 0 ) then
     dummy = EntityCreateNew( "penman_dummy" )
     EntitySetTransform( dummy, 100, -100 )
     GamePrint( "have some: "..dummy )
 end
-local literally_every_comp = dofile_once( "mods/penman/extra/lists/every_comp.lua" )
--- pen.magic_comp( dummy, "DamageModelComponent", function( comp_id, is_enabled )
---     local comps = EntityGetAllComponents( dummy )
---     for i,id in ipairs( comps ) do
---         local name = ComponentGetTypeName( id )
---         if( literally_every_comp[ name ] ~= nil ) then
---             literally_every_comp[ name ] = nil
---         end
---     end
---     pen.print_table( literally_every_comp )
--- end)
 
-local hooman = pen.get_hooman()
+hooman = pen.get_hooman()
 if( hooman == 0 or pen.testing_done ) then
-	return
+    if( pen.testing_done == 1 ) then
+        return
+    else
+        -- misc_tests()
+        entity_cloner()
+        -- text2func()
+        
+        pen.testing_done = 1
+        return
+    end
 end
 pen.testing_done = true
 
+-- *************************************************************************
+
+function misc_tests()
+
+local herd = pen.magic_herder( "mods/penman/extra/test.csv", function( herd, h1, h2 )
+    local dft = {
+        balls = 0,
+        hmmmm = 100,
+
+        also = {
+            balls = 100,
+            hmmmm = 0,
+        },
+    }
+
+    local out = 100
+    if( dft[h1] ~= nil ) then
+        out = dft[h1]
+    elseif( dft.also[h2] ~= nil ) then
+        out = dft.also[h2]
+    end
+    return out
+end, {"orcs"})
+print( herd.orcs.crawler )
+print( herd.crawler.orcs )
+print( herd.fire.orcs )
+print( tostring( herd.balls.balls ))
+print( tostring( herd.trap.hmmmm ))
+print( tostring( herd.balls.trap ))
+print( tostring( herd.hmmmm.healer ))
+
+pen.print_table({
+    1,
+    2,
+    7,
+    {
+        hmm = {"a","b"},
+        huh = {"c","d"},
+    },
+})
+
 local dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
+pen.clone_comp( hooman, dmg_comp, {
+    _tags = "balls",
+    max_hp = 50,
+})
+EntityRemoveComponent( hooman, dmg_comp )
+pen.magic_comp( hooman, { "DamageModelComponent", "balls" }, function( comp_id, is_enabled )
+    print( ComponentGetValue2( comp_id, "max_hp" ))
+end)
+
+end
 
 -- *************************************************************************
 
--- pen.print_table({
---     1,
---     2,
---     7,
---     {
---         hmm = {"a","b"},
---         huh = {"c","d"},
---     },
--- })
+function entity_cloner()
 
--- local dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
--- pen.clone_comp( hooman, dmg_comp, {
---     _tags = "balls",
---     max_hp = 50,
--- })
--- EntityRemoveComponent( hooman, dmg_comp )
--- pen.magic_comp( hooman, { "DamageModelComponent", "balls" }, function( comp_id, is_enabled )
---     print( ComponentGetValue2( comp_id, "max_hp" ))
--- end)
-
--- *************************************************************************
-
+local literally_every_comp = dofile_once( "mods/penman/extra/lists/every_comp.lua" )
 local comp_patches = {
     DebugSpatialVisualizerComponent = { --deletes entity overtime
         _enabled = false,
@@ -153,9 +183,26 @@ local function add_comp( entity_id, comp_name, vals )
     local skipped = {
         MoveToSurfaceOnCreateComponent = 1, --always is selfremoved
         SetStartVelocityComponent = 1, --always is selfremoved
+
+        ExplosionComponent = 1,
+        DamageModelComponent = 1,
+        MaterialInventoryComponent = 1,
+        ProjectileComponent = 1,
+        GenomeDataComponent = 1,
+        BiomeTrackerComponent = 1,
+        CellEaterComponent = 1,
+        MagicConvertMaterialComponent = 1,
+        VerletPhysicsComponent = 1,
     }
-    
-    if( skipped[ comp_name ] == nil ) then
+
+	--[ProjectileComponent] mDamagedEntities
+	--[GenomeDataComponent] friend_firemage, friend_thundermage
+	--[BiomeTrackerComponent] current_biome
+	--[CellEaterComponent] materials
+	--[MagicConvertMaterialComponent] mFromMaterialArray, mToMaterialArray
+	--[VerletPhysicsComponent] links, sprite, colors, materials
+
+    if( skipped[ comp_name ] ~= nil ) then
         return EntityAddComponent2( entity_id, comp_name, vals )
     end
 end
@@ -192,43 +239,71 @@ pen.magic_comp( pen.clone_entity( dummy, 0, -100, {
             delay = { 0, 9999 },
         },
     },
+    MaterialInventoryComponent = {
+        count_per_material_type = {
+            blood = 50,
+            water = 150,
+        },
+    },
+    ProjectileComponent = {
+        damage_critical = {
+            mSucceeded = true,
+            chance = 69,
+        },
+    },
 }), "ExplosionComponent", function( comp_id, is_enabled )
     local a, b = pen.magic_comp( comp_id, {"config_explosion","delay"})
-    print( a.."|"..b )
+    print( tostring( a ).."|"..tostring( b ))
+
+    a,b = pen.catch_comp( "ExplosionComponent", "config_explosiondelay", 1, ComponentObjectGetValue2, {comp_id,"config_explosion","delay"}, true )
+    print( tostring( a ).."|"..tostring( b ))
 end)
+
+pen.magic_comp( dummy, "MaterialInventoryComponent", function( comp_id, is_enabled )
+    pen.magic_comp( comp_id, "count_per_material_type", {
+        blood = 69,
+        water = 420,
+    })
+end)
+
+end
 
 -- *************************************************************************
 
--- if(( pen.balls or 0 ) == 0 ) then
--- 	pen.lib.text2func( "balls", [[ function()
--- 		dofile_once( "mods/penman/_penman.lua" )
+function text2func()
+
+if(( pen.balls or 0 ) == 0 ) then
+	pen.lib.t2f( "balls", [[ function()
+		dofile_once( "mods/penman/_penman.lua" )
         
--- 		for i = 1,2 do
--- 			pen.chrono( pen.magic_comp, { hooman, "DamageModelComponent", function( comp_id, is_enabled )
--- 				pen.magic_comp( comp_id, {"damage_multipliers","explosion"}, 5 )
--- 				pen.magic_comp( comp_id, {
--- 					hp = 5,
--- 					max_hp = 50,
--- 					mLastDamageFrame = function( old_val )
--- 						print( old_val )
--- 						return 5
--- 					end,
--- 				})
--- 				print( pen.magic_comp( comp_id, "mLastDamageFrame" ))
--- 			end})
+		for i = 1,2 do
+			pen.chrono( pen.magic_comp, { hooman, "DamageModelComponent", function( comp_id, is_enabled )
+				pen.magic_comp( comp_id, {"damage_multipliers","explosion"}, 5 )
+				pen.magic_comp( comp_id, {
+					hp = 5,
+					max_hp = 50,
+					mLastDamageFrame = function( old_val )
+						print( old_val )
+						return 5
+					end,
+				})
+				print( pen.magic_comp( comp_id, "mLastDamageFrame" ))
+			end})
             
--- 			pen.chrono( pen.magic_comp, { hooman, "DamageModelComponent", function( comp_id, is_enabled )
--- 				ComponentObjectSetValue2( comp_id, "damage_multipliers", "explosion", 5 )
--- 				ComponentSetValue2( comp_id, "hp", 5 )
--- 				ComponentSetValue2( comp_id, "max_hp", 50 )
--- 				print( ComponentGetValue2( comp_id, "mLastDamageFrame" ))
--- 				ComponentSetValue2( comp_id, "mLastDamageFrame", 6 )
--- 				print( ComponentGetValue2( comp_id, "mLastDamageFrame" ))
--- 			end})
--- 		end
--- 	end ]])
--- 	if( pen.balls ~= nil ) then
--- 		pen.balls()
--- 		pen.balls = 1
--- 	end
--- end
+			pen.chrono( pen.magic_comp, { hooman, "DamageModelComponent", function( comp_id, is_enabled )
+				ComponentObjectSetValue2( comp_id, "damage_multipliers", "explosion", 5 )
+				ComponentSetValue2( comp_id, "hp", 5 )
+				ComponentSetValue2( comp_id, "max_hp", 50 )
+				print( ComponentGetValue2( comp_id, "mLastDamageFrame" ))
+				ComponentSetValue2( comp_id, "mLastDamageFrame", 6 )
+				print( ComponentGetValue2( comp_id, "mLastDamageFrame" ))
+			end})
+		end
+	end ]])
+	if( pen.balls ~= nil ) then
+		pen.balls()
+		pen.balls = 1
+	end
+end
+
+end

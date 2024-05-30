@@ -4,11 +4,10 @@ pen = pen or {}
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
--- add custom field handling funcs to clone_comp
 -- matter_fabricator
 -- rate_creature
 -- from_tbl_with_id
--- magic_herder
+-- get_xy_matter
 
 --interpolation lib
 --new font system
@@ -302,12 +301,17 @@ function pen.get_hybrid_function( func, input )
 	end
 end
 
-function pen.get_hybrid_table( table )
+function pen.is_table_weird( tbl )
+	return pen.get_table_count( tbl, true ) > 0 and #tbl == 0
+end
+
+function pen.get_hybrid_table( table, allow_weird )
 	if( not( pen.vld( table ))) then
 		return
 	end
 	
-	if( type( table ) == "table" ) then
+	allow_weird = allow_weird or false
+	if( type( table ) == "table" and ( allow_weird or not( pen.is_table_weird( table )))) then
 		return table
 	else
 		return {table}
@@ -552,6 +556,14 @@ function pen.add_dynamic_fields( tbl, fields ) --thanks to ImmortalDamned
     return tbl
 end
 
+function pen.t2i( tbl, dft )
+	local new_tbl = {}
+	for i,v in ipairs( tbl ) do
+		new_tbl[v] = dft or i
+	end
+	return new_tbl
+end
+
 function pen.get_table_count( tbl, just_checking )
 	tbl = tbl or 0
 	if( type( tbl ) ~= "table" ) then
@@ -641,7 +653,9 @@ function pen.from_tbl_with_id( tbl, id, subtract, custom_key, default )
 				stuff = {}
 				gonna_stuff = false
 			end
-			if(( dud[key] or dud[1] or dud ) == id ) then
+
+			local check = pen.get_hybrid_table( dud )
+			if(( check[key] or check[1]) == id ) then
 				stuff = dud
 				tbl_id = i
 				break
@@ -762,32 +776,41 @@ function pen.get_killable_stuff( c_x, c_y, r )
 	return pen.add_table( pen.add_table( stuff, EntityGetInRadiusWithTag( c_x, c_y, r, "hittable" ) or {} ), EntityGetInRadiusWithTag( c_x, c_y, r, "mortal" ) or {} )
 end
 
-function pen.t2t( str )
-	return string.gsub( str, "\r\n", "\n" )
+function pen.ptrn( id )
+	return "([^"..( type( id ) == "number" and pen[ "DIV_"..( id or 1 )] or tostring( id )).."]+)"
 end
 
-function pen.t2l( str, string_indexed )
+function pen.ctrn( str, marker, string_indexed )
 	local t = {}
-	
-	for line in string.gmatch( pen.t2t( str ), "([^\n]+)" ) do
+
+	for word in string.gmatch( str, pen.ptrn( marker or "%s" )) do
 		if( string_indexed ) then
-			t[ line ] = 1
+			t[ word ] = 1
 		else
-			table.insert( t, line )
+			table.insert( t, pen.t2t( word, true ))
 		end
 	end
 	
 	return t
 end
 
-function pen.t2w( str )
-	local t = {}
-	
-	for word in string.gmatch( str, "([^%s]+)" ) do
-		table.insert( t, word )
+function pen.t2t( str, is_post )
+	if( is_post ) then
+		str = string.gsub( str, "\t", "    " )
+		str = string.gsub( str, "^%s+", "" )
+		str = string.gsub( str, "%s+$", "" )
+	else
+		str = string.gsub( str, "\r\n", "\n" )
 	end
-	
-	return t
+	return str
+end
+
+function pen.t2l( str, string_indexed )
+	return pen.ctrn( pen.t2t( str ), "\n", string_indexed )
+end
+
+function pen.t2w( str )
+	return pen.ctrn( str )
 end
 
 function pen.get_translated_line( text )
@@ -808,54 +831,86 @@ function pen.magic_append( to_file, from_file )
 	ModTextFileSetContent( to_file, string.gsub( a, marker, b..line_wrecker..marker ))
 end
 
-function pen.magic_herder(  )
-	--pass custom csv path, list of herds to override (dublicates are skipped in other case), default value (make it a function and pass an average + player relation of the herd in question) for undeclared stuff
-	
-	-- local vanilla_herd = "data/genome_relations.csv"
-	-- file = pen.t2l( ModTextFileGetContent( vanilla_herd ))
-	-- local _,count = string.gsub( file[1], ",", "" )
-	
-	-- for i,herd in ipairs( herd_relations ) do
-	-- 	file[1] = file[1]..","..herd.name
-	-- 	for e = 2,( count + i ) do
-	-- 		if( e < 37 ) then
-	-- 			file[e] = file[e]..","..herd.vanilla_vertical[ e - 1 ]
-	-- 		elseif( e > count - #herd_relations + i and herd.custom_vertical ~= nil ) then
-	-- 			local value = herd.custom_vertical[ e - ( count + 1 ) ] or herd.default_value
-	-- 			file[e] = file[e]..","..value
-	-- 		else
-	-- 			file[e] = file[e]..","..herd.default_value
-	-- 		end
-	-- 	end
+function pen.magic_herder( new_file, default, overrides )
+	local herd = {}
+	local old_file = "data/genome_relations.csv"
+	overrides = pen.t2i( overrides or {})
+
+	local raw_herd = pen.t2l( ModTextFileGetContent( old_file ))
+	local header = pen.ctrn( raw_herd[1], "," )
+	for i = 2,#raw_herd do
+		local line = pen.ctrn( raw_herd[i], "," )
+		local name = line[1]
 		
-	-- 	local new_line = herd.name
-	-- 	for e = 1,( count + i ) do
-	-- 		if( e < 36 ) then
-	-- 			new_line = new_line..","..herd.vanilla_horizontal[e]
-	-- 		elseif( e > count - #herd_relations and herd.custom_horizontal ~= nil ) then
-	-- 			local value = herd.custom_horizontal[ e - count ] or herd.default_value
-	-- 			new_line = new_line..","..value
-	-- 		else
-	-- 			new_line = new_line..","..herd.default_value
-	-- 		end
-	-- 	end
-	-- 	table.insert( file, new_line )
-	-- end
+		herd[name] = {}
+		for e = 2,#line do
+			herd[name][header[e]] = tonumber( line[e])
+		end
+	end
+	if( new_file == nil ) then
+		return herd
+	end
+
+	raw_herd = pen.t2l( ModTextFileGetContent( new_file ))
+	local new_header = pen.ctrn( raw_herd[1], "," )
+	for i = 2,#raw_herd do
+		local line = pen.ctrn( raw_herd[i], "," )
+		local name = line[1]
+		if( herd[name] == nil ) then
+			overrides[name] = 0
+		end
+
+		herd[name] = herd[name] or {}
+		for e = 2,#line do
+			if(( overrides[name] ~= nil or overrides[new_header[e]] ~= nil ) and line[e] ~= "_" ) then
+				herd[name][new_header[e]] = tonumber( line[e])
+			end
+		end
+	end
 	
-	-- local new_herd = ""
-	-- for i,line in ipairs( file ) do
-	-- 	new_herd = new_herd..line.."\n"
-	-- end
-	-- ModTextFileSetContent( vanilla_herd, new_herd )
+	local function herd_sorter( tbl )
+		return pen.magic_sorter( tbl, function( a,b )
+			local _,ida = pen.from_tbl_with_id( header, a )
+			local _,idb = pen.from_tbl_with_id( header, b )
+
+			local out = false
+			if( ida == nil and idb ~= nil ) then
+				out = false
+			elseif( ida ~= nil and idb == nil ) then
+				out = true
+			elseif( ida ~= nil and idb ~= nil ) then
+				out = ida < idb
+			else
+				out = a < b
+			end
+			
+			return out
+		end)
+	end
+
+	new_header, new_file = "HERD", ""
+	for h1 in herd_sorter( herd ) do
+		local new_line = h1
+		for h2 in herd_sorter( herd ) do
+			herd[h1] = herd[h1] or {}
+			if( herd[h1][h2] == nil ) then
+				herd[h1][h2] = default( herd, h1, h2 )
+			end
+			new_line = new_line..","..herd[h1][h2]
+		end
+		new_header = new_header..","..h1
+		new_file = new_file..new_line.."\n"
+	end
+	if( ModTextFileSetContent ) then
+		ModTextFileSetContent( old_file, new_header.."\n"..new_file )
+	end
+
+	return herd
 end
 
 function pen.set_translations( path )
 	local file, main = ModTextFileGetContent( path ), "data/translations/common.csv"
 	ModTextFileSetContent( main, ModTextFileGetContent( main )..string.gsub( file, "^[^\n]*\n", "" ))
-end
-
-function pen.ptrn( id )
-	return "([^"..pen[ "DIV_"..( id or 1 )].."]+)"
 end
 
 --add new liner (mnee will have to be rewritten)
@@ -989,10 +1044,11 @@ function pen.magic_parse( data, separators )
 			return tostring( data )
 		end
 
-		local data_raw = separator
-		local is_weird = pen.get_table_count( data, true ) > 0 and #data == 0
+		local data_raw, is_weird = separator, pen.is_table_weird( data )
 		for name,value in pairs( data ) do
-			if( is_weird ) then data_raw = data_raw..name..separator end
+			if( is_weird ) then
+				data_raw = data_raw..name..separator
+			end
 			data_raw = data_raw..XD_packer( value, separators, i )..separator
 		end
 		return data_raw
@@ -1232,8 +1288,8 @@ function pen.magic_comp( id, data, func )
 	if( not( pen.vld( id, true ))) then
 		return
 	end
-	data = pen.get_hybrid_table( data )
-	
+
+	data = pen.get_hybrid_table( data, true )
 	if( #data == 0 ) then
 		for field,val in pairs( data ) do
 			local v = val
@@ -1247,18 +1303,23 @@ function pen.magic_comp( id, data, func )
 			ComponentSetValue2( unpack( v ))
 		end
 	elseif( type( func or 0 ) ~= "function" ) then
+		local will_get = func == nil
 		local is_object = data[2] ~= nil
-		local method = "Component"..( is_object and "Object" or "" )..( func == nil and "Get" or "Set" ).."Value2"
+		local method = "Component"..( is_object and "Object" or "" )..( will_get and "Get" or "Set" ).."Value2"
 
+		local field = ""
 		if( type( func ) ~= "table" ) then func = {func} end
 		for i = 2,1,-1 do
 			if( data[i] ~= nil ) then
+				field = data[i]..field
 				table.insert( func, 1, data[i])
 			end
 		end
 		table.insert( func, 1, id )
 		
-		return _G[ method ]( unpack( func ))
+		local out = { pen.catch_comp( ComponentGetTypeName( id ), field, will_get and 1 or 3, _G[ method ], func, true )}
+		table.remove( out, 1 )
+		return unpack( out )
 	else
 		local comps = EntityGetComponentIncludingDisabled( unpack({ id, data[1], data[2]}))
 		if( pen.vld( comps )) then
@@ -1607,8 +1668,8 @@ function pen.access_matter_damage( entity_id, matter, damage )
 	end
 end
 
-function pen.catch_comp( comp_name, field_name, index, func, args, will_set )
-	will_set = will_set or false
+function pen.catch_comp( comp_name, field_name, index, func, args, forced )
+	local will_set = index == 3
 	pen.catch_comp_cache = pen.catch_comp_cache or {}
 	pen.catch_comp_cache[ comp_name ] = pen.catch_comp_cache[ comp_name ] or {}
 	pen.catch_comp_cache[ comp_name ][ field_name ] = pen.catch_comp_cache[ comp_name ][ field_name ] or {}
@@ -1616,26 +1677,31 @@ function pen.catch_comp( comp_name, field_name, index, func, args, will_set )
 	local v = pen.catch_comp_cache[ comp_name ][ field_name ][ index ]
 	local check_val = 0
 	if( pen.CANCER_COMPS[ comp_name ] ~= nil ) then
-		if( index == 2 ) then
-			check_val = pen.CANCER_COMPS[ comp_name ][ field_name ] or -2
-		else
-			check_val = pen.CANCER_COMPS[ comp_name ][ field_name ] or check_val
-		end
-	end
-	if( check_val < 0 and index == 2 ) then
-		v = check_val == -1
-	elseif( check_val > 0 and ( check_val > 2 or not( will_set ))) then
-		v = check_val == 2
+		check_val = pen.CANCER_COMPS[ comp_name ][ field_name ] or (( index == 2 ) and -2 or check_val )
 	end
 
-	if( not( pen.vld( v ))) then
+	local out = {v}
+	if( type( check_val ) == "function" ) then
+		out = {check_val( args[1], args[#args], index )}; forced = false
+	elseif( check_val < 0 and index == 2 ) then
+		out[1] = check_val == -1
+	elseif( check_val > 0 and ( check_val > 2 or not( will_set ))) then
+		out[1] = check_val == 2
+	end
+	
+	v = out[1]
+	if( not( pen.vld( v )) or forced ) then
 		pen.silent_catch = true
-		v = pen.catch( func, args ) ~= nil
-		pen.catch_comp_cache[ comp_name ][ field_name ][ index ] = v or will_set --cannot check write
+		
+		out = {pen.catch( func, args )}
+		v = out[1] ~= nil --cannot check write
+		table.insert( out, 1, v )
+
+		pen.catch_comp_cache[ comp_name ][ field_name ][ index ] = v or will_set
 		pen.silent_catch = nil
 	end
 
-	return v
+	return unpack( out )
 end
 
 function pen.clone_comp( entity_id, comp_id, mutators )
@@ -1669,9 +1735,9 @@ function pen.clone_comp( entity_id, comp_id, mutators )
 		return pen.catch_comp( comp_name, field_name, 1 + pen.b2n( is_obj ), f, input )
 	end
 	local function set_stuff( field, value )
-		if( #value == 1 ) then
+		if( #value == 1 and type( value[1]) ~= "table" ) then
 			main_values[field] = value[1]
-		elseif( type( value[1]) ~= "table" ) then
+		else
 			extra_values[field] = value
 		end
 	end
@@ -1716,13 +1782,13 @@ function pen.clone_comp( entity_id, comp_id, mutators )
 				table.insert( value, 1, field )
 				table.insert( value, 1, object )
 				table.insert( value, 1, comp_id )
-				pen.catch_comp( comp_name, object..field, 3, ComponentObjectSetValue2, value, true )
+				pen.catch_comp( comp_name, object..field, 3, ComponentObjectSetValue2, value )
 			end
 		end
 		for field,value in pairs( extra_values ) do
 			table.insert( value, 1, field )
 			table.insert( value, 1, comp_id )
-			pen.catch_comp( comp_name, field, 3, ComponentSetValue2, value, true )
+			pen.catch_comp( comp_name, field, 3, ComponentSetValue2, value )
 		end
 	end
 	
@@ -2157,14 +2223,6 @@ pen.CANCER_COMPS = {
 	-- -1 is an object; -2 is not an object (defaults to -2 if the component table is empty, else checks)
 	-- on nil will check, 1 is an invalid write with checked read, 2 is a fully valid field, 3 is a fully invalid field
 
-	--[DamageModelComponent] mDamageMaterialsHowMuch, mDamageMaterials, mCollisionMessageMaterials
-	--[MaterialInventoryComponent] count_per_material_type
-	--[PhysicsPickUpComponent] transform
-	--[AttachToEntityComponent] Transform
-	--[InheritTransformComponent] Transform
-	--[ProjectileComponent] mDamagedEntities
-	--[GenomeDataComponent] friend_firemage, friend_thundermage
-
 	AIAttackComponent = {},
 	AIComponent = {
 		data = 3,
@@ -2339,7 +2397,17 @@ pen.CANCER_COMPS = {
 	ManaReloaderComponent = {},
 	MaterialAreaCheckerComponent = {},
 	MaterialInventoryComponent = {
-		count_per_material_type = 1,
+		count_per_material_type = function( comp_id, value, index )
+			if( index == 3 ) then
+				local entity_id = ComponentGetEntity( comp_id )
+				for matter,count in pairs( value ) do
+					AddMaterialInventoryMaterial( entity_id, matter, count )
+				end
+			end
+
+			local index_tbl = { true, false, true }
+			return index_tbl[ index ]
+		end,
 	},
 	MaterialSeaSpawnerComponent = {},
 	MaterialSuckerComponent = {},
@@ -2417,9 +2485,9 @@ pen.CANCER_COMPS = {
 	PressurePlateComponent = {},
 	ProjectileComponent = {
 		config = -1,
-		config_explosion = -1,
 		damage_by_type = -1,
 		damage_critical = -1,
+		config_explosion = -1,
 		config_explosiondamage_critical = 3,
 		mTriggers = 3,
 		mDamagedEntities = 1,
