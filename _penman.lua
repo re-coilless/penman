@@ -307,7 +307,7 @@ end
 
 function pen.get_hybrid_table( table, allow_weird )
 	if( not( pen.vld( table ))) then
-		return
+		return {}
 	end
 	
 	allow_weird = allow_weird or false
@@ -1294,13 +1294,13 @@ function pen.magic_comp( id, data, func )
 		for field,val in pairs( data ) do
 			local v = val
 			if( type( v ) == "function" ) then
-				v = { v( unpack({ComponentGetValue2( id, field )}))}
-			elseif( type( v ) ~= "table" ) then
-				v = { v }
+				v = { v( unpack({pen.magic_comp( id, field )}))}
+			else
+				v = pen.get_hybrid_table( v )
 			end
 			table.insert( v, 1, field )
 			table.insert( v, 1, id )
-			ComponentSetValue2( unpack( v ))
+			pen.magic_comp( unpack( v ))
 		end
 	elseif( type( func or 0 ) ~= "function" ) then
 		local will_get = func == nil
@@ -1308,7 +1308,7 @@ function pen.magic_comp( id, data, func )
 		local method = "Component"..( is_object and "Object" or "" )..( will_get and "Get" or "Set" ).."Value2"
 
 		local field = ""
-		if( type( func ) ~= "table" ) then func = {func} end
+		func = pen.get_hybrid_table( func )
 		for i = 2,1,-1 do
 			if( data[i] ~= nil ) then
 				field = data[i]..field
@@ -1675,6 +1675,9 @@ function pen.catch_comp( comp_name, field_name, index, func, args, forced )
 	pen.catch_comp_cache[ comp_name ][ field_name ] = pen.catch_comp_cache[ comp_name ][ field_name ] or {}
 
 	local v = pen.catch_comp_cache[ comp_name ][ field_name ][ index ]
+	if( forced ) then
+		v = nil
+	end
 	local check_val = 0
 	if( pen.CANCER_COMPS[ comp_name ] ~= nil ) then
 		check_val = pen.CANCER_COMPS[ comp_name ][ field_name ] or (( index == 2 ) and -2 or check_val )
@@ -1682,7 +1685,7 @@ function pen.catch_comp( comp_name, field_name, index, func, args, forced )
 
 	local out = {v}
 	if( type( check_val ) == "function" ) then
-		out = {check_val( args[1], args[#args], index )}; forced = false
+		out = {check_val( args[1], args[#args], index )}
 	elseif( check_val < 0 and index == 2 ) then
 		out[1] = check_val == -1
 	elseif( check_val > 0 and ( check_val > 2 or not( will_set ))) then
@@ -1690,9 +1693,9 @@ function pen.catch_comp( comp_name, field_name, index, func, args, forced )
 	end
 	
 	v = out[1]
-	if( not( pen.vld( v )) or forced ) then
+	if( not( pen.vld( v ))) then
 		pen.silent_catch = true
-		
+
 		out = {pen.catch( func, args )}
 		v = out[1] ~= nil --cannot check write
 		table.insert( out, 1, v )
@@ -1734,8 +1737,8 @@ function pen.clone_comp( entity_id, comp_id, mutators )
 
 		return pen.catch_comp( comp_name, field_name, 1 + pen.b2n( is_obj ), f, input )
 	end
-	local function set_stuff( field, value )
-		if( #value == 1 and type( value[1]) ~= "table" ) then
+	local function set_stuff( field, value, always_extra )
+		if( not( always_extra ) and #value == 1 and type( value[1]) ~= "table" ) then
 			main_values[field] = value[1]
 		else
 			extra_values[field] = value
@@ -1747,7 +1750,8 @@ function pen.clone_comp( entity_id, comp_id, mutators )
 		
 		local stuff = obj and ComponentObjectGetMembers( comp_id, obj ) or ComponentGetMembers( comp_id )
 		for field in pairs( stuff ) do
-			if( not( obj ) and is_supported( field, true )) then
+			local is_object, forced_extra = is_supported( field, true )
+			if( not( obj ) and is_object ) then
 				get_stuff( field )
 			elseif( is_supported( field, obj )) then
 				if( obj or not( pen.vld( mutators[field]))) then
@@ -1762,10 +1766,10 @@ function pen.clone_comp( entity_id, comp_id, mutators )
 							object_values[obj][field] = pen.get_hybrid_table( mutators[obj][field])
 						end
 					elseif( pen.vld( value )) then
-						set_stuff( field, value )
+						set_stuff( field, value, forced_extra )
 					end
 				elseif( mutators[field] ~= nomarker ) then
-					set_stuff( field, pen.get_hybrid_table( mutators[field]))
+					set_stuff( field, pen.get_hybrid_table( mutators[field]), forced_extra )
 				end
 			end
 		end
@@ -2322,8 +2326,22 @@ pen.CANCER_COMPS = {
 	GameStatsComponent = {},
 	GasBubbleComponent = {},
 	GenomeDataComponent = {
-		friend_firemage = 1,
-		friend_thundermage = 1,
+		friend_firemage = function( comp_id, value, index )
+			if( index == 3 ) then
+				ComponentSetValue2( comp_id, "friend_firemage", value == 1 )
+			end
+			
+			local index_tbl = { true, false, true }
+			return index_tbl[ index ], true
+		end,
+		friend_thundermage = function( comp_id, value, index )
+			if( index == 3 ) then
+				ComponentSetValue2( comp_id, "friend_thundermage", value == 1 )
+			end
+
+			local index_tbl = { true, false, true }
+			return index_tbl[ index ], true
+		end,
 	},
 	GhostComponent = {},
 	GodInfoComponent = {

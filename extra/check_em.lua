@@ -12,11 +12,12 @@ if( hooman == 0 or pen.testing_done ) then
     if( pen.testing_done == 1 ) then
         return
     else
+        pen.testing_done = 1
+
         -- misc_tests()
-        entity_cloner()
+        -- entity_cloner()
         -- text2func()
         
-        pen.testing_done = 1
         return
     end
 end
@@ -194,14 +195,7 @@ local function add_comp( entity_id, comp_name, vals )
         MagicConvertMaterialComponent = 1,
         VerletPhysicsComponent = 1,
     }
-
-	--[ProjectileComponent] mDamagedEntities
-	--[GenomeDataComponent] friend_firemage, friend_thundermage
-	--[BiomeTrackerComponent] current_biome
-	--[CellEaterComponent] materials
-	--[MagicConvertMaterialComponent] mFromMaterialArray, mToMaterialArray
-	--[VerletPhysicsComponent] links, sprite, colors, materials
-
+    
     if( skipped[ comp_name ] ~= nil ) then
         return EntityAddComponent2( entity_id, comp_name, vals )
     end
@@ -220,6 +214,13 @@ for comp in pen.magic_sorter( literally_every_comp ) do
     add_comp( dummy, comp, patch )
 end
 GamePrint( pen.get_table_count( EntityGetAllComponents( dummy )).."/"..pen.get_table_count( literally_every_comp ))
+
+pen.magic_comp( dummy, "GenomeDataComponent", function( comp_id, is_enabled )
+    pen.magic_comp( comp_id, {
+        friend_firemage = 1,
+        friend_thundermage = 1,
+    })
+end)
 
 pen.clone_comp_debug = 1
 pen.magic_comp( pen.clone_entity( dummy, 0, -100, {
