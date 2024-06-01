@@ -14,7 +14,7 @@ if( hooman == 0 or pen.testing_done ) then
     else
         pen.testing_done = 1
 
-        -- misc_tests()
+        misc_tests()
         -- entity_cloner()
         -- text2func()
         
@@ -26,6 +26,19 @@ pen.testing_done = true
 -- *************************************************************************
 
 function misc_tests()
+
+pen.matter_fabricator( 0, -100, {
+    matter = "sand",
+    size = {10,15},
+    count = {1,5},
+    delay = {1,5},
+    time = {5,20},
+    is_real = true,
+    is_real2 = true,
+    is_fake = true,
+    is_grid = true,
+    frames = -1,
+})
 
 local herd = pen.magic_herder( "mods/penman/extra/test.csv", function( herd, h1, h2 )
     local dft = {
@@ -70,8 +83,9 @@ pen.clone_comp( hooman, dmg_comp, {
     max_hp = 50,
 })
 EntityRemoveComponent( hooman, dmg_comp )
-pen.magic_comp( hooman, { "DamageModelComponent", "balls" }, function( comp_id, is_enabled )
+pen.magic_comp( hooman, { "DamageModelComponent", "balls" }, function( comp_id, v, is_enabled )
     print( ComponentGetValue2( comp_id, "max_hp" ))
+    v.hp = 0.01
 end)
 
 end
@@ -215,7 +229,7 @@ for comp in pen.magic_sorter( literally_every_comp ) do
 end
 GamePrint( pen.get_table_count( EntityGetAllComponents( dummy )).."/"..pen.get_table_count( literally_every_comp ))
 
-pen.magic_comp( dummy, "GenomeDataComponent", function( comp_id, is_enabled )
+pen.magic_comp( dummy, "GenomeDataComponent", function( comp_id, v, is_enabled )
     pen.magic_comp( comp_id, {
         friend_firemage = 1,
         friend_thundermage = 1,
@@ -252,7 +266,7 @@ pen.magic_comp( pen.clone_entity( dummy, 0, -100, {
             chance = 69,
         },
     },
-}), "ExplosionComponent", function( comp_id, is_enabled )
+}), "ExplosionComponent", function( comp_id, v, is_enabled )
     local a, b = pen.magic_comp( comp_id, {"config_explosion","delay"})
     print( tostring( a ).."|"..tostring( b ))
 
@@ -260,7 +274,7 @@ pen.magic_comp( pen.clone_entity( dummy, 0, -100, {
     print( tostring( a ).."|"..tostring( b ))
 end)
 
-pen.magic_comp( dummy, "MaterialInventoryComponent", function( comp_id, is_enabled )
+pen.magic_comp( dummy, "MaterialInventoryComponent", function( comp_id, v, is_enabled )
     pen.magic_comp( comp_id, "count_per_material_type", {
         blood = 69,
         water = 420,
@@ -278,7 +292,7 @@ if(( pen.balls or 0 ) == 0 ) then
 		dofile_once( "mods/penman/_penman.lua" )
         
 		for i = 1,2 do
-			pen.chrono( pen.magic_comp, { hooman, "DamageModelComponent", function( comp_id, is_enabled )
+			pen.chrono( pen.magic_comp, { hooman, "DamageModelComponent", function( comp_id, v, is_enabled )
 				pen.magic_comp( comp_id, {"damage_multipliers","explosion"}, 5 )
 				pen.magic_comp( comp_id, {
 					hp = 5,
@@ -291,7 +305,7 @@ if(( pen.balls or 0 ) == 0 ) then
 				print( pen.magic_comp( comp_id, "mLastDamageFrame" ))
 			end})
             
-			pen.chrono( pen.magic_comp, { hooman, "DamageModelComponent", function( comp_id, is_enabled )
+			pen.chrono( pen.magic_comp, { hooman, "DamageModelComponent", function( comp_id, v, is_enabled )
 				ComponentObjectSetValue2( comp_id, "damage_multipliers", "explosion", 5 )
 				ComponentSetValue2( comp_id, "hp", 5 )
 				ComponentSetValue2( comp_id, "max_hp", 50 )

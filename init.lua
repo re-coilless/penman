@@ -14,13 +14,39 @@ function OnPlayerSpawned( hooman )
 end
 
 penman_w = penman_w or ModTextFileSetContent
+function OnWorldPreUpdate()
+	if( HasFlagPersistent( "one_shall_not_spawn" )) then
+		RemoveFlagPersistent( "one_shall_not_spawn" )
+	end
+
+	if( not( matter_test_file or false )) then
+		matter_test_file = true
+		
+		local full_list = ""
+		local full_matters = {
+			CellFactory_GetAllLiquids(),
+			CellFactory_GetAllSands(),
+			CellFactory_GetAllGases(),
+			CellFactory_GetAllFires(),
+			CellFactory_GetAllSolids(),
+		}
+		for	i,list in ipairs( full_matters ) do
+			for e,mtr in ipairs( list ) do
+				full_list = full_list..mtr..","
+			end
+		end
+		local matter_test = "mods/index_core/files/misc/matter_test.xml"
+		penman_w( matter_test, string.gsub( ModTextFileGetContent( matter_test ), "_MATTERLISTHERE_", string.sub( full_list, 1, -2 )))
+	end
+end
+
 function OnWorldPostUpdate()
 	dofile_once( "mods/penman/_libman.lua" )
 
 	local world_id = GameGetWorldStateEntity() or 0
 	local ctrl_body = pen.get_hooman_child( world_id, "pen_ctrl" )
 	local storage_request = pen.get_storage( ctrl_body, "request" )
-	if( storage_request == 0 ) then
+	if( not( pen.vld( storage_request, true ))) then
 		return
 	end
 
@@ -36,5 +62,5 @@ function OnWorldPostUpdate()
 		ComponentSetValue2( storage_request, "value_string", pen.DIV_1 )
 	end
 	
-	dofile( "mods/penman/extra/check_em.lua" )
+	-- dofile( "mods/penman/extra/check_em.lua" )
 end

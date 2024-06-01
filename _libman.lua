@@ -43,12 +43,46 @@ end
 
 --make scripts to save(convert to nxml tbl) and load(via nxml tbl) entities
 
-if( io == nil ) then
-    pen.lib = pen.lib or lib
-    return
+function lib.get_xy_matter( x, y, duration )
+	pen.lib.get_xy_matter_memo = pen.lib.get_xy_matter_memo or {
+		probe = EntityLoad( "mods/penman/extra/matter_test.xml", x, y ),
+		frames = GameGetFrameNum() + ( duration or 5 ),
+		mtr_list = {},
+	}
+	
+    local data = pen.lib.get_xy_matter_memo
+	if( data.frames > GameGetFrameNum()) then
+		local jitter_mag = 0.5
+        EntityApplyTransform( data.probe, x + jitter_mag*pen.get_sign( math.random(-1,0)), y + jitter_mag*pen.get_sign( math.random(-1,0)))
+        
+        local dmg_comp = EntityGetFirstComponentIncludingDisabled( data.probe, "DamageModelComponent" )
+        local matter = ComponentGetValue2( dmg_comp, "mCollisionMessageMaterials" )
+        local count = ComponentGetValue2( dmg_comp, "mCollisionMessageMaterialCountsThisFrame" )
+        for i,v in ipairs( count ) do
+            if( v > 0 ) then
+                local id = matter[i]
+                pen.lib.get_xy_matter_memo.mtr_list[id] = ( data.mtr_list[id] or 0 ) + v
+            end
+        end
+	else
+		local max_id = { 0, 0 }
+        for id,cnt in pairs( data.mtr_list ) do
+            if( max_id[2] < cnt ) then
+                max_id[1] = id
+                max_id[2] = cnt
+            end
+        end
+		
+		EntityKill( data.probe )
+		pen.lib.get_xy_matter_memo = nil
+		
+		return max_id[1]
+	end
 end
 
---[UNSAFE]
+--[SAFE] ^^^^^^^^^^^^
+if( io == nil ) then pen.lib = pen.lib or lib; return end
+--[UNSAFE] vvvvvvvvvv
 
 
 
