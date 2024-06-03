@@ -1,4 +1,32 @@
 dofile_once( "mods/penman/_penman.lua" )
+if( GameHasFlagRun( pen.FLAG_UPDATE_UTF )) then
+	local the_concept_of_table_itself = dofile_once( "mods/penman/extra/lists/every_character.lua" )
+	for i,the_concept_of_set_itself in ipairs( the_concept_of_table_itself ) do
+		local the_concept_of_language_itself = string.gsub( string.gsub( pen.t2t( the_concept_of_set_itself ), "\n", "" ), "%s", "" )
+		local the_concept_of_number_itself, the_concept_of_counter_itself = 0, 0
+		for the_concept_of_character_itself in string.gmatch( the_concept_of_language_itself, "." ) do
+			local the_concept_of_byte_itself = string.byte( the_concept_of_character_itself )
+			if( the_concept_of_byte_itself == string.byte( "." )) then
+				if( the_concept_of_number_itself > 0 and pen.BYTE_TO_ID[ the_concept_of_number_itself ] == nil ) then
+					local the_concept_of_i_itself = 1
+					for str in string.gmatch( the_concept_of_language_itself, "([^%.]+)" ) do
+						if( the_concept_of_i_itself == the_concept_of_counter_itself ) then
+							pen.BYTE_TO_ID[ the_concept_of_number_itself ] = pen.magic_byte( str )
+							print( "["..the_concept_of_number_itself.."]="..pen.BYTE_TO_ID[ the_concept_of_number_itself ])
+							break
+						end
+						the_concept_of_i_itself = the_concept_of_i_itself + 1
+					end
+				end
+				the_concept_of_number_itself = 0
+				the_concept_of_counter_itself = the_concept_of_counter_itself + 1
+			else
+				the_concept_of_number_itself = bit.lshift( the_concept_of_number_itself, 10 ) + the_concept_of_byte_itself
+			end
+		end
+		print("\n")
+	end
+end
 
 local lib = {}
 
@@ -41,7 +69,11 @@ function lib.t2f( name, text )
 	return pen[ name ]
 end
 
---make scripts to save(convert to nxml tbl) and load(via nxml tbl) entities
+function lib.nxml2entity()
+end
+
+function lib.entity2nxml()
+end
 
 function lib.get_xy_matter( x, y, duration )
 	pen.lib.get_xy_matter_memo = pen.lib.get_xy_matter_memo or {

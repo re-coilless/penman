@@ -2,14 +2,8 @@ function OnPlayerSpawned( hooman )
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 	
 	local world_id = GameGetWorldStateEntity()
-	local ctrl_body = EntityLoad( "mods/penman/extra/ctrl_body.xml" )
-	EntityAddComponent( ctrl_body, "VariableStorageComponent", 
-	{
-		name = "request",
-		value_string = "&",
-	})
-	EntityAddChild( world_id, ctrl_body )
-
+	EntityAddChild( world_id, EntityLoad( "mods/penman/extra/ctrl_body.xml" ))
+	
 	--logo is pen in inkpot
 end
 
@@ -18,7 +12,7 @@ function OnWorldPreUpdate()
 	if( HasFlagPersistent( "one_shall_not_spawn" )) then
 		RemoveFlagPersistent( "one_shall_not_spawn" )
 	end
-
+	
 	if( not( matter_test_file or false )) then
 		matter_test_file = true
 		
@@ -62,5 +56,5 @@ function OnWorldPostUpdate()
 		ComponentSetValue2( storage_request, "value_string", pen.DIV_1 )
 	end
 	
-	-- dofile( "mods/penman/extra/check_em.lua" )
+	dofile( "mods/penman/extra/check_em.lua" )
 end

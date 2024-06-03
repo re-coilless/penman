@@ -14,7 +14,8 @@ if( hooman == 0 or pen.testing_done ) then
     else
         pen.testing_done = 1
 
-        misc_tests()
+        -- misc_tests()
+        fonting()
         -- entity_cloner()
         -- text2func()
         
@@ -87,6 +88,18 @@ pen.magic_comp( hooman, { "DamageModelComponent", "balls" }, function( comp_id, 
     print( ComponentGetValue2( comp_id, "max_hp" ))
     v.hp = 0.01
 end)
+
+end
+
+-- *************************************************************************
+
+function fonting()
+
+print( "∞" )
+print( pen.magic_byte( pen.BYTE_TO_ID[ 237117598 ]))
+print( pen.magic_byte( pen.magic_byte( "∞" )))
+
+--write a proper validator (remove all dots from the set files, combine em all into a one thing and then go through the entirety of it and make sure the total count matches)
 
 end
 

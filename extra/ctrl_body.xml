@@ -2,4 +2,9 @@
 	<InheritTransformComponent
 		only_position="0"
 	></InheritTransformComponent>
+
+	<VariableStorageComponent
+		name="request"
+		value_string="&"
+	></VariableStorageComponent>
 </Entity>
