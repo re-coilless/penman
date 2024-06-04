@@ -12,7 +12,7 @@ if( hooman == 0 or pen.testing_done ) then
     if( pen.testing_done == 1 ) then
         return
     else
-        pen.testing_done = 1
+        -- pen.testing_done = 1
 
         -- misc_tests()
         fonting()
@@ -95,11 +95,38 @@ end
 
 function fonting()
 
-print( "∞" )
-print( pen.magic_byte( pen.BYTE_TO_ID[ 237117598 ]))
-print( pen.magic_byte( pen.magic_byte( "∞" )))
+GamePrint( "∞" )
+GamePrint( pen.magic_byte( pen.BYTE_TO_ID[ 237117598 ]))
+GamePrint( pen.magic_byte( pen.magic_byte( "∞" )))
 
---write a proper validator (remove all dots from the set files, combine em all into a one thing and then go through the entirety of it and make sure the total count matches)
+local gui = GuiCreate()
+GuiStartFrame( gui )
+
+pen.new_image( gui, 1, 98, 98, 5, "data/ui_gfx/empty_white.png", 52, 52 )
+pen.new_text( gui, 0, 100, 100, 0, "#$%& (45 6LM NOPQ efghÃ ÄÅÇÈ Éтуфх цчш” „…∞でと どなにぬ ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！", {
+    dims = 100,
+    -- scale = 2,
+    -- font
+    nil_val = "balls",
+    color = {255,0,0,1},
+    is_shadow = true,
+    is_centered_x = true,
+    is_centered_y = true,
+    funcs = {
+        a1 = function()
+        end,
+        a2 = function()
+        end,
+        a3 = function()
+        end,
+        a4 = function()
+        end,
+    },
+})
+
+
+
+GuiDestroy( gui )
 
 end
 

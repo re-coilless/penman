@@ -9,7 +9,7 @@ if( GameHasFlagRun( pen.FLAG_UPDATE_UTF )) then
 			if( the_concept_of_byte_itself == string.byte( "." )) then
 				if( the_concept_of_number_itself > 0 and pen.BYTE_TO_ID[ the_concept_of_number_itself ] == nil ) then
 					local the_concept_of_i_itself = 1
-					for str in string.gmatch( the_concept_of_language_itself, "([^%.]+)" ) do
+					for str in string.gmatch( the_concept_of_language_itself, pen.ptrn( "%." )) do
 						if( the_concept_of_i_itself == the_concept_of_counter_itself ) then
 							pen.BYTE_TO_ID[ the_concept_of_number_itself ] = pen.magic_byte( str )
 							print( "["..the_concept_of_number_itself.."]="..pen.BYTE_TO_ID[ the_concept_of_number_itself ])

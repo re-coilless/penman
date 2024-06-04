@@ -821,7 +821,7 @@ function pen.get_translated_line( text )
 end
 
 function pen.magic_append( to_file, from_file )
-	local marker = "%-%-<{> MAGICAL APPEND MARKER <}>%-%-"
+	local marker = pen.MARKER_MAGIC_APPEND
 	local line_wrecker = "\n\n\n"
 	
 	local a = ModTextFileGetContent( to_file )
@@ -1005,18 +1005,27 @@ function pen.magic_byte( str ) --https://github.com/meepen/Lua-5.1-UTF-8/blob/ma
 	end
 end
 
+function pen.font_cancer( font, is_shadow )
+	if( not( pen.vld( font ))) then
+		local default = GameHasFlagRun( pen.FLAG_USE_FANCY_FONT ) and "data/fonts/generated/notosans_ko_24.bin" or "data/fonts/font_pixel"..(( is_shadow or false ) and "" or "_noshadow" )..".xml"
+		font = pen.FONT_MAP[GameTextGetTranslatedOrNot( "$current_language" )] or default
+	end
+	return font, string.find( font, "%.bin$", 1 ) == nil
+end
+
 function pen.get_char_dims( c, id, font )
 	id = id or pen.magic_byte( c )
 	c = c or pen.magic_byte( id )
-	font = font or GameTextGetTranslatedOrNot( "$current_language" )
+
+	local is_pixel_font = false
+	font, is_pixel_font = pen.font_cancer( font )
 
 	pen.char_dims_memo = pen.char_dims_memo or {}
 	pen.char_dims_memo[ font ] = pen.char_dims_memo[ font ] or {}
 	if( pen.char_dims_memo[ font ][ id ] == nil ) then
 		local gui = GuiCreate()
 		GuiStartFrame( gui )
-		local is_weird = string.find( font, "%.%a%a%a$", 1 ) == nil
-		pen.char_dims_memo[ font ][ id ] = {GuiGetTextDimensions( gui, c, 1, 2, is_weird and "" or font, false )}
+		pen.char_dims_memo[ font ][ id ] = {GuiGetTextDimensions( gui, c, 1, 2, font, is_pixel_font )}
 		GuiDestroy( gui )
 	end
 
@@ -1025,13 +1034,18 @@ end
 
 function pen.liner( text, length, height, font, nil_val )
 	if( not( pen.vld( text ))) then
-		return nil_val or {"[NIL]"}
+		text = nil_val or "[NIL]"
 	end
 
-	font = font or GameTextGetTranslatedOrNot( "$current_language" )
+	local is_pixel_font = false
+	font, is_pixel_font = pen.font_cancer( font )
 	local space_l, font_height = pen.get_char_dims( nil, 32, font )
-	length = length + space_l
+	length = ( length or 1920 ) + space_l
 	height = height or -1
+
+	if( GameGetFrameNum()%36000 == 0 ) then
+		pen.font_liner_memo = nil
+	end
 
 	local hid = length..math.abs( height )
 	pen.font_liner_memo = pen.font_liner_memo or {}
@@ -1046,16 +1060,20 @@ function pen.liner( text, length, height, font, nil_val )
 		return unpack( pen.font_liner_memo[ font ][ hid ][ text ])
 	end
 	
+	local function defancifier( str )
+		return string.gsub( string.gsub( str, pen.MARKER_FANCY_TEXT[1].."%S+;", "" ), pen.MARKER_FANCY_TEXT[2], "" )
+	end
+
 	local was_spaced = false
-	local formatted,max_l,h = {},0,0
-	local full_text = "@"..string.gsub( string.gsub( pen.t2t( text ), "\n", "@" ), "\t", "\\__" ).."@"
-	for paragraph in string.gmatch( full_text, "([^@]+)" ) do
+	local formatted, max_l, h = {}, 0, 0
+	local full_text = pen.DIV_0..string.gsub( string.gsub( pen.t2t( text ), "\n", pen.DIV_0 ), "\t", "\\__" )..pen.DIV_0
+	for paragraph in string.gmatch( full_text, pen.ptrn( 0 )) do
 		local line,l = "", 0
 		if( paragraph ~= "" ) then
 			for i,word in ipairs( pen.t2w( paragraph )) do
 				local num, range, w = 0, {1,1}, " "
 				local counter, this_l, overlines = 0, space_l, {}
-				for c in string.gmatch( word, "." ) do
+				for c in string.gmatch( defancifier( word ), "." ) do
 					num = bit.lshift( num, 10 ) + string.byte( c )
 					counter = counter + 1
 					
@@ -1086,7 +1104,10 @@ function pen.liner( text, length, height, font, nil_val )
 				local new_l = is_complicated and ( length + 1 ) or ( l + this_l )
 				if( new_l > length and line ~= "" ) then
 					local new_h = h + font_height
-					if( height > 0 and new_h > height ) then break end
+					if( height > 0 and new_h > height ) then
+						break
+					end
+
 					table.insert( formatted, { line, l })
 					line, new_l = "", new_l - l
 					h = new_h
@@ -1097,18 +1118,25 @@ function pen.liner( text, length, height, font, nil_val )
 						is_complicated = 1
 						break
 					end
+
 					h = new_h
 					table.insert( formatted, {( k > 1 and " " or "" )..string.sub( w, ( overlines[k-1] or 0 ) + 1, overpos ), length })
 					if( k == #overlines ) then
 						w, new_l = " "..string.sub( w, overpos + 1, #w ), this_l
 					end
 				end
-				if( is_complicated == 1 ) then break end
+				if( is_complicated == 1 ) then
+					break
+				end
 				line, l = line..w, new_l
 			end
 		end
+
 		local new_h = h + font_height
-		if( height > 0 and new_h > height ) then break end
+		if( height > 0 and new_h > height ) then
+			break
+		end
+
 		table.insert( formatted, { line, l })
 		h = new_h
 	end
@@ -1160,7 +1188,7 @@ function pen.magic_parse( data, separators )
 		end
 	
 		local data = {}
-		for value in string.gmatch( data_raw, "([^"..separator.."]+)" ) do
+		for value in string.gmatch( data_raw, pen.ptrn( separator )) do
 			table.insert( data, XD_extractor( value, separators, i ))
 		end
 		return data
@@ -1713,11 +1741,11 @@ function pen.access_matter_damage( entity_id, matter, damage )
 		local mtrs_dmg = ComponentGetValue2( dmg_comp, "materials_how_much_damage" )
 		
 		local tbl_mtr = {}
-		for mtr in string.gmatch( mtrs, "([^,]+)" ) do
+		for mtr in string.gmatch( mtrs, pen.ptrn( "," )) do
 			table.insert( tbl_mtr, mtr )
 		end
 		local tbl_dmg = {}
-		for mtr_dmg in string.gmatch( mtrs_dmg, "([^,]+)" ) do
+		for mtr_dmg in string.gmatch( mtrs_dmg, pen.ptrn( "," )) do
 			table.insert( tbl_dmg, mtr_dmg )
 		end
 		
@@ -1873,7 +1901,7 @@ function pen.clone_entity( entity_id, x, y, mutators )
 	EntitySetTransform( new_id, x, y )
 	
 	local tags = EntityGetTags( entity_id ) or ""
-	for value in string.gmatch( tags, "([^,]+)" ) do
+	for value in string.gmatch( tags, pen.ptrn( "," )) do
 		EntityAddTag( new_id, value )
 	end
 	local comps = EntityGetAllComponents( entity_id )
@@ -2174,15 +2202,19 @@ function pen.secs_to_time( secs )
 	return out
 end
 
-function pen.colourer( gui, c_type )
-	if( #c_type == 0 ) then return end
-	local color = { r = 0, g = 0, b = 0 }
-	if( type( c_type ) == "table" ) then
-		color.r = c_type[1] or 255
-		color.g = c_type[2] or 255
-		color.b = c_type[3] or 255
+function pen.colourer( gui, c )
+	if( not( pen.vld( c ))) then
+		return
 	end
-	GuiColorSetForNextWidget( gui, color.r/255, color.g/255, color.b/255, 1 )
+
+	c = pen.get_hybrid_table( c )
+	local color = {
+		r = c[1] or 0,
+		g = c[2] or c[1] or 0,
+		b = c[3] or c[1] or 0,
+		a = c[4] or 1
+	}
+	GuiColorSetForNextWidget( gui, color.r/255, color.g/255, color.b/255, color.a )
 end
 
 function pen.play_sound( event, x, y, no_bullshit )
@@ -2216,26 +2248,87 @@ function pen.play_entity_sound( entity_id, x, y, event_mutator, no_bullshit )
 	pen.play_sound( sound_table, x, y, no_bullshit )
 end
 
-function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, colours, scale, font ) --make it be a table thing
-	--per char function
+function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
+	-- if( GameGetFrameNum()%36000 == 0 ) then
+	-- 	metafont_memo = nil
+	-- end
+
+	local is_pixel_font = false
+	data = data or {}
+	data.font, is_pixel_font = pen.font_cancer( data.font, data.is_shadow )
+	data.scale = ( is_pixel_font and 1 or 1.25 )*( data.scale or 1 )
 	
-	local out_str = {}
-	if( text ~= nil ) then
-		if( type( text ) == "table" ) then
-			out_str = text
-		else
-			table.insert( out_str, text )
-		end
+	local dims, new_line = {}, 9
+	if( pen.vld( data.dims )) then
+		data.dims = pen.get_hybrid_table( data.dims )
+		text, dims = pen.liner( text, data.dims[1]/data.scale, ( data.dims[2] or -1 )/data.scale, data.font, data.nil_val )
 	else
-		table.insert( out_str, "[NIL]" )
+		_,dims = pen.liner( text, nil, nil, data.font )
+		text = pen.get_hybrid_table( text or data.nil_val )
+		data.dims = dims
 	end
 	
-	for i,line in ipairs( out_str ) do
-		pen.colourer( gui, colours or {})
-		GuiZSetForNextWidget( gui, pic_z )
-		GuiText( gui, pic_x, pic_y, line, scale, font )
-		pic_y = pic_y + 9
+	--probably cache the structure
+
+	local structure = {}
+	local func_list, height_counter = {}, 0
+	for i,line in ipairs( text ) do
+		local temp = line
+		local l_pos, r_pos = 0, 0
+		local new_element = { x = 0, y = height_counter }
+		if( data.is_centered_x ) then
+			local _,off = pen.liner( line, nil, nil, data.font )
+			new_element.x = ( data.dims[1] - off[1])/2
+		end
+
+		while pen.vld( temp ) do
+			local gotcha = 0
+			l_pos, r_pos = string.find( temp, pen.MARKER_FANCY_TEXT[1]..".-;" )
+			if( l_pos ~= nil ) then
+				gotcha = 1
+				goto continue
+			end
+			l_pos, r_pos = string.find( temp, pen.MARKER_FANCY_TEXT[2])
+			if( l_pos ~= nil ) then
+				gotcha = -1
+				goto continue
+			end
+			::continue::
+			new_element.text = string.sub( temp, 1, ( l_pos or 0 ) - 1 )
+			new_element.f = pen.magic_copy( func_list )
+			table.insert( structure, new_element )
+			
+			if( gotcha ~= 0 ) then
+				local _,off = pen.liner( new_element.text, nil, nil, data.font )
+				new_element.x = new_element.x + off[1]
+				
+				if( gotcha > 0 ) then
+					table.insert( func_list, string.sub( temp, l_pos + #pen.MARKER_FANCY_TEXT[1], r_pos - 1 ))
+				elseif( gotcha < 0 ) then
+					table.remove( func_list )
+				end
+			end
+			
+			temp = r_pos ~= nil and string.sub( temp, r_pos + 1, -1 ) or ""
+		end
+		height_counter = height_counter + new_line
 	end
+	
+	--for custom funcs do it per-character
+	local off_x = ( data.is_centered_x or false ) and -data.dims[1]/2 or 0
+	local off_y = ( data.is_centered_y or false ) and -math.max( data.dims[2] or 0, dims[2])/2 or 0
+	for i,element in ipairs( structure ) do
+		if( pen.vld( element.text )) then
+			local pos_x = pic_x + data.scale*( off_x + element.x )
+			local pos_y = pic_y + data.scale*( off_y + element.y )
+
+			pen.colourer( gui, data.color )
+			GuiZSetForNextWidget( gui, pic_z )
+			GuiText( gui, pos_x, pos_y, element.text, data.scale, data.font, is_pixel_font )
+		end
+	end
+
+	return uid, dims
 end
 
 function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, s_x, s_y, alpha, interactive, angle )
@@ -2304,7 +2397,7 @@ function pen.new_anim( gui, uid, auid, pic_x, pic_y, pic_z, path, amount, delay,
 	return uid
 end
 
-function pen.new_cutout( gui, uid, pic_x, pic_y, size_x, size_y, func, v )
+function pen.new_cutout( gui, uid, pic_x, pic_y, size_x, size_y, func, v ) --credit goes to aarvlo
 	uid = uid + 1
 	GuiIdPush( gui, uid )
 
@@ -2322,13 +2415,23 @@ function pen.new_cutout( gui, uid, pic_x, pic_y, size_x, size_y, func, v )
 end
 
 --[GLOBALS]
+pen.FLAG_UPDATE_UTF = "PENMAN_UTF_MAP_UPDATE"
+pen.FLAG_USE_FANCY_FONT = "PENMAN_FANCY_FONTING"
+
 pen.DIV_0 = "@"
 pen.DIV_1 = "&"
 pen.DIV_2 = "|"
 pen.DIV_3 = "!"
 pen.DIV_4 = ":"
 
-pen.FLAG_UPDATE_UTF = "PENMAN_UTF_MAP_UPDATE"
+pen.MARKER_FANCY_TEXT = { "%{>>%{", "%}<<%}" }
+pen.MARKER_MAGIC_APPEND = "%-%-<{> MAGICAL APPEND MARKER <}>%-%-"
+
+pen.FONT_MAP = {
+	["简体中文"] = "data/fonts/generated/notosans_zhcn_24.bin",
+	["日本語"] = "data/fonts/generated/notosans_jp_24.bin",
+	["한국어"] = "data/fonts/generated/notosans_ko_24.bin",
+}
 
 pen.AI_COMPS = {
 	AIAttackComponent = 1,
@@ -2705,8 +2808,10 @@ pen.BYTE_TO_ID = {
 	[87]=87,	[88]=88,	[89]=89,	[90]=90,	[91]=91,	[92]=92,	[93]=93,	[94]=94,	[95]=95,	[96]=96,	[97]=97,
 	[98]=98,	[99]=99,	[100]=100,	[101]=101,	[102]=102,	[103]=103,	[104]=104,	[105]=105,	[106]=106,	[107]=107,	[108]=108,
 	[109]=109,	[110]=110,	[111]=111,	[112]=112,	[113]=113,	[114]=114,	[115]=115,	[116]=116,	[117]=117,	[118]=118,	[119]=119,
-	[120]=120,	[121]=121,	[122]=122,	[124]=124,	[126]=126,
+	[120]=120,	[121]=121,	[122]=122,	[123]=123,	[124]=124,	[125]=125,	[126]=126,
 
+	[198832]=176,	[199831]=215,	[199863]=247,	[198841]=185,	[198834]=178,	[198835]=179,	[198830]=174,	[198845]=189,
+	[198844]=188,	[198823]=167,	[198818]=162,	[198819]=163,	[198821]=165,	[198838]=182,	[198833]=177,	[212096]=960,
 	[198817]=161,	[198825]=169,	[198827]=171,	[198828]=172,	[198843]=187,	[198847]=191,	[199808]=192,	[199809]=193,
 	[199810]=194,	[199811]=195,	[199812]=196,	[199813]=197,	[199815]=199,	[199816]=200,	[199817]=201,	[199818]=202,
 	[199819]=203,	[199820]=204,	[199821]=205,	[199822]=206,	[199823]=207,	[199825]=209,	[199827]=211,	[199828]=212,
@@ -2726,8 +2831,39 @@ pen.BYTE_TO_ID = {
 	[214148]=1092,	[214149]=1093,	[214150]=1094,	[214151]=1095,	[214152]=1096,	[214153]=1097,	[214154]=1098,	[214155]=1099,
 	[214156]=1100,	[214157]=1101,	[214158]=1102,	[214159]=1103,	[214161]=1105,
 
-	[237109395]=8211,	[237109396]=8212,	[237109401]=8217,	[237109404]=8220,
-	[237109405]=8221,	[237109406]=8222,	[237109414]=8230,	[237117598]=8734,
+	[237111465]=8361,	[237109400]=8216,	[237109408]=8224,	[237118624]=8800,	[237118600]=8776,	[237118629]=8805,	[237118628]=8804,
+	[237111468]=8364,	[237111485]=8381,	[237113495]=8471,	[237113506]=8482,	[237113504]=8480,	[237117594]=8730,	[237109437]=8253,
+	[237121688]=8984,	[237121701]=8997,	[237115537]=8593,	[237115539]=8595,	[237115536]=8592,	[237115538]=8594,	[237132943]=9679,
+	[237131936]=9632,	[237133968]=9744,	[237133969]=9745,	[237133970]=9746,	[237138067]=10003,	[237138070]=10006,	[237109395]=8211,
+	[237109396]=8212,	[237109401]=8217,	[237109404]=8220,	[237109405]=8221,	[237109406]=8222,	[237109414]=8230,	[237117598]=8734,
+
+	[250798268]=65084,	[250798231]=65047,	[250798232]=65048,	[237141160]=10216,	[237141162]=10218,	[237148297]=10633,	[237139116]=10092,
+	[237139118]=10094,	[237139120]=10096,	[237121705]=9001,	[237148305]=10641,	[237149372]=10748,	[237141161]=10217,	[237141163]=10219,
+	[237148298]=10634,	[237139117]=10093,	[237139119]=10095,	[237139121]=10097,	[237121706]=9002,	[237148306]=10642,	[237149373]=10749,
+	[250798271]=65087,	[250799232]=65088,	[250798269]=65085,	[250798270]=65086,	[250803362]=65378,	[237166754]=11810,	[237166756]=11812,
+	[250803363]=65379,	[237166755]=11811,	[237166757]=11813,	[250799234]=65090,	[250799233]=65089,	[250799236]=65092,	[250799235]=65091,
+	[237148291]=10627,	[237139124]=10100,	[250799259]=65115,	[237148292]=10628,	[237139125]=10101,	[250799260]=65116,	[237124766]=9182,
+	[237124767]=9183,	[250798263]=65079,	[250798264]=65080,	[237141158]=10214,	[237148299]=10635,	[237148301]=10637,	[237148303]=10639,
+	[237110405]=8261,	[237141159]=10215,	[237148300]=10636,	[237148302]=10638,	[237148304]=10640,	[237110406]=8262,	[237123764]=9140,
+	[237123765]=9141,	[250799239]=65095,	[250799240]=65096,	[237123766]=9142,	[237110461]=8317,	[237111437]=8333,	[237166760]=11816,
+	[237148293]=10629,	[237141166]=10222,	[237148295]=10631,	[237139112]=10088,	[237139114]=10090,	[250794174]=64830,	[250799257]=65113,
+	[237110462]=8318,	[237111438]=8334,	[237166761]=11817,	[237148294]=10630,	[237141167]=10223,	[237148296]=10632,	[237139113]=10089,
+	[237139115]=10091,	[250794175]=64831,	[250799258]=65114,	[237124764]=9180,	[237124765]=9181,	[250798261]=65077,	[250798262]=65078,
+
+	[250802337]=65313,	[250802338]=65314,	[250802339]=65315,	[250802340]=65316,	[250802341]=65317,	[250802342]=65318,	[250802343]=65319,
+	[250802344]=65320,	[250802345]=65321,	[250802346]=65322,	[250802347]=65323,	[250802348]=65324,	[250802349]=65325,	[250802350]=65326,
+	[250802351]=65327,	[250802352]=65328,	[250802353]=65329,	[250802354]=65330,	[250802355]=65331,	[250802356]=65332,	[250802357]=65333,
+	[250802358]=65334,	[250802359]=65335,	[250802360]=65336,	[250802361]=65337,	[250802362]=65338,	[250803329]=65345,	[250803330]=65346,
+	[250803331]=65347,	[250803332]=65348,	[250803333]=65349,	[250803334]=65350,	[250803335]=65351,	[250803336]=65352,	[250803337]=65353,
+	[250803338]=65354,	[250803339]=65355,	[250803340]=65356,	[250803341]=65357,	[250803342]=65358,	[250803343]=65359,	[250803344]=65360,
+	[250803345]=65361,	[250803346]=65362,	[250803347]=65363,	[250803348]=65364,	[250803349]=65365,	[250803350]=65366,	[250803351]=65367,
+	[250803352]=65368,	[250803353]=65369,	[250803354]=65370,	[250802320]=65296,	[250802321]=65297,	[250802322]=65298,	[250802323]=65299,
+	[250802324]=65300,	[250802325]=65301,	[250802326]=65302,	[250802327]=65303,	[250802328]=65304,	[250802329]=65305,	[250802305]=65281,
+	[250802306]=65282,	[250802307]=65283,	[250802308]=65284,	[250802309]=65285,	[250802310]=65286,	[250802311]=65287,	[250802315]=65291,
+	[250802316]=65292,	[250802317]=65293,	[250802318]=65294,	[250802319]=65295,	[250802330]=65306,	[250802331]=65307,	[250802332]=65308,
+	[250802334]=65310,	[250802335]=65311,	[250802336]=65312,	[250802364]=65340,	[250802366]=65342,	[250802367]=65343,	[250803328]=65344,
+	[250803356]=65372,	[250803358]=65374,	[250803365]=65381,	[250805408]=65504,	[250805409]=65505,	[250805410]=65506,	[250805411]=65507,
+	[250805412]=65508,	[250805413]=65509,	[250805414]=65510,
 
 	[238158977]=12353,	[238158978]=12354,	[238158979]=12355,	[238158980]=12356,	[238158981]=12357,	[238158982]=12358,	[238158983]=12359,
 	[238158984]=12360,	[238158985]=12361,	[238158986]=12362,	[238158987]=12363,	[238158988]=12364,	[238158989]=12365,	[238158990]=12366,
