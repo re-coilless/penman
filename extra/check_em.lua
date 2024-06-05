@@ -95,31 +95,29 @@ end
 
 function fonting()
 
-GamePrint( "∞" )
-GamePrint( pen.magic_byte( pen.BYTE_TO_ID[ 237117598 ]))
-GamePrint( pen.magic_byte( pen.magic_byte( "∞" )))
+-- GamePrint( "∞" )
+-- GamePrint( pen.magic_byte( pen.BYTE_TO_ID[ 237117598 ]))
+-- GamePrint( pen.magic_byte( pen.magic_byte( "∞" )))
 
 local gui = GuiCreate()
 GuiStartFrame( gui )
 
 pen.new_image( gui, 1, 98, 98, 5, "data/ui_gfx/empty_white.png", 52, 52 )
-pen.new_text( gui, 0, 100, 100, 0, "#$%& (45 6LM NOPQ efghÃ ÄÅÇÈ Éтуфх цчш” „…∞でと どなにぬ ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！", {
+pen.new_text( gui, 0, 100, 150, 0, "#$%& (45 \n\t;;;;; NOPQ 6LM.,\n[_;;;;; NOPQ 6LM.,{>>{a1;efghÃÄÅÇÈÉтуzabcфхцgaш”6LM.,{>>{a2;efjjgghghÃÉтуфхцчш”„…∞でとballs ass hmmどぬg}<<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！", {
     dims = 100,
     -- scale = 2,
     -- font
     nil_val = "balls",
     color = {255,0,0,1},
-    is_shadow = true,
-    is_centered_x = true,
+    -- is_shadow = true,
+    -- is_centered_x = true,
     is_centered_y = true,
     funcs = {
-        a1 = function()
+        a1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+            return uid, pic_x[1], pic_y[1], {0,255,0,0.5}
         end,
-        a2 = function()
-        end,
-        a3 = function()
-        end,
-        a4 = function()
+        a2 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+            return uid, pic_x[1], pic_y[1], {0,0,255,0.5}
         end,
     },
 })

@@ -4,8 +4,9 @@ pen = pen or {}
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---allow fancy text-encoded per-letter functions
---test chinese
+--finish pen.new_text
+--Add default text modifiers (dialogue printing, wave, rainbow, a set of standard p2k/hermes colors, shaking, reactive to mouse pointer, hyperlink with interactivity via lua globals)
+--Add tip function that does all the display logic and dev only has to define the visuals
 
 --make sure all rating functions are accurate
 --interpolation lib
@@ -412,7 +413,7 @@ function pen.generic_random( a, b, macro_drift, bidirectional )
 	
 	local tm = { GameGetDateAndTimeUTC() }
 	SetRandomSeed( math.random( GameGetFrameNum(), macro_drift ), (((( tm[2]*30 + tm[3] )*24 + tm[4] )*60 + tm[5] )*60 + tm[6] )%macro_drift )
-	Random( 1, 5 ); Random( 1, 5 ); Random( 1, 5 )
+	Random( 1, 5 );Random( 1, 5 );Random( 1, 5 )
 	return bidirectional and ( Random( a, b*2 ) - b ) or Random( a, b )
 end
 
@@ -794,10 +795,10 @@ end
 
 function pen.t2t( str, is_post )
 	if( is_post ) then
-		str = string.gsub( str, "\t", "    " )
 		str = string.gsub( str, "^%s+", "" )
 		str = string.gsub( str, "%s+$", "" )
 	else
+		str = string.gsub( str, "\t", "" )
 		str = string.gsub( str, "\r\n", "\n" )
 	end
 	return str
@@ -1061,22 +1062,52 @@ function pen.liner( text, length, height, font, nil_val )
 	end
 	
 	local function defancifier( str )
-		return string.gsub( string.gsub( str, pen.MARKER_FANCY_TEXT[1].."%S+;", "" ), pen.MARKER_FANCY_TEXT[2], "" )
+		local markers = { pen.MARKER_FANCY_TEXT[1].."%S-;", pen.MARKER_FANCY_TEXT[2]}
+		local new_str, gotcha, is_fancy = "", 0, false
+		new_str, gotcha = string.gsub( str, markers[1], "" ); is_fancy = is_fancy or ( gotcha or 0 ) > 0
+		new_str, gotcha = string.gsub( str, markers[2], "" ); is_fancy = is_fancy or ( gotcha or 0 ) > 0
+
+		local fancy_list = {}
+		if( is_fancy ) then
+			local pos, is_going = {1,1}, true
+			local l_pos, r_pos, drift = 0, 0, 0
+			while( is_going ) do
+				is_going = false
+				for i = 1,2 do
+					l_pos, r_pos = string.find( str, markers[i], pos[i])
+					if( l_pos ) then
+						local marker = string.sub( str, l_pos, r_pos )
+						pos[i], is_going = r_pos, true
+						table.insert( fancy_list, { l_pos, marker, r_pos - l_pos + 1 })
+					end
+				end
+			end
+			table.sort( fancy_list, function( a, b )
+				return a[1] < b[1]
+			end)
+			for i,marker in ipairs( fancy_list ) do
+				fancy_list[i][1] = marker[1] - drift
+				drift = drift + marker[3]
+			end
+		end
+
+		return new_str, fancy_list
 	end
 
 	local was_spaced = false
 	local formatted, max_l, h = {}, 0, 0
-	local full_text = pen.DIV_0..string.gsub( string.gsub( pen.t2t( text ), "\n", pen.DIV_0 ), "\t", "\\__" )..pen.DIV_0
+	local full_text = pen.DIV_0..string.gsub( pen.t2t( string.gsub( text, "\n\t", "\n"..pen.MARKER_TAB )), "\n", pen.DIV_0 )..pen.DIV_0
 	for paragraph in string.gmatch( full_text, pen.ptrn( 0 )) do
-		local line,l = "", 0
+		local line, l = "", 0
 		if( paragraph ~= "" ) then
-			for i,word in ipairs( pen.t2w( paragraph )) do
+			for i,raw_word in ipairs( pen.t2w( paragraph )) do
 				local num, range, w = 0, {1,1}, " "
+				local word, is_fancy = defancifier( raw_word )
 				local counter, this_l, overlines = 0, space_l, {}
-				for c in string.gmatch( defancifier( word ), "." ) do
+				for c in string.gmatch( word, "." ) do
 					num = bit.lshift( num, 10 ) + string.byte( c )
 					counter = counter + 1
-					
+
 					local id = pen.BYTE_TO_ID[ num ]
 					if( id ) then
 						w = w..string.sub( word, range[1], range[2])
@@ -1085,10 +1116,18 @@ function pen.liner( text, length, height, font, nil_val )
 						if( font_height < c_h ) then
 							font_height = c_h
 						end
-
+						
 						local new_l = this_l + c_w
 						if( new_l > length ) then
-							table.insert( overlines, counter )
+							local drift = 0
+							if( pen.vld( is_fancy )) then
+								for i,marker in ipairs( is_fancy ) do
+									if( range[2] >= marker[1] ) then
+										drift = drift + marker[3]
+									end
+								end
+							end
+							table.insert( overlines, counter + drift + 1 )
 							new_l = new_l - this_l + space_l
 						end
 						this_l = new_l
@@ -1099,7 +1138,10 @@ function pen.liner( text, length, height, font, nil_val )
 						range[2] = range[2] + 1
 					end
 				end
-				
+				if( pen.vld( is_fancy )) then
+					w = raw_word
+				end
+
 				local is_complicated = #overlines > 0
 				local new_l = is_complicated and ( length + 1 ) or ( l + this_l )
 				if( new_l > length and line ~= "" ) then
@@ -1118,11 +1160,11 @@ function pen.liner( text, length, height, font, nil_val )
 						is_complicated = 1
 						break
 					end
-
+					
 					h = new_h
-					table.insert( formatted, {( k > 1 and " " or "" )..string.sub( w, ( overlines[k-1] or 0 ) + 1, overpos ), length })
+					table.insert( formatted, {( k > 1 and " " or "" )..string.sub( w, overlines[k-1] or 0, overpos - 1 ), length })
 					if( k == #overlines ) then
-						w, new_l = " "..string.sub( w, overpos + 1, #w ), this_l
+						w, new_l = " "..string.sub( w, overpos, -1 ), this_l
 					end
 				end
 				if( is_complicated == 1 ) then
@@ -1140,9 +1182,19 @@ function pen.liner( text, length, height, font, nil_val )
 		table.insert( formatted, { line, l })
 		h = new_h
 	end
+
 	for i,line in ipairs( formatted ) do
-		if( line[2] > max_l ) then max_l = line[2] end 
-		formatted[i] = string.gsub( pen.t2t( line[1], true ), "\\__", "    " )
+		if( line[2] > max_l ) then max_l = line[2] end
+		
+		local tab_plug = ""
+		local tab_a, tab_b = string.sub( pen.MARKER_TAB, 1, 1 ), string.sub( pen.MARKER_TAB, 2, 2 )
+		tab_a = pen.get_char_dims( tab_a, pen.magic_byte( tab_a ), font )
+		tab_b = pen.get_char_dims( tab_b, pen.magic_byte( tab_b ), font )
+		local tab_l = tab_a + tab_b
+		for i = 1,math.floor( tab_l/space_l ) do
+			tab_plug = tab_plug.." "
+		end
+		formatted[i] = string.gsub( pen.t2t( line[1], true ), pen.MARKER_TAB, tab_plug )
 	end
 	
 	local dims = { max_l - space_l, h }
@@ -2253,8 +2305,8 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	-- 	metafont_memo = nil
 	-- end
 
-	local is_pixel_font = false
 	data = data or {}
+	local is_pixel_font = false
 	data.font, is_pixel_font = pen.font_cancer( data.font, data.is_shadow )
 	data.scale = ( is_pixel_font and 1 or 1.25 )*( data.scale or 1 )
 	
@@ -2274,57 +2326,89 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	local func_list, height_counter = {}, 0
 	for i,line in ipairs( text ) do
 		local temp = line
-		local l_pos, r_pos = 0, 0
+		local l_pos, r_pos = {0,0}, {0,0}
 		local new_element = { x = 0, y = height_counter }
 		if( data.is_centered_x ) then
 			local _,off = pen.liner( line, nil, nil, data.font )
 			new_element.x = ( data.dims[1] - off[1])/2
 		end
 
-		while pen.vld( temp ) do
+		while( pen.vld( temp )) do
 			local gotcha = 0
-			l_pos, r_pos = string.find( temp, pen.MARKER_FANCY_TEXT[1]..".-;" )
-			if( l_pos ~= nil ) then
+			l_pos[1], r_pos[1] = string.find( temp, pen.MARKER_FANCY_TEXT[1].."%S-;" )
+			l_pos[2], r_pos[2] = string.find( temp, pen.MARKER_FANCY_TEXT[2])
+			if( l_pos[1] ~= nil and l_pos[1] < ( l_pos[2] or #temp )) then
 				gotcha = 1
-				goto continue
-			end
-			l_pos, r_pos = string.find( temp, pen.MARKER_FANCY_TEXT[2])
-			if( l_pos ~= nil ) then
+			elseif( l_pos[2] ~= nil ) then
 				gotcha = -1
-				goto continue
+				l_pos[1], r_pos[1] = l_pos[2], r_pos[2]
 			end
-			::continue::
-			new_element.text = string.sub( temp, 1, ( l_pos or 0 ) - 1 )
+			new_element.text = string.sub( temp, 1, ( l_pos[1] or 0 ) - 1 )
 			new_element.f = pen.magic_copy( func_list )
-			table.insert( structure, new_element )
+			table.insert( structure, pen.magic_copy( new_element ))
 			
 			if( gotcha ~= 0 ) then
 				local _,off = pen.liner( new_element.text, nil, nil, data.font )
 				new_element.x = new_element.x + off[1]
 				
 				if( gotcha > 0 ) then
-					table.insert( func_list, string.sub( temp, l_pos + #pen.MARKER_FANCY_TEXT[1], r_pos - 1 ))
+					local drift = #string.gsub( pen.MARKER_FANCY_TEXT[1], "%%", "" )
+					table.insert( func_list, string.sub( temp, l_pos[1] + drift, r_pos[1] - 1 ))
 				elseif( gotcha < 0 ) then
 					table.remove( func_list )
 				end
 			end
 			
-			temp = r_pos ~= nil and string.sub( temp, r_pos + 1, -1 ) or ""
+			temp = r_pos[1] ~= nil and string.sub( temp, r_pos[1] + 1, -1 ) or ""
 		end
 		height_counter = height_counter + new_line
 	end
 	
-	--for custom funcs do it per-character
+	local counter_global, counter_local = 1, 1
 	local off_x = ( data.is_centered_x or false ) and -data.dims[1]/2 or 0
 	local off_y = ( data.is_centered_y or false ) and -math.max( data.dims[2] or 0, dims[2])/2 or 0
 	for i,element in ipairs( structure ) do
 		if( pen.vld( element.text )) then
 			local pos_x = pic_x + data.scale*( off_x + element.x )
 			local pos_y = pic_y + data.scale*( off_y + element.y )
+			
+			if( pen.vld( element.f )) then
+				local num = 0; counter_local = 1
+				local orig_x, orig_y = pos_x, pos_y
+				for c in string.gmatch( element.text, "." ) do
+					num = bit.lshift( num, 10 ) + string.byte( c )
+					
+					local id = pen.BYTE_TO_ID[ num ]
+					if( id ) then
+						num, pos_x, pos_y = 0, orig_x, orig_y
+						
+						local clr, char, font = data.color, pen.magic_byte( id ), {data.font,is_pixel_font}
+						local off = { pen.get_char_dims( char, id, font[1])}
+						for e,func in ipairs( element.f ) do
+							local new_clr, new_font, new_char = {}, {}, ""
+							if( data.funcs[func] ~= nil ) then
+								uid, pos_x, pos_y, new_clr, new_font, new_char = data.funcs[func](
+									gui, uid, {pos_x,orig_x}, {pos_y,orig_y}, pic_z, {off,char,font}, clr, {counter_global,counter_local}
+								)
+							end
+							if( pen.vld( new_clr )) then clr = new_clr end
+							if( pen.vld( new_font )) then font = new_font end
+							if( pen.vld( new_char )) then char = new_char end
+						end
+						
+						pen.colourer( gui, clr )
+						GuiZSetForNextWidget( gui, pic_z )
+						GuiText( gui, pos_x, pos_y, char, data.scale, font[1], font[2])
 
-			pen.colourer( gui, data.color )
-			GuiZSetForNextWidget( gui, pic_z )
-			GuiText( gui, pos_x, pos_y, element.text, data.scale, data.font, is_pixel_font )
+						orig_x = orig_x + off[1]
+						counter_global, counter_local = counter_global + 1, counter_local + 1
+					end
+				end
+			else
+				pen.colourer( gui, data.color )
+				GuiZSetForNextWidget( gui, pic_z )
+				GuiText( gui, pos_x, pos_y, element.text, data.scale, data.font, is_pixel_font )
+			end
 		end
 	end
 
@@ -2424,8 +2508,109 @@ pen.DIV_2 = "|"
 pen.DIV_3 = "!"
 pen.DIV_4 = ":"
 
+pen.MARKER_TAB = "\\_"
 pen.MARKER_FANCY_TEXT = { "%{>>%{", "%}<<%}" }
 pen.MARKER_MAGIC_APPEND = "%-%-<{> MAGICAL APPEND MARKER <}>%-%-"
+
+pen.PALETTE = {
+	["B"] = {0,0,0},
+	["W"] = {255,255,255},
+	
+	["VNL"] = {
+		YELLOW = {255,255,178},
+		GREY = {150,150,150},
+		RED = {208,70,70},
+		WARNING = {252,67,85},
+		DARK_SLOT = {185,220,223},
+		HP = {135,191,28},
+		FLIGHT = {255,170,64},
+		MANA = {66,168,226},
+		CAST = {252,138,67},
+	}
+
+	["HRMS"] = {
+		GOLD_1 = {205,104,61},
+		GOLD_2 = {230,144,78},
+		GOLD_3 = {251,185,84},
+		GREEN_1 = {35,144,99},
+		GREEN_2 = {30,188,115},
+		GREEN_3 = {145,219,105},
+		GREY_1 = {46,34,47},
+		GREY_2 = {105,79,98},
+		GREY_3 = {127,112,138},
+		GREY_4 = {155,171,178},
+		GREY_5 = {199,220,208},
+		RED_1 = {110,39,39},
+		RED_2 = {174,35,52},
+		RED_3 = {232,59,59},
+		BLUE_1 = {72,74,119},
+		BLUE_2 = {77,101,180},
+		BLUE_3 = {77,155,230},
+	},
+
+	["PRSP"] = {
+		PURPLE = {179,141,232},
+		BLUE = {136,121,247},
+		RED = {245,132,132},
+		WHITE = {238,226,206},
+		GREEN = {157,245,132},
+		GREY = {176,176,176},
+	},
+
+	["NCRS"] = {
+		GREY_1 = {21,29,40},
+		GREY_2 = {32,46,55},
+		GREY_3 = {57,74,80},
+		GREY_4 = {87,114,119},
+		RED_1 = {65,29,49},
+		RED_2 = {117,36,56},
+		RED_3 = {165,48,48},
+		RED_4 = {207,87,60},
+		RED_5 = {218,134,62},
+		GREEN_1 = {70,130,50},
+		GREEN_2 = {117,167,67},
+		GREEN_3 = {168,202,88},
+		GREEN_4 = {208,218,145},
+		PURPLE_1 = {36,21,39},
+		PURPLE_2 = {34,32,52},
+		PURPLE_3 = {69,40,60},
+		PURPLE_4 = {122,54,123},
+		PURPLE_5 = {162,62,140},
+		PURPLE_6 = {198,81,151},
+	},
+
+	["SWRD"] = {
+		IRON_1 = {32,46,55},
+		IRON_2 = {57,74,80},
+		IRON_3 = {87,114,119},
+		IRON_4 = {129,151,150},
+		IRON_5 = {147,152,161},
+		IRON_6 = {168,181,178},
+		STEEL_1 = {78,84,89},
+		STEEL_2 = {124,129,143},
+		STEEL_3 = {143,167,188},
+		STEEL_4 = {159,168,167},
+		STEEL_5 = {167,181,192},
+		SEAL_1 = {128,12,83},
+		SEAL_2 = {189,31,63},
+		EPEE_1 = {56,89,179},
+		EPEE_2 = {51,136,222},
+		FATE_1 = {30,64,88},
+		FATE_2 = {0,101,84},
+		HEIR_1 = {48,40,48},
+		HEIR_2 = {72,40,42},
+		CORE_1 = {124,21,120},
+		CORE_2 = {177,44,155},
+		CORE_3 = {219,48,144},
+		CORE_4 = {214,68,158},
+		CORE_5 = {232,86,146},
+		CORE_6 = {238,121,150},
+		CORE_7 = {230,154,167},
+	},
+
+	--every color must have a comment with hex
+	--N40K: ammo types, classes, misc colors
+}
 
 pen.FONT_MAP = {
 	["简体中文"] = "data/fonts/generated/notosans_zhcn_24.bin",
@@ -2808,7 +2993,7 @@ pen.BYTE_TO_ID = {
 	[87]=87,	[88]=88,	[89]=89,	[90]=90,	[91]=91,	[92]=92,	[93]=93,	[94]=94,	[95]=95,	[96]=96,	[97]=97,
 	[98]=98,	[99]=99,	[100]=100,	[101]=101,	[102]=102,	[103]=103,	[104]=104,	[105]=105,	[106]=106,	[107]=107,	[108]=108,
 	[109]=109,	[110]=110,	[111]=111,	[112]=112,	[113]=113,	[114]=114,	[115]=115,	[116]=116,	[117]=117,	[118]=118,	[119]=119,
-	[120]=120,	[121]=121,	[122]=122,	[123]=123,	[124]=124,	[125]=125,	[126]=126,
+	[120]=120,	[121]=121,	[122]=122,	[123]=123,	[124]=124,	[125]=125,	[126]=126,	[127]=127,
 
 	[198832]=176,	[199831]=215,	[199863]=247,	[198841]=185,	[198834]=178,	[198835]=179,	[198830]=174,	[198845]=189,
 	[198844]=188,	[198823]=167,	[198818]=162,	[198819]=163,	[198821]=165,	[198838]=182,	[198833]=177,	[212096]=960,

@@ -1,10 +1,10 @@
 function OnPlayerSpawned( hooman )
-	GlobalsSetValue( "HERMES_IS_REAL", "1" )
+	GlobalsSetValue( "PROSPERO_IS_REAL", "1" )
 	
 	local world_id = GameGetWorldStateEntity()
 	EntityAddChild( world_id, EntityLoad( "mods/penman/extra/ctrl_body.xml" ))
 	
-	--logo is pen in inkpot
+	--logo is prospero themed book
 end
 
 penman_w = penman_w or ModTextFileSetContent
