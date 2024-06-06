@@ -18,7 +18,7 @@ if( hooman == 0 or pen.testing_done ) then
         fonting()
         -- entity_cloner()
         -- text2func()
-        
+
         return
     end
 end
@@ -99,12 +99,12 @@ function fonting()
 -- GamePrint( pen.magic_byte( pen.BYTE_TO_ID[ 237117598 ]))
 -- GamePrint( pen.magic_byte( pen.magic_byte( "∞" )))
 
-local gui = GuiCreate()
+gui = gui or GuiCreate()
 GuiStartFrame( gui )
 
 pen.new_image( gui, 1, 98, 98, 5, "data/ui_gfx/empty_white.png", 52, 52 )
-pen.new_text( gui, 0, 100, 150, 0, "#$%& (45 \n\t;;;;; NOPQ 6LM.,\n[_;;;;; NOPQ 6LM.,{>>{a1;efghÃÄÅÇÈÉтуzabcфхцgaш”6LM.,{>>{a2;efjjgghghÃÉтуфхцчш”„…∞でとballs ass hmmどぬg}<<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！", {
-    dims = 100,
+pen.new_text( gui, 0, 100, 150, 0, "#$%& (45\n|          |{>e1>{\n\t||||| NOPQ {>e2>{6LM.,}<e1<}\n/_;;;;; NOPQ}<e2<} 6LM.,{>c1>{efghÃÄÅ{>e6>{ÇÈÉтуzab cфхцgaш”6LM.,}<e6<}{>c2>{{>e5>{efjjgghghÃÉту}<e5<}фхцчш”„…∞{>e4>{でとどぬballlls}<e4<} {>e3>{;ass}<e3<} hmmmでとg}<c2<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf", {
+    dims = {100,100},
     -- scale = 2,
     -- font
     nil_val = "balls",
@@ -113,18 +113,26 @@ pen.new_text( gui, 0, 100, 150, 0, "#$%& (45 \n\t;;;;; NOPQ 6LM.,\n[_;;;;; NOPQ 
     -- is_centered_x = true,
     is_centered_y = true,
     funcs = {
-        a1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+        c1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
             return uid, pic_x[1], pic_y[1], {0,255,0,0.5}
         end,
-        a2 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-            return uid, pic_x[1], pic_y[1], {0,0,255,0.5}
+        c2 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+            return uid, pic_x[1], pic_y[1], pen.PALETTE.PRSP.RED
+        end,
+
+        e1 = pen.FONT_MODS.wave,
+        e2 = pen.FONT_MODS.quake,
+        e3 = pen.FONT_MODS.cancer,
+        e4 = pen.FONT_MODS.rainbow,
+        e5 = pen.FONT_MODS.shadow,
+        e6 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+            return pen.FONT_MODS.hyperlink( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, "balls" )
         end,
     },
 })
-
-
-
-GuiDestroy( gui )
+if( pen.font_hyperlink_state[ "balls" ][2] == GameGetFrameNum()) then
+    EntityLoad( "data/entities/animals/scavenger_smg.xml", 0, -200 )
+end
 
 end
 

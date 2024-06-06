@@ -4,8 +4,6 @@ pen = pen or {}
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---finish pen.new_text
---Add default text modifiers (dialogue printing, wave, rainbow, a set of standard p2k/hermes colors, shaking, reactive to mouse pointer, hyperlink with interactivity via lua globals)
 --Add tip function that does all the display logic and dev only has to define the visuals
 
 --make sure all rating functions are accurate
@@ -795,8 +793,8 @@ end
 
 function pen.t2t( str, is_post )
 	if( is_post ) then
-		str = string.gsub( str, "^%s+", "" )
-		str = string.gsub( str, "%s+$", "" )
+		str = string.gsub( str, "^ +", "" )
+		str = string.gsub( str, " +$", "" )
 	else
 		str = string.gsub( str, "\t", "" )
 		str = string.gsub( str, "\r\n", "\n" )
@@ -1011,22 +1009,27 @@ function pen.font_cancer( font, is_shadow )
 		local default = GameHasFlagRun( pen.FLAG_USE_FANCY_FONT ) and "data/fonts/generated/notosans_ko_24.bin" or "data/fonts/font_pixel"..(( is_shadow or false ) and "" or "_noshadow" )..".xml"
 		font = pen.FONT_MAP[GameTextGetTranslatedOrNot( "$current_language" )] or default
 	end
-	return font, string.find( font, "%.bin$", 1 ) == nil
+	return font, string.find( font, "%.bin$", 1 ) == nil, pen.FONT_SPACING[ font ] or 0
 end
 
 function pen.get_char_dims( c, id, font )
 	id = id or pen.magic_byte( c )
 	c = c or pen.magic_byte( id )
 
-	local is_pixel_font = false
-	font, is_pixel_font = pen.font_cancer( font )
+	local is_pixel_font, line_offset = false, 0
+	font, is_pixel_font, line_offset = pen.font_cancer( font )
 
 	pen.char_dims_memo = pen.char_dims_memo or {}
 	pen.char_dims_memo[ font ] = pen.char_dims_memo[ font ] or {}
 	if( pen.char_dims_memo[ font ][ id ] == nil ) then
 		local gui = GuiCreate()
 		GuiStartFrame( gui )
-		pen.char_dims_memo[ font ][ id ] = {GuiGetTextDimensions( gui, c, 1, 2, font, is_pixel_font )}
+
+		local reference = GuiGetTextDimensions( gui, ".", 1, 0, font, is_pixel_font )
+		pen.char_dims_memo[ font ][ id ] = { pen.catch( GuiGetTextDimensions, { gui, "."..c..".", 1, 0, font, is_pixel_font }, {0,0})}
+		pen.char_dims_memo[ font ][ id ][1] = pen.char_dims_memo[ font ][ id ][1] - 2*reference
+		pen.char_dims_memo[ font ][ id ][2] = pen.char_dims_memo[ font ][ id ][2] - line_offset
+
 		GuiDestroy( gui )
 	end
 
@@ -1040,10 +1043,10 @@ function pen.liner( text, length, height, font, nil_val )
 
 	local is_pixel_font = false
 	font, is_pixel_font = pen.font_cancer( font )
-	local space_l, font_height = pen.get_char_dims( nil, 32, font )
+	local space_l, font_height = pen.get_char_dims( " ", nil, font )
 	length = ( length or 1920 ) + space_l
 	height = height or -1
-
+	
 	if( GameGetFrameNum()%36000 == 0 ) then
 		pen.font_liner_memo = nil
 	end
@@ -1062,11 +1065,11 @@ function pen.liner( text, length, height, font, nil_val )
 	end
 	
 	local function defancifier( str )
-		local markers = { pen.MARKER_FANCY_TEXT[1].."%S-;", pen.MARKER_FANCY_TEXT[2]}
-		local new_str, gotcha, is_fancy = "", 0, false
-		new_str, gotcha = string.gsub( str, markers[1], "" ); is_fancy = is_fancy or ( gotcha or 0 ) > 0
-		new_str, gotcha = string.gsub( str, markers[2], "" ); is_fancy = is_fancy or ( gotcha or 0 ) > 0
-
+		local markers = { pen.MARKER_FANCY_TEXT[1], pen.MARKER_FANCY_TEXT[2]}
+		local new_str, gotcha, is_fancy = str, 0, false
+		new_str, gotcha = string.gsub( new_str, markers[1], "" ); is_fancy = is_fancy or ( gotcha or 0 ) > 0
+		new_str, gotcha = string.gsub( new_str, markers[2], "" ); is_fancy = is_fancy or ( gotcha or 0 ) > 0
+		
 		local fancy_list = {}
 		if( is_fancy ) then
 			local pos, is_going = {1,1}, true
@@ -1093,24 +1096,24 @@ function pen.liner( text, length, height, font, nil_val )
 
 		return new_str, fancy_list
 	end
-
+	
 	local was_spaced = false
 	local formatted, max_l, h = {}, 0, 0
-	local full_text = pen.DIV_0..string.gsub( pen.t2t( string.gsub( text, "\n\t", "\n"..pen.MARKER_TAB )), "\n", pen.DIV_0 )..pen.DIV_0
+	local full_text = string.gsub( text, " + ", "\t" )
+	full_text = pen.DIV_0..string.gsub( pen.t2t( string.gsub( full_text, "\t", pen.MARKER_TAB )), "\n", pen.DIV_0 )..pen.DIV_0
 	for paragraph in string.gmatch( full_text, pen.ptrn( 0 )) do
 		local line, l = "", 0
 		if( paragraph ~= "" ) then
-			for i,raw_word in ipairs( pen.t2w( paragraph )) do
-				local num, range, w = 0, {1,1}, " "
+			for i,raw_word in ipairs( pen.t2w( pen.t2t( paragraph, true ))) do
+				local num, range, w = 0, {1,1}, ""
+				local this_l, overlines = space_l, {}
 				local word, is_fancy = defancifier( raw_word )
-				local counter, this_l, overlines = 0, space_l, {}
 				for c in string.gmatch( word, "." ) do
 					num = bit.lshift( num, 10 ) + string.byte( c )
-					counter = counter + 1
-
+					
 					local id = pen.BYTE_TO_ID[ num ]
 					if( id ) then
-						w = w..string.sub( word, range[1], range[2])
+						num, w = 0, w..string.sub( word, range[1], range[2])
 
 						local c_w, c_h = pen.get_char_dims( nil, id, font )
 						if( font_height < c_h ) then
@@ -1118,25 +1121,24 @@ function pen.liner( text, length, height, font, nil_val )
 						end
 						
 						local new_l = this_l + c_w
-						if( new_l > length ) then
+						if( new_l > length - space_l ) then
 							local drift = 0
 							if( pen.vld( is_fancy )) then
 								for i,marker in ipairs( is_fancy ) do
-									if( range[2] >= marker[1] ) then
+									if( range[2] >= marker[1]) then
 										drift = drift + marker[3]
 									end
 								end
 							end
-							table.insert( overlines, counter + drift + 1 )
+							
+							table.insert( overlines, range[2] + drift + 1 )
 							new_l = new_l - this_l + space_l
 						end
 						this_l = new_l
 						
-						num, range[1] = 0, range[2] + 1
-						range[2] = range[1]
-					else
-						range[2] = range[2] + 1
+						range[1] = range[2] + 1
 					end
+					range[2] = range[2] + 1
 				end
 				if( pen.vld( is_fancy )) then
 					w = raw_word
@@ -1162,15 +1164,15 @@ function pen.liner( text, length, height, font, nil_val )
 					end
 					
 					h = new_h
-					table.insert( formatted, {( k > 1 and " " or "" )..string.sub( w, overlines[k-1] or 0, overpos - 1 ), length })
+					table.insert( formatted, { string.sub( w, overlines[k-1] or 0, overpos - 1 ), length })
 					if( k == #overlines ) then
-						w, new_l = " "..string.sub( w, overpos, -1 ), this_l
+						w, new_l = string.sub( w, overpos, -1 ), this_l
 					end
 				end
 				if( is_complicated == 1 ) then
 					break
 				end
-				line, l = line..w, new_l
+				line, l = line..( #line > 0 and " " or "" )..w, new_l
 			end
 		end
 
@@ -1182,7 +1184,7 @@ function pen.liner( text, length, height, font, nil_val )
 		table.insert( formatted, { line, l })
 		h = new_h
 	end
-
+	
 	for i,line in ipairs( formatted ) do
 		if( line[2] > max_l ) then max_l = line[2] end
 		
@@ -1194,13 +1196,13 @@ function pen.liner( text, length, height, font, nil_val )
 		for i = 1,math.floor( tab_l/space_l ) do
 			tab_plug = tab_plug.." "
 		end
-		formatted[i] = string.gsub( pen.t2t( line[1], true ), pen.MARKER_TAB, tab_plug )
+		formatted[i] = string.gsub( line[1], pen.MARKER_TAB, tab_plug )
 	end
 	
 	local dims = { max_l - space_l, h }
-	pen.font_liner_memo[ font ][ hid ][ text ] = { formatted, dims }
+	pen.font_liner_memo[ font ][ hid ][ text ] = { formatted, dims, font_height }
 	pen.font_liner_memo.reset_num = pen.font_liner_memo.reset_num + 1
-	return formatted, dims
+	return unpack( pen.font_liner_memo[ font ][ hid ][ text ])
 end
 
 function pen.magic_parse( data, separators )
@@ -2306,20 +2308,17 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	-- end
 
 	data = data or {}
-	local is_pixel_font = false
+	data.scale = data.scale or 1
+	local dims, is_pixel_font, new_line = {}, false, 9
 	data.font, is_pixel_font = pen.font_cancer( data.font, data.is_shadow )
-	data.scale = ( is_pixel_font and 1 or 1.25 )*( data.scale or 1 )
-	
-	local dims, new_line = {}, 9
 	if( pen.vld( data.dims )) then
 		data.dims = pen.get_hybrid_table( data.dims )
-		text, dims = pen.liner( text, data.dims[1]/data.scale, ( data.dims[2] or -1 )/data.scale, data.font, data.nil_val )
+		text, dims, new_line = pen.liner( text, data.dims[1]/data.scale, ( data.dims[2] or -1 )/data.scale, data.font, data.nil_val )
 	else
-		_,dims = pen.liner( text, nil, nil, data.font )
-		text = pen.get_hybrid_table( text or data.nil_val )
+		text, dims, new_line = pen.liner( text, nil, nil, data.font, data.nil_val )
 		data.dims = dims
 	end
-	
+
 	--probably cache the structure
 
 	local structure = {}
@@ -2335,7 +2334,7 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 
 		while( pen.vld( temp )) do
 			local gotcha = 0
-			l_pos[1], r_pos[1] = string.find( temp, pen.MARKER_FANCY_TEXT[1].."%S-;" )
+			l_pos[1], r_pos[1] = string.find( temp, pen.MARKER_FANCY_TEXT[1])
 			l_pos[2], r_pos[2] = string.find( temp, pen.MARKER_FANCY_TEXT[2])
 			if( l_pos[1] ~= nil and l_pos[1] < ( l_pos[2] or #temp )) then
 				gotcha = 1
@@ -2348,14 +2347,18 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 			table.insert( structure, pen.magic_copy( new_element ))
 			
 			if( gotcha ~= 0 ) then
-				local _,off = pen.liner( new_element.text, nil, nil, data.font )
-				new_element.x = new_element.x + off[1]
+				local _,off = pen.liner( "."..new_element.text..".", nil, nil, data.font )
+				new_element.x = new_element.x + off[1] - 2*GuiGetTextDimensions( gui, ".", 1, 0, data.font, is_pixel_font )
 				
 				if( gotcha > 0 ) then
-					local drift = #string.gsub( pen.MARKER_FANCY_TEXT[1], "%%", "" )
-					table.insert( func_list, string.sub( temp, l_pos[1] + drift, r_pos[1] - 1 ))
-				elseif( gotcha < 0 ) then
-					table.remove( func_list )
+					table.insert( func_list, string.sub( temp, l_pos[1] + 2, r_pos[1] - 2 ))
+				elseif( gotcha < 0 and pen.vld( func_list )) then
+					local _,id = pen.from_tbl_with_id( func_list, string.sub( temp, l_pos[1] + 2, r_pos[1] - 2 ))
+					if( pen.vld( id )) then
+						table.remove( func_list, id )
+					else
+						func_list = {}
+					end
 				end
 			end
 			
@@ -2385,20 +2388,22 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 						local clr, char, font = data.color, pen.magic_byte( id ), {data.font,is_pixel_font}
 						local off = { pen.get_char_dims( char, id, font[1])}
 						for e,func in ipairs( element.f ) do
-							local new_clr, new_font, new_char = {}, {}, ""
+							local new_clr, new_font, new_char = {}, {}, nil
 							if( data.funcs[func] ~= nil ) then
 								uid, pos_x, pos_y, new_clr, new_font, new_char = data.funcs[func](
-									gui, uid, {pos_x,orig_x}, {pos_y,orig_y}, pic_z, {off,char,font}, clr, {counter_global,counter_local}
+									gui, uid, {pos_x,orig_x}, {pos_y,orig_y}, pic_z, {char,off,font}, clr, {counter_global,counter_local}
 								)
 							end
 							if( pen.vld( new_clr )) then clr = new_clr end
 							if( pen.vld( new_font )) then font = new_font end
-							if( pen.vld( new_char )) then char = new_char end
+							if( new_char ~= nil ) then char = new_char end
 						end
 						
-						pen.colourer( gui, clr )
-						GuiZSetForNextWidget( gui, pic_z )
-						GuiText( gui, pos_x, pos_y, char, data.scale, font[1], font[2])
+						if( pen.vld( char )) then
+							pen.colourer( gui, clr )
+							GuiZSetForNextWidget( gui, pic_z )
+							GuiText( gui, pos_x, pos_y, char, data.scale, font[1], font[2])
+						end
 
 						orig_x = orig_x + off[1]
 						counter_global, counter_local = counter_global + 1, counter_local + 1
@@ -2509,7 +2514,7 @@ pen.DIV_3 = "!"
 pen.DIV_4 = ":"
 
 pen.MARKER_TAB = "\\_"
-pen.MARKER_FANCY_TEXT = { "%{>>%{", "%}<<%}" }
+pen.MARKER_FANCY_TEXT = { "%{>%S->%{", "%}<%S-<%}" }
 pen.MARKER_MAGIC_APPEND = "%-%-<{> MAGICAL APPEND MARKER <}>%-%-"
 
 pen.PALETTE = {
@@ -2526,7 +2531,7 @@ pen.PALETTE = {
 		FLIGHT = {255,170,64},
 		MANA = {66,168,226},
 		CAST = {252,138,67},
-	}
+	},
 
 	["HRMS"] = {
 		GOLD_1 = {205,104,61},
@@ -2616,6 +2621,83 @@ pen.FONT_MAP = {
 	["简体中文"] = "data/fonts/generated/notosans_zhcn_24.bin",
 	["日本語"] = "data/fonts/generated/notosans_jp_24.bin",
 	["한국어"] = "data/fonts/generated/notosans_ko_24.bin",
+}
+pen.FONT_SPACING = {
+	["data/fonts/generated/notosans_zhcn_24.bin"] = 1.5,
+	["data/fonts/generated/notosans_jp_24.bin"] = 1.5,
+	["data/fonts/generated/notosans_ko_24.bin"] = 1.5,
+}
+pen.FONT_MODS = {
+	_bold = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		pen.colourer( gui, color )
+		GuiZSetForNextWidget( gui, pic_z )
+		local off_x, off_y = pen.get_char_dims( char_data[1], nil, char_data[3][1])
+		GuiText( gui, pic_x[1] - 0.25*off_x, pic_y[1] - 0.25*off_y, char_data[1], 1.25, char_data[3][1], char_data[3][2])
+		return uid, pic_x[1], pic_y[1], nil, nil, ""
+	end,
+	_italic = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		--get letter pic
+		return uid, pic_x[1], pic_y[1]
+	end,
+	shadow = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		return uid, pic_x[1], pic_y[1], nil, { "data/fonts/font_pixel.xml", true }
+	end,
+	cancer = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		local new_one = pen.magic_byte( pen.generic_random( 33, 127 ))
+		return uid, pic_x[1], pic_y[1], nil, nil, new_one == "$" and "!" or new_one
+	end,
+	
+	wave = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		pic_y[1] = pic_y[1] + math.sin( 0.5*indexes[1] + GameGetFrameNum()/7 )
+		return uid, pic_x[1], pic_y[1]
+	end,
+	quake = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		pic_x[1] = pic_x[1] + pen.generic_random( 0, 100, nil, true )/200
+		pic_y[1] = pic_y[1] + pen.generic_random( 0, 100, nil, true )/200
+		return uid, pic_x[1], pic_y[1]
+	end,
+	rainbow = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		color = pen.magic_rbg( color, false, "hsv" )
+		color[1] = (( 5*indexes[1] + GameGetFrameNum())%100 )/100
+		return uid, pic_x[1], pic_y[1], pen.magic_rbg( color, true, "hsv" )
+	end,
+
+	_reactive = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		--hovering over a letter generates waves
+		return uid, pic_x[1], pic_y[1]
+	end,
+	_dialogue = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		--make another layer of formatting that will allow to tweak the params of this one
+		return uid, pic_x[1], pic_y[1]
+	end,
+	hyperlink = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, link_id )
+		link_id = link_id or "default"
+		pen.font_hyperlink_state = pen.font_hyperlink_state or {}
+		pen.font_hyperlink_state[ link_id ] = pen.font_hyperlink_state[ link_id ] or {0,0}
+
+		local off_x, off_y = pen.get_char_dims( char_data[1], nil, char_data[3][1])
+
+		local frame_num = GameGetFrameNum()
+		local state = pen.font_hyperlink_state[ link_id ]
+		color = state[2] == 0 and pen.PALETTE.VNL.MANA or pen.PALETTE.VNL.RED
+		if( frame_num < state[1]) then
+			pen.colourer( gui, color )
+			uid = pen.new_image( gui, uid, pic_x[1], pic_y[1] + off_y*0.8, pic_z + 0.001, "data/ui_gfx/empty_white.png", off_x*0.5, 0.5 )
+		end
+		
+		uid = pen.new_image( gui, uid, pic_x[1] - off_x*0.25, pic_y[1], pic_z, "data/ui_gfx/empty.png", off_x*0.75, off_y*0.5, 1, true )
+		local clicked, _, is_hovered = GuiGetPreviousWidgetInfo( gui )
+		if( is_hovered ) then
+			pen.font_hyperlink_state[ link_id ][1] = frame_num + 5
+		end
+		if( clicked ) then
+			pen.font_hyperlink_state[ link_id ][2] = frame_num
+		end
+		
+		return uid, pic_x[1], pic_y[1], color
+	end,
+
+	--a set of standard p2k/hermes colors
 }
 
 pen.AI_COMPS = {
