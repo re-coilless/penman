@@ -103,7 +103,7 @@ gui = gui or GuiCreate()
 GuiStartFrame( gui )
 
 pen.new_image( gui, 1, 98, 98, 5, "data/ui_gfx/empty_white.png", 52, 52 )
-pen.new_text( gui, 0, 100, 150, 0, "#$%& (45\n|          |{>e1>{\n\t||||| NOPQ {>e2>{6LM.,}<e1<}\n/_;;;;; NOPQ}<e2<} 6LM.,{>c1>{efghÃÄÅ{>e6>{ÇÈÉтуzab cфхцgaш”6LM.,}<e6<}{>c2>{{>e5>{efjjgghghÃÉту}<e5<}фхцчш”„…∞{>e4>{でとどぬballlls}<e4<} {>e3>{;ass}<e3<} hmmmでとg}<c2<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf", {
+pen.new_text( gui, 0, 100, 150, 0, "#$%& (45\n|{-}you_should_not_see_this{-}|{>wave>{\n\t||||| NOPQ {>quake>{6LM.,}<wave<}\n/_;;;;; NOPQ}<quake<} 6LM.,{>c1>{efghÃÄÅ{>e1>{ÇÈÉтуzab cфхцgaш”6LM.,}<e1<}{>c2>{{>shadow>{efjjgghghÃÉту}<shadow<}фхцчш”„…∞{>rainbow>{でとどぬballlls}<rainbow<} {>cancer>{;ass}<cancer<} hmmmでとg}<c2<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf", {
     dims = {100,100},
     -- scale = 2,
     -- font
@@ -120,12 +120,7 @@ pen.new_text( gui, 0, 100, 150, 0, "#$%& (45\n|          |{>e1>{\n\t||||| NOPQ {
             return uid, pic_x[1], pic_y[1], pen.PALETTE.PRSP.RED
         end,
 
-        e1 = pen.FONT_MODS.wave,
-        e2 = pen.FONT_MODS.quake,
-        e3 = pen.FONT_MODS.cancer,
-        e4 = pen.FONT_MODS.rainbow,
-        e5 = pen.FONT_MODS.shadow,
-        e6 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+        e1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
             return pen.FONT_MODS.hyperlink( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, "balls" )
         end,
     },

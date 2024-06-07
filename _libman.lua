@@ -29,6 +29,12 @@ if( GameHasFlagRun( pen.FLAG_UPDATE_UTF )) then
 end
 
 local lib = {}
+local orig_do_mod_appends = do_mod_appends
+do_mod_appends = function( filename, ... ) --stolen from https://github.com/alex-3141/noita-parallax
+    pen.LOCAL_PATH = filename:match("(.+/)[^/]+")
+    do_mod_appends = orig_do_mod_appends
+    do_mod_appends( filename, ... )
+end
 
 function lib.magic_write( path, file )
 	local id = tonumber( GlobalsGetValue( "PENMAN_WRITE_INDEX", "0" ))

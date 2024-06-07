@@ -4,10 +4,13 @@ pen = pen or {}
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
+--finish new_text
 --Add tip function that does all the display logic and dev only has to define the visuals
+--figure out https://github.com/EvaisaDev/Unshackle
+--new serialization with 4 markers ({|}|,|=) to get any depth and string indexed support (the same way lua tables work) + autoconverter for old formats
 
 --make sure all rating functions are accurate
---interpolation lib
+--interpolation lib (https://github.com/peete-q/assets/blob/master/lua-modules/lib/interpolate.lua)
 --lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
 --autoappended shader lib
 
@@ -1065,18 +1068,20 @@ function pen.liner( text, length, height, font, nil_val )
 	end
 	
 	local function defancifier( str )
-		local markers = { pen.MARKER_FANCY_TEXT[1], pen.MARKER_FANCY_TEXT[2]}
+		local markers = pen.MARKER_FANCY_TEXT
 		local new_str, gotcha, is_fancy = str, 0, false
-		new_str, gotcha = string.gsub( new_str, markers[1], "" ); is_fancy = is_fancy or ( gotcha or 0 ) > 0
-		new_str, gotcha = string.gsub( new_str, markers[2], "" ); is_fancy = is_fancy or ( gotcha or 0 ) > 0
-		
+		for i = 1,#markers do
+			new_str, gotcha = string.gsub( new_str, markers[i], "" )
+			is_fancy = is_fancy or ( gotcha or 0 ) > 0
+		end
+
 		local fancy_list = {}
 		if( is_fancy ) then
-			local pos, is_going = {1,1}, true
+			local pos, is_going = {1,1,1}, true
 			local l_pos, r_pos, drift = 0, 0, 0
 			while( is_going ) do
 				is_going = false
-				for i = 1,2 do
+				for i = 1,#markers do
 					l_pos, r_pos = string.find( str, markers[i], pos[i])
 					if( l_pos ) then
 						local marker = string.sub( str, l_pos, r_pos )
@@ -2307,8 +2312,10 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	-- 	metafont_memo = nil
 	-- end
 
+	--cache the structure
+	
 	data = data or {}
-	data.scale = data.scale or 1
+	data.scale, data.funcs = data.scale or 1, data.funcs or {}
 	local dims, is_pixel_font, new_line = {}, false, 9
 	data.font, is_pixel_font = pen.font_cancer( data.font, data.is_shadow )
 	if( pen.vld( data.dims )) then
@@ -2318,14 +2325,15 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 		text, dims, new_line = pen.liner( text, nil, nil, data.font, data.nil_val )
 		data.dims = dims
 	end
-
-	--probably cache the structure
+	for name,func in pairs( pen.FONT_MODS ) do
+		data.funcs[ name ] = func
+	end
 
 	local structure = {}
 	local func_list, height_counter = {}, 0
 	for i,line in ipairs( text ) do
 		local temp = line
-		local l_pos, r_pos = {0,0}, {0,0}
+		local l_pos, r_pos = {0,0,0}, {0,0,0}
 		local new_element = { x = 0, y = height_counter }
 		if( data.is_centered_x ) then
 			local _,off = pen.liner( line, nil, nil, data.font )
@@ -2334,8 +2342,9 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 
 		while( pen.vld( temp )) do
 			local gotcha = 0
-			l_pos[1], r_pos[1] = string.find( temp, pen.MARKER_FANCY_TEXT[1])
-			l_pos[2], r_pos[2] = string.find( temp, pen.MARKER_FANCY_TEXT[2])
+			for i = 1,2 do
+				l_pos[i], r_pos[i] = string.find( temp, pen.MARKER_FANCY_TEXT[i])
+			end
 			if( l_pos[1] ~= nil and l_pos[1] < ( l_pos[2] or #temp )) then
 				gotcha = 1
 			elseif( l_pos[2] ~= nil ) then
@@ -2361,6 +2370,15 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 					end
 				end
 			end
+
+			--pass the stuff that is inside to the following character if there is a function
+			l_pos[3], r_pos[3] = string.find( temp, pen.MARKER_FANCY_TEXT[3])
+			if( l_pos[3] ~= nil ) then
+				if( pen.vld( func_list )) then
+					--remove from string, add to extra field with r_pos num
+				end
+				temp = string.sub( temp, l_pos[3], r_pos[3])
+			end
 			
 			temp = r_pos[1] ~= nil and string.sub( temp, r_pos[1] + 1, -1 ) or ""
 		end
@@ -2374,7 +2392,6 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 		if( pen.vld( element.text )) then
 			local pos_x = pic_x + data.scale*( off_x + element.x )
 			local pos_y = pic_y + data.scale*( off_y + element.y )
-			
 			if( pen.vld( element.f )) then
 				local num = 0; counter_local = 1
 				local orig_x, orig_y = pos_x, pos_y
@@ -2514,7 +2531,7 @@ pen.DIV_3 = "!"
 pen.DIV_4 = ":"
 
 pen.MARKER_TAB = "\\_"
-pen.MARKER_FANCY_TEXT = { "%{>%S->%{", "%}<%S-<%}" }
+pen.MARKER_FANCY_TEXT = { "%{>%S->%{", "%}<%S-<%}", "%{%-%}%S-%{%-%}" }
 pen.MARKER_MAGIC_APPEND = "%-%-<{> MAGICAL APPEND MARKER <}>%-%-"
 
 pen.PALETTE = {
