@@ -12,10 +12,10 @@ if( hooman == 0 or pen.testing_done ) then
     if( pen.testing_done == 1 ) then
         return
     else
-        -- pen.testing_done = 1
-
-        -- misc_tests()
-        fonting()
+        pen.testing_done = 1
+        
+        misc_tests()
+        -- fonting()
         -- entity_cloner()
         -- text2func()
 
@@ -27,6 +27,10 @@ pen.testing_done = true
 -- *************************************************************************
 
 function misc_tests()
+
+pen.print_table( pen.magic_parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
+
+--[[
 
 pen.matter_fabricator( 0, -100, {
     matter = "sand",
@@ -89,7 +93,7 @@ pen.magic_comp( hooman, { "DamageModelComponent", "balls" }, function( comp_id, 
     v.hp = 0.01
 end)
 
-end
+]]end
 
 -- *************************************************************************
 

@@ -7,12 +7,11 @@ pen = pen or {}
 --finish new_text
 --Add tip function that does all the display logic and dev only has to define the visuals
 --figure out https://github.com/EvaisaDev/Unshackle
---new serialization with 4 markers ({|}|,|=) to get any depth and string indexed support (the same way lua tables work) + autoconverter for old formats
+--shader appending func (steal from n40)
 
 --make sure all rating functions are accurate
 --interpolation lib (https://github.com/peete-q/assets/blob/master/lua-modules/lib/interpolate.lua)
 --lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
---autoappended shader lib
 
 --update dialogsystem
 --reorder and move all the gui stuff to the very bottom
@@ -273,6 +272,38 @@ function pen.catch( f, input, fallback )
 		table.remove( out, 1 )
 		return unpack( out )
 	end
+end
+
+function pen.cache( structure, update_func, data )
+	data = data or {}
+	data.reset_count = data.reset_count or 999
+	data.reset_frame = data.reset_frame or 36000
+
+	pen.cached = pen.cached or {}
+	local the_one = pen.cached
+	structure = pen.get_hybrid_table( structure )
+	for i = 1,( #structure - 1 ) do
+		the_one[ structure[i]] = the_one[ structure[i]] or {}
+		the_one = the_one[ structure[i]]
+	end
+
+	local name = structure[1]
+	pen.cached[ name ].cache_reset_count = pen.cached[ name ].cache_reset_count or 0
+	pen.cached[ name ].cache_reset_frame = pen.cached[ name ].cache_reset_frame or 0
+	local is_too_many = data.reset_count > 0 and pen.cached[ name ].cache_reset_count > data.reset_count
+	local is_too_long = data.reset_frame > 0 and GameGetFrameNum() > data.reset_frame
+	if( data.reset_now or is_too_many or is_too_long ) then
+		pen.cached[ name ] = {}
+		pen.cached[ name ].cache_reset_count = 0
+		pen.cached[ name ].cache_reset_frame = GameGetFrameNum() + data.reset_frame
+	end
+
+	local val = structure[ #structure ]
+	if( the_one[ val ] == nil ) then
+		the_one[ val ] = { update_func()}
+		pen.cached[ name ].cache_reset_count = pen.cached[ name ].cache_reset_count + 1
+	end
+	return unpack( the_one[ val ])
 end
 
 function pen.chrono( f, input, storage_comp, name )
@@ -779,7 +810,6 @@ end
 function pen.ptrn( id )
 	return "([^"..( type( id ) == "number" and pen[ "DIV_"..( id or 1 )] or tostring( id )).."]+)"
 end
-
 function pen.ctrn( str, marker, string_indexed )
 	local t = {}
 
@@ -792,6 +822,31 @@ function pen.ctrn( str, marker, string_indexed )
 	end
 	
 	return t
+end
+
+function pen.w2c( word, on_char, do_pre, on_iter )
+	local num = 0 
+	for c in string.gmatch( word, "." ) do
+		if( do_pre ~= false and on_iter ~= nil ) then
+			on_iter()
+		end
+
+		if( on_char ~= nil ) then
+			num = bit.lshift( num, 10 ) + string.byte( c )
+
+			local id = pen.BYTE_TO_ID[ num ]
+			if( id ) then
+				num = 0
+				if( on_char( id )) then
+					break
+				end
+			end
+		end
+
+		if( do_pre ~= true and on_iter ~= nil ) then
+			on_iter()
+		end
+	end
 end
 
 function pen.t2t( str, is_post )
@@ -908,7 +963,7 @@ function pen.magic_herder( new_file, default, overrides )
 	return herd
 end
 
-function pen.set_translations( path )
+function pen.set_translations( path ) --check if this works when new languges get added
 	local file, main = ModTextFileGetContent( path ), "data/translations/common.csv"
 	ModTextFileSetContent( main, ModTextFileGetContent( main )..string.gsub( file, "^[^\n]*\n", "" ))
 end
@@ -1021,22 +1076,17 @@ function pen.get_char_dims( c, id, font )
 
 	local is_pixel_font, line_offset = false, 0
 	font, is_pixel_font, line_offset = pen.font_cancer( font )
-
-	pen.char_dims_memo = pen.char_dims_memo or {}
-	pen.char_dims_memo[ font ] = pen.char_dims_memo[ font ] or {}
-	if( pen.char_dims_memo[ font ][ id ] == nil ) then
+	return pen.cache({ "char_dims", font, id }, function()
 		local gui = GuiCreate()
 		GuiStartFrame( gui )
 
 		local reference = GuiGetTextDimensions( gui, ".", 1, 0, font, is_pixel_font )
-		pen.char_dims_memo[ font ][ id ] = { pen.catch( GuiGetTextDimensions, { gui, "."..c..".", 1, 0, font, is_pixel_font }, {0,0})}
-		pen.char_dims_memo[ font ][ id ][1] = pen.char_dims_memo[ font ][ id ][1] - 2*reference
-		pen.char_dims_memo[ font ][ id ][2] = pen.char_dims_memo[ font ][ id ][2] - line_offset
+		local out = { pen.catch( GuiGetTextDimensions, { gui, "."..c..".", 1, 0, font, is_pixel_font }, {0,0})}
+		out[1], out[2] = out[1] - 2*reference, out[2] - line_offset
 
 		GuiDestroy( gui )
-	end
-
-	return unpack( pen.char_dims_memo[ font ][ id ])
+		return unpack( out )
+	end)
 end
 
 function pen.liner( text, length, height, font, nil_val )
@@ -1047,26 +1097,9 @@ function pen.liner( text, length, height, font, nil_val )
 	local is_pixel_font = false
 	font, is_pixel_font = pen.font_cancer( font )
 	local space_l, font_height = pen.get_char_dims( " ", nil, font )
-	length = ( length or 1920 ) + space_l
-	height = height or -1
-	
-	if( GameGetFrameNum()%36000 == 0 ) then
-		pen.font_liner_memo = nil
-	end
-
+	length, height = ( length or 1920 ) + space_l, height or -1
 	local hid = length..math.abs( height )
-	pen.font_liner_memo = pen.font_liner_memo or {}
-	pen.font_liner_memo.reset_num = pen.font_liner_memo.reset_num or 0
-	if( pen.font_liner_memo.reset_num > 999 ) then
-		pen.font_liner_memo = {}
-		pen.font_liner_memo.reset_num = 0
-	end
-	pen.font_liner_memo[ font ] = pen.font_liner_memo[ font ] or {}
-	pen.font_liner_memo[ font ][ hid ] = pen.font_liner_memo[ font ][ hid ] or {}
-	if( pen.font_liner_memo[ font ][ hid ][ text ] ~= nil ) then
-		return unpack( pen.font_liner_memo[ font ][ hid ][ text ])
-	end
-	
+
 	local function defancifier( str )
 		local markers = pen.MARKER_FANCY_TEXT
 		local new_str, gotcha, is_fancy = str, 0, false
@@ -1102,165 +1135,181 @@ function pen.liner( text, length, height, font, nil_val )
 		return new_str, fancy_list
 	end
 	
-	local was_spaced = false
-	local formatted, max_l, h = {}, 0, 0
-	local full_text = string.gsub( text, " + ", "\t" )
-	full_text = pen.DIV_0..string.gsub( pen.t2t( string.gsub( full_text, "\t", pen.MARKER_TAB )), "\n", pen.DIV_0 )..pen.DIV_0
-	for paragraph in string.gmatch( full_text, pen.ptrn( 0 )) do
-		local line, l = "", 0
-		if( paragraph ~= "" ) then
-			for i,raw_word in ipairs( pen.t2w( pen.t2t( paragraph, true ))) do
-				local num, range, w = 0, {1,1}, ""
-				local this_l, overlines = space_l, {}
-				local word, is_fancy = defancifier( raw_word )
-				for c in string.gmatch( word, "." ) do
-					num = bit.lshift( num, 10 ) + string.byte( c )
-					
-					local id = pen.BYTE_TO_ID[ num ]
-					if( id ) then
-						num, w = 0, w..string.sub( word, range[1], range[2])
+	local function do_a_word( formatted, line, l, h, raw_word )
+		local range, w = {1,1}, ""
+		local this_l, overlines = space_l, {}
+		local word, is_fancy = defancifier( raw_word )
+		pen.w2c( word, function( id )
+			w = w..string.sub( word, range[1], range[2])
 
-						local c_w, c_h = pen.get_char_dims( nil, id, font )
-						if( font_height < c_h ) then
-							font_height = c_h
-						end
-						
-						local new_l = this_l + c_w
-						if( new_l > length - space_l ) then
-							local drift = 0
-							if( pen.vld( is_fancy )) then
-								for i,marker in ipairs( is_fancy ) do
-									if( range[2] >= marker[1]) then
-										drift = drift + marker[3]
-									end
-								end
-							end
-							
-							table.insert( overlines, range[2] + drift + 1 )
-							new_l = new_l - this_l + space_l
-						end
-						this_l = new_l
-						
-						range[1] = range[2] + 1
-					end
-					range[2] = range[2] + 1
-				end
+			local c_w, c_h = pen.get_char_dims( nil, id, font )
+			if( font_height < c_h ) then
+				font_height = c_h
+			end
+			
+			local new_l = this_l + c_w
+			if( new_l > length - space_l ) then
+				local drift = 0
 				if( pen.vld( is_fancy )) then
-					w = raw_word
+					for i,marker in ipairs( is_fancy ) do
+						if( range[2] >= marker[1]) then
+							drift = drift + marker[3]
+						end
+					end
 				end
+				
+				table.insert( overlines, range[2] + drift + 1 )
+				new_l = new_l - this_l + space_l
+			end
+			this_l = new_l
+			
+			range[1] = range[2] + 1
+		end, false, function()
+			range[2] = range[2] + 1
+		end)
+		if( pen.vld( is_fancy )) then
+			w = raw_word
+		end
 
-				local is_complicated = #overlines > 0
-				local new_l = is_complicated and ( length + 1 ) or ( l + this_l )
-				if( new_l > length and line ~= "" ) then
-					local new_h = h + font_height
-					if( height > 0 and new_h > height ) then
-						break
-					end
+		local is_complicated = #overlines > 0
+		local new_l = is_complicated and ( length + 1 ) or ( l + this_l )
+		if( new_l > length and line ~= "" ) then
+			local new_h = h + font_height
+			if( height > 0 and new_h > height ) then
+				return
+			end
 
-					table.insert( formatted, { line, l })
-					line, new_l = "", new_l - l
-					h = new_h
-				end
-				for k,overpos in ipairs( overlines ) do
-					local new_h = h + font_height
-					if( height > 0 and new_h > height ) then
-						is_complicated = 1
-						break
-					end
-					
-					h = new_h
-					table.insert( formatted, { string.sub( w, overlines[k-1] or 0, overpos - 1 ), length })
-					if( k == #overlines ) then
-						w, new_l = string.sub( w, overpos, -1 ), this_l
-					end
-				end
-				if( is_complicated == 1 ) then
-					break
-				end
-				line, l = line..( #line > 0 and " " or "" )..w, new_l
+			table.insert( formatted, { line, l })
+			line, new_l = "", new_l - l
+			h = new_h
+		end
+		for k,overpos in ipairs( overlines ) do
+			local new_h = h + font_height
+			if( height > 0 and new_h > height ) then
+				is_complicated = 1
+				break
+			end
+			
+			h = new_h
+			table.insert( formatted, { string.sub( w, overlines[k-1] or 0, overpos - 1 ), length })
+			if( k == #overlines ) then
+				w, new_l = string.sub( w, overpos, -1 ), this_l
 			end
 		end
 
-		local new_h = h + font_height
-		if( height > 0 and new_h > height ) then
-			break
-		end
+		if( is_complicated == 1 ) then return end
+		return line..( #line > 0 and " " or "" )..w, new_l, h
+	end
 
-		table.insert( formatted, { line, l })
-		h = new_h
-	end
+	return pen.cache({ "font_liner", font, hid, text }, function()
+		local formatted, max_l, h = {}, 0, 0
+		local full_text = string.gsub( text, " + ", "\t" )
+		full_text = pen.DIV_0..string.gsub( pen.t2t( string.gsub( full_text, "\t", pen.MARKER_TAB )), "\n", pen.DIV_0 )..pen.DIV_0
+		for paragraph in string.gmatch( full_text, pen.ptrn( 0 )) do
+			local line, l = "", 0
+			if( paragraph ~= "" ) then
+				for i,raw_word in ipairs( pen.t2w( pen.t2t( paragraph, true ))) do
+					local new_line, new_l, new_h = do_a_word( formatted, line, l, h, raw_word )
+					if( new_line ) then
+						line, l, h = new_line, new_l, new_h
+					else
+						break
+					end
+				end
+			end
+			
+			local new_h = h + font_height
+			if( height > 0 and new_h > height ) then
+				break
+			end
 	
-	for i,line in ipairs( formatted ) do
-		if( line[2] > max_l ) then max_l = line[2] end
-		
-		local tab_plug = ""
-		local tab_a, tab_b = string.sub( pen.MARKER_TAB, 1, 1 ), string.sub( pen.MARKER_TAB, 2, 2 )
-		tab_a = pen.get_char_dims( tab_a, pen.magic_byte( tab_a ), font )
-		tab_b = pen.get_char_dims( tab_b, pen.magic_byte( tab_b ), font )
-		local tab_l = tab_a + tab_b
-		for i = 1,math.floor( tab_l/space_l ) do
-			tab_plug = tab_plug.." "
+			table.insert( formatted, { line, l })
+			h = new_h
 		end
-		formatted[i] = string.gsub( line[1], pen.MARKER_TAB, tab_plug )
-	end
-	
-	local dims = { max_l - space_l, h }
-	pen.font_liner_memo[ font ][ hid ][ text ] = { formatted, dims, font_height }
-	pen.font_liner_memo.reset_num = pen.font_liner_memo.reset_num + 1
-	return unpack( pen.font_liner_memo[ font ][ hid ][ text ])
+		
+		for i,line in ipairs( formatted ) do
+			if( line[2] > max_l ) then max_l = line[2] end
+			
+			local tab_plug = ""
+			local tab_a, tab_b = string.sub( pen.MARKER_TAB, 1, 1 ), string.sub( pen.MARKER_TAB, 2, 2 )
+			tab_a = pen.get_char_dims( tab_a, pen.magic_byte( tab_a ), font )
+			tab_b = pen.get_char_dims( tab_b, pen.magic_byte( tab_b ), font )
+			local tab_l = tab_a + tab_b
+			for i = 1,math.floor( tab_l/space_l ) do
+				tab_plug = tab_plug.." "
+			end
+			formatted[i] = string.gsub( line[1], pen.MARKER_TAB, tab_plug )
+		end
+		
+		return formatted, { max_l - space_l, h }, font_height
+	end)
 end
 
-function pen.magic_parse( data, separators )
-	if( not( pen.vld( data ))) then
-		return
+function pen.magic_parse( data )
+	if( not( pen.vld( data ))) then return end
+	local function ser( tbl )--special thanks to ImmortalDamned
+		return ({
+			["nil"] = function( v ) return tostring( v ) end,
+			["number"] = function( v ) return tostring( v ) end,
+			["string"] = function( v ) return "\""..v.."\"" end,
+			["boolean"] = function( v ) return tostring( v ) end,
+			["table"] = function( t )
+				local s, i = "{", 1
+				local l = pen.get_table_count( t )
+				for k,v in pairs( t ) do
+					s = s.."["..ser( k ).."]="..ser( v )..( i < l and "," or "" )
+					i = i + 1
+				end
+				return s.."}"
+			end,
+			--["function"] = function( v )
+			--    return string.dump( v )
+			--end,
+		})[ type( tbl )]( tbl )
 	end
-	separators = separators or { pen.DIV_1, pen.DIV_2, pen.DIV_3, pen.DIV_4 }
-
-	local function XD_packer( data, separators, i )
-		data = data or 0
-		i = ( i or 0 ) + 1
-		local separator = separators[i]
-		if( separator == nil or type( data ) ~= "table" ) then
-			return tostring( data )
-		end
-
-		local data_raw, is_weird = separator, pen.is_table_weird( data )
-		for name,value in pairs( data ) do
-			if( is_weird ) then
-				data_raw = data_raw..name..separator
+	local function dser( str )
+		return pen.cache({ "table_parse", str }, function()
+			local out = {}
+			if( string.sub( str, 1, 1 ) ~= "{" ) then return out end
+			str = ","..string.sub( string.sub( str, 2, -1 ), 1, -2 )..","
+			
+			local function s2v( s )
+				local is_string = string.sub( s, 1, 1 ) == "\""
+				if( is_string ) then
+					s = string.sub( s, 2, -2 )
+				else
+					is_string = tonumber( s )
+					if( is_string == nil ) then
+						s = s == "true"
+					else
+						s = is_string
+					end
+				end
+				return s
 			end
-			data_raw = data_raw..XD_packer( value, separators, i )..separator
-		end
-		return data_raw
+			local function s2n( s )
+				local name = string.sub( s, string.find( s, "^%[\"?.-\"?%]=" ))
+				return s2v( string.sub( name, 2, -3 ))
+			end
+			
+			for v in string.gmatch( str, "%[[^%]]+]=%b{}" ) do --special thanks to dextercd and nphhpn
+				local a,b = string.find( str, v, 1, true )
+				str = string.sub( str, 1, a - 1 )..string.sub( str, b + 1, -1 )
+				out[ s2n( v )] = dser( string.gsub( v, "^%[\"?.-\"?%]=", "" ) )
+			end
+			for i,v in ipairs( pen.ctrn( str, "," )) do
+				out[ s2n( v )] = s2v( string.gsub( v, "^%[\"?.-\"?%]=", "" ))
+			end
+			
+			return out
+		end)
 	end
 	
-	local function XD_extractor( data_raw, separators, i )
-		data_raw = data_raw or 0
-		if( type( data_raw ) ~= "string" ) then
-			return
-		end
-		i = ( i or 0 ) + 1
-		local separator = separators[i]
-		if( separator == nil or string.find( data_raw, separator, 1, true ) == nil ) then
-			local num = tonumber( data_raw )
-			return ( num == nil and data_raw or num )
-		end
-	
-		local data = {}
-		for value in string.gmatch( data_raw, pen.ptrn( separator )) do
-			table.insert( data, XD_extractor( value, separators, i ))
-		end
-		return data
-	end
-
 	local out = nil
 	if( type( data ) == "table" ) then
-		local depth = pen.get_table_depth( data )
-		if( pen.get_table_count( data ) > 0 and #separators >= depth ) then
-			out = XD_packer( data, separators )
-		end
+		out = ser( data )
 	elseif( pen.vld( data )) then
-		out = XD_extractor( data, separators )
+		out = dser( data )
 	end
 	return out
 end
@@ -1791,7 +1840,7 @@ function pen.get_custom_effect( hooman, effect_name, effect_id )
 	end
 end
 
-function pen.access_matter_damage( entity_id, matter, damage )
+function pen.access_matter_damage( entity_id, matter, damage ) --make this a magic comp thing
 	if( damage ~= nil ) then
 		EntitySetDamageFromMaterial( entity_id, matter, damage )
 	else
@@ -2393,39 +2442,34 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 			local pos_x = pic_x + data.scale*( off_x + element.x )
 			local pos_y = pic_y + data.scale*( off_y + element.y )
 			if( pen.vld( element.f )) then
-				local num = 0; counter_local = 1
+				counter_local = 1 --local counter is kinda weird
 				local orig_x, orig_y = pos_x, pos_y
-				for c in string.gmatch( element.text, "." ) do
-					num = bit.lshift( num, 10 ) + string.byte( c )
+				pen.w2c( element.text, function( id )
+					pos_x, pos_y = orig_x, orig_y
 					
-					local id = pen.BYTE_TO_ID[ num ]
-					if( id ) then
-						num, pos_x, pos_y = 0, orig_x, orig_y
-						
-						local clr, char, font = data.color, pen.magic_byte( id ), {data.font,is_pixel_font}
-						local off = { pen.get_char_dims( char, id, font[1])}
-						for e,func in ipairs( element.f ) do
-							local new_clr, new_font, new_char = {}, {}, nil
-							if( data.funcs[func] ~= nil ) then
-								uid, pos_x, pos_y, new_clr, new_font, new_char = data.funcs[func](
-									gui, uid, {pos_x,orig_x}, {pos_y,orig_y}, pic_z, {char,off,font}, clr, {counter_global,counter_local}
-								)
-							end
-							if( pen.vld( new_clr )) then clr = new_clr end
-							if( pen.vld( new_font )) then font = new_font end
-							if( new_char ~= nil ) then char = new_char end
+					local clr, char, font = data.color, pen.magic_byte( id ), {data.font,is_pixel_font}
+					local off = { pen.get_char_dims( char, id, font[1])}
+					for e,func in ipairs( element.f ) do
+						local new_clr, new_font, new_char = {}, {}, nil
+						if( data.funcs[func] ~= nil ) then
+							uid, pos_x, pos_y, new_clr, new_font, new_char = data.funcs[func](
+								gui, uid, {pos_x,orig_x}, {pos_y,orig_y}, pic_z, {char,off,font}, clr, {counter_global,counter_local}
+							)
 						end
-						
-						if( pen.vld( char )) then
-							pen.colourer( gui, clr )
-							GuiZSetForNextWidget( gui, pic_z )
-							GuiText( gui, pos_x, pos_y, char, data.scale, font[1], font[2])
-						end
-
-						orig_x = orig_x + off[1]
-						counter_global, counter_local = counter_global + 1, counter_local + 1
+						if( pen.vld( new_clr )) then clr = new_clr end
+						if( pen.vld( new_font )) then font = new_font end
+						if( new_char ~= nil ) then char = new_char end
 					end
-				end
+					
+					if( pen.vld( char )) then
+						pen.colourer( gui, clr )
+						GuiZSetForNextWidget( gui, pic_z )
+						GuiText( gui, pos_x, pos_y, char, data.scale, font[1], font[2])
+					end
+
+					orig_x = orig_x + off[1]
+					counter_global, counter_local = counter_global + 1, counter_local + 1
+				end)
 			else
 				pen.colourer( gui, data.color )
 				GuiZSetForNextWidget( gui, pic_z )
@@ -2489,7 +2533,7 @@ function pen.new_anim( gui, uid, auid, pic_x, pic_y, pic_z, path, amount, delay,
 	anims_state = anims_state or {}
 	anims_state[auid] = anims_state[auid] or { 1, 0 }
 	
-	pen.new_image( gui, uid, pic_x, pic_y, pic_z, path..anims_state[auid][1]..".png", s_x, s_y, alpha, interactive )
+	uid = pen.new_image( gui, uid, pic_x, pic_y, pic_z, path..anims_state[auid][1]..".png", s_x, s_y, alpha, interactive )
 	
 	anims_state[auid][2] = anims_state[auid][2] + 1
 	if( anims_state[auid][2] > delay ) then
@@ -2531,7 +2575,7 @@ pen.DIV_3 = "!"
 pen.DIV_4 = ":"
 
 pen.MARKER_TAB = "\\_"
-pen.MARKER_FANCY_TEXT = { "%{>%S->%{", "%}<%S-<%}", "%{%-%}%S-%{%-%}" }
+pen.MARKER_FANCY_TEXT = { "{>%S->{", "}<%S-<}", "{%-}%S-{%-}" }
 pen.MARKER_MAGIC_APPEND = "%-%-<{> MAGICAL APPEND MARKER <}>%-%-"
 
 pen.PALETTE = {
