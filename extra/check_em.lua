@@ -14,7 +14,7 @@ if( hooman == 0 or pen.testing_done ) then
     else
         pen.testing_done = 1
         
-        misc_tests()
+        -- misc_tests()
         -- fonting()
         -- entity_cloner()
         -- text2func()
@@ -107,29 +107,31 @@ gui = gui or GuiCreate()
 GuiStartFrame( gui )
 
 pen.new_image( gui, 1, 98, 98, 5, "data/ui_gfx/empty_white.png", 52, 52 )
-pen.new_text( gui, 0, 100, 150, 0, "#$%& (45\n|{-}you_should_not_see_this{-}|{>wave>{\n\t||||| NOPQ {>quake>{6LM.,}<wave<}\n/_;;;;; NOPQ}<quake<} 6LM.,{>c1>{efghÃÄÅ{>e1>{ÇÈÉтуzab cфхцgaш”6LM.,}<e1<}{>c2>{{>shadow>{efjjgghghÃÉту}<shadow<}фхцчш”„…∞{>rainbow>{でとどぬballlls}<rainbow<} {>cancer>{;ass}<cancer<} hmmmでとg}<c2<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf", {
-    dims = {100,100},
-    -- scale = 2,
-    -- font
-    nil_val = "balls",
-    color = {255,0,0,1},
-    -- is_shadow = true,
-    -- is_centered_x = true,
-    is_centered_y = true,
-    funcs = {
-        c1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-            return uid, pic_x[1], pic_y[1], {0,255,0,0.5}
-        end,
-        c2 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-            return uid, pic_x[1], pic_y[1], pen.PALETTE.PRSP.RED
-        end,
+for i = 1,10 do
+    pen.chrono( pen.new_text, { gui, 0, 100, 150, 0, "#$%& (45\n|{-}you_should_not_see_this{-}|{>wave>{\n\thmmmmm {-}balls{-}NOPQ {>quake>{{-}ass{-}6LM.,}<wave<}\n/_;;;;; NOPQ}<quake<} 6LM.,{>c1>{efghÃÄÅ{>e1>{ÇÈÉтуzab cфхцgaш”6LM.,}<e1<}{>c2>{{>shadow>{efjjgghghÃÉту}<shadow<}фхцчш”„…∞{>rainbow>{でとどぬballlls}<rainbow<} {>cancer>{;ass}<cancer<} hmmmでとg}<c2<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf", {
+        dims = {100, i == 8 and 99 or 100},
+        -- scale = 2,
+        -- font
+        nil_val = "balls",
+        color = {255,0,0,1},
+        -- is_shadow = true,
+        is_centered_x = i == 3,
+        is_centered_y = true,
+        funcs = {
+            c1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+                return uid, pic_x[1], pic_y[1], {0,255,0,0.5}
+            end,
+            c2 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+                return uid, pic_x[1], pic_y[1], pen.PALETTE.PRSP.RED
+            end,
 
-        e1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-            return pen.FONT_MODS.hyperlink( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, "balls" )
-        end,
-    },
-})
-if( pen.font_hyperlink_state[ "balls" ][2] == GameGetFrameNum()) then
+            e1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+                return pen.FONT_MODS.hyperlink( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, "balls" )
+            end,
+        },
+    }})
+end
+if(( pen.cache({ "hyperlink_state", "balls" }) or -1 ) == GameGetFrameNum()) then
     EntityLoad( "data/entities/animals/scavenger_smg.xml", 0, -200 )
 end
 

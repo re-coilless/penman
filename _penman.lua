@@ -4,7 +4,6 @@ pen = pen or {}
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---finish new_text
 --Add tip function that does all the display logic and dev only has to define the visuals
 --figure out https://github.com/EvaisaDev/Unshackle
 --shader appending func (steal from n40)
@@ -279,31 +278,36 @@ function pen.cache( structure, update_func, data )
 	data.reset_count = data.reset_count or 999
 	data.reset_frame = data.reset_frame or 36000
 
-	pen.cached = pen.cached or {}
-	local the_one = pen.cached
-	structure = pen.get_hybrid_table( structure )
-	for i = 1,( #structure - 1 ) do
-		the_one[ structure[i]] = the_one[ structure[i]] or {}
-		the_one = the_one[ structure[i]]
-	end
-
 	local name = structure[1]
+	pen.cached = pen.cached or {}
+	pen.cached[ name ] = pen.cached[ name ] or {}
 	pen.cached[ name ].cache_reset_count = pen.cached[ name ].cache_reset_count or 0
 	pen.cached[ name ].cache_reset_frame = pen.cached[ name ].cache_reset_frame or 0
+
 	local is_too_many = data.reset_count > 0 and pen.cached[ name ].cache_reset_count > data.reset_count
 	local is_too_long = data.reset_frame > 0 and GameGetFrameNum() > data.reset_frame
-	if( data.reset_now or is_too_many or is_too_long ) then
+	if( data.reset_now or ( update_func ~= nil and ( is_too_many or is_too_long ))) then
 		pen.cached[ name ] = {}
 		pen.cached[ name ].cache_reset_count = 0
 		pen.cached[ name ].cache_reset_frame = GameGetFrameNum() + data.reset_frame
 	end
 
+	local the_one = pen.cached[ name ]
+	structure = pen.get_hybrid_table( structure )
+	for i = 2,( #structure - 1 ) do
+		the_one[ structure[i]] = the_one[ structure[i]] or {}
+		the_one = the_one[ structure[i]]
+	end
+
 	local val = structure[ #structure ]
-	if( the_one[ val ] == nil ) then
+	if( data.always_update ) then
+		local new_val = { update_func( the_one[ val ])}
+		if( pen.vld( new_val )) then the_one[ val ] = new_val end
+	elseif( the_one[ val ] == nil and update_func ~= nil ) then
 		the_one[ val ] = { update_func()}
 		pen.cached[ name ].cache_reset_count = pen.cached[ name ].cache_reset_count + 1
 	end
-	return unpack( the_one[ val ])
+	return unpack( the_one[ val ] or {})
 end
 
 function pen.chrono( f, input, storage_comp, name )
@@ -460,7 +464,7 @@ function pen.uint2color( color )
 	return { bit.band( color, 0xff ), bit.band( bit.rshift( color, 8 ), 0xff ), bit.band( bit.rshift( color, 16 ), 0xff )}
 end
 
-function pen.magic_rbg( c, to_rbg, mode )
+function pen.magic_rgb( c, to_rbg, mode )
 	--HSV: https://github.com/iskolbin/lhsx/blob/master/hsx.lua
 	--OKLAB: https://bottosson.github.io/posts/oklab/#converting-from-linear-srgb-to-oklab
 
@@ -2329,19 +2333,14 @@ function pen.play_sound( event, x, y, no_bullshit )
 	if( type( event ) ~= "table" ) then
 		event = { "mods/penman/sfx/penman.bank", event, }
 	end
-	no_bullshit = no_bullshit or false
 	
-	if( not( no_bullshit )) then
+	if( not( no_bullshit or false )) then
 		local sfx_id = tostring( GameGetFrameNum())..event[2]
-		if( sound_played == sfx_id ) then
-			return
-		end
-		sound_played = sfx_id
+		if( pen.sound_played == sfx_id ) then return end
+		pen.sound_played = sfx_id
 	end
 	
-	if( x == nil ) then
-		x, y = GameGetCameraPos()
-	end
+	if( x == nil ) then x, y = GameGetCameraPos() end
 	GamePlaySound( event[1], event[2], x, y )
 end
 
@@ -2354,131 +2353,6 @@ function pen.play_entity_sound( entity_id, x, y, event_mutator, no_bullshit )
 		return
 	end
 	pen.play_sound( sound_table, x, y, no_bullshit )
-end
-
-function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
-	-- if( GameGetFrameNum()%36000 == 0 ) then
-	-- 	metafont_memo = nil
-	-- end
-
-	--cache the structure
-	
-	data = data or {}
-	data.scale, data.funcs = data.scale or 1, data.funcs or {}
-	local dims, is_pixel_font, new_line = {}, false, 9
-	data.font, is_pixel_font = pen.font_cancer( data.font, data.is_shadow )
-	if( pen.vld( data.dims )) then
-		data.dims = pen.get_hybrid_table( data.dims )
-		text, dims, new_line = pen.liner( text, data.dims[1]/data.scale, ( data.dims[2] or -1 )/data.scale, data.font, data.nil_val )
-	else
-		text, dims, new_line = pen.liner( text, nil, nil, data.font, data.nil_val )
-		data.dims = dims
-	end
-	for name,func in pairs( pen.FONT_MODS ) do
-		data.funcs[ name ] = func
-	end
-
-	local structure = {}
-	local func_list, height_counter = {}, 0
-	for i,line in ipairs( text ) do
-		local temp = line
-		local l_pos, r_pos = {0,0,0}, {0,0,0}
-		local new_element = { x = 0, y = height_counter }
-		if( data.is_centered_x ) then
-			local _,off = pen.liner( line, nil, nil, data.font )
-			new_element.x = ( data.dims[1] - off[1])/2
-		end
-
-		while( pen.vld( temp )) do
-			local gotcha = 0
-			for i = 1,2 do
-				l_pos[i], r_pos[i] = string.find( temp, pen.MARKER_FANCY_TEXT[i])
-			end
-			if( l_pos[1] ~= nil and l_pos[1] < ( l_pos[2] or #temp )) then
-				gotcha = 1
-			elseif( l_pos[2] ~= nil ) then
-				gotcha = -1
-				l_pos[1], r_pos[1] = l_pos[2], r_pos[2]
-			end
-			new_element.text = string.sub( temp, 1, ( l_pos[1] or 0 ) - 1 )
-			new_element.f = pen.magic_copy( func_list )
-			table.insert( structure, pen.magic_copy( new_element ))
-			
-			if( gotcha ~= 0 ) then
-				local _,off = pen.liner( "."..new_element.text..".", nil, nil, data.font )
-				new_element.x = new_element.x + off[1] - 2*GuiGetTextDimensions( gui, ".", 1, 0, data.font, is_pixel_font )
-				
-				if( gotcha > 0 ) then
-					table.insert( func_list, string.sub( temp, l_pos[1] + 2, r_pos[1] - 2 ))
-				elseif( gotcha < 0 and pen.vld( func_list )) then
-					local _,id = pen.from_tbl_with_id( func_list, string.sub( temp, l_pos[1] + 2, r_pos[1] - 2 ))
-					if( pen.vld( id )) then
-						table.remove( func_list, id )
-					else
-						func_list = {}
-					end
-				end
-			end
-
-			--pass the stuff that is inside to the following character if there is a function
-			l_pos[3], r_pos[3] = string.find( temp, pen.MARKER_FANCY_TEXT[3])
-			if( l_pos[3] ~= nil ) then
-				if( pen.vld( func_list )) then
-					--remove from string, add to extra field with r_pos num
-				end
-				temp = string.sub( temp, l_pos[3], r_pos[3])
-			end
-			
-			temp = r_pos[1] ~= nil and string.sub( temp, r_pos[1] + 1, -1 ) or ""
-		end
-		height_counter = height_counter + new_line
-	end
-	
-	local counter_global, counter_local = 1, 1
-	local off_x = ( data.is_centered_x or false ) and -data.dims[1]/2 or 0
-	local off_y = ( data.is_centered_y or false ) and -math.max( data.dims[2] or 0, dims[2])/2 or 0
-	for i,element in ipairs( structure ) do
-		if( pen.vld( element.text )) then
-			local pos_x = pic_x + data.scale*( off_x + element.x )
-			local pos_y = pic_y + data.scale*( off_y + element.y )
-			if( pen.vld( element.f )) then
-				counter_local = 1 --local counter is kinda weird
-				local orig_x, orig_y = pos_x, pos_y
-				pen.w2c( element.text, function( id )
-					pos_x, pos_y = orig_x, orig_y
-					
-					local clr, char, font = data.color, pen.magic_byte( id ), {data.font,is_pixel_font}
-					local off = { pen.get_char_dims( char, id, font[1])}
-					for e,func in ipairs( element.f ) do
-						local new_clr, new_font, new_char = {}, {}, nil
-						if( data.funcs[func] ~= nil ) then
-							uid, pos_x, pos_y, new_clr, new_font, new_char = data.funcs[func](
-								gui, uid, {pos_x,orig_x}, {pos_y,orig_y}, pic_z, {char,off,font}, clr, {counter_global,counter_local}
-							)
-						end
-						if( pen.vld( new_clr )) then clr = new_clr end
-						if( pen.vld( new_font )) then font = new_font end
-						if( new_char ~= nil ) then char = new_char end
-					end
-					
-					if( pen.vld( char )) then
-						pen.colourer( gui, clr )
-						GuiZSetForNextWidget( gui, pic_z )
-						GuiText( gui, pos_x, pos_y, char, data.scale, font[1], font[2])
-					end
-
-					orig_x = orig_x + off[1]
-					counter_global, counter_local = counter_global + 1, counter_local + 1
-				end)
-			else
-				pen.colourer( gui, data.color )
-				GuiZSetForNextWidget( gui, pic_z )
-				GuiText( gui, pos_x, pos_y, element.text, data.scale, data.font, is_pixel_font )
-			end
-		end
-	end
-
-	return uid, dims
 end
 
 function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, s_x, s_y, alpha, interactive, angle )
@@ -2519,6 +2393,188 @@ function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic )
 	GuiOptionsAddForNextWidget( gui, 47 ) --NoSound
 	local clicked, r_clicked = GuiImageButton( gui, uid, pic_x, pic_y, "", pic )
 	return uid, clicked, r_clicked
+end
+
+function pen.new_interface( gui, uid, pos, pic_z, is_debugging )
+	local x, y, s_x, s_y = pos[1], pos[2], math.abs( pos[3] or 1 ), math.abs( pos[4] or 1 )
+
+	local is_vertical = s_x < s_y
+	local width = is_vertical and s_x or s_y
+	local clicked, r_clicked, hovered = false, false, false
+	
+	local function do_interface( p_x, p_y )
+		uid = pen.new_image( gui, uid, p_x, p_y, pic_z, "data/ui_gfx/empty"..( is_debugging and "_black" or "" )..".png", width/2, width/2, 0.75, true )
+		local c, r_c, h = GuiGetPreviousWidgetInfo( gui )
+		clicked, r_clicked, hovered = clicked or c, r_clicked or r_c, hovered or h
+	end
+	
+	if( s_x ~= 0 and s_y ~= 0 ) then
+		local count = math.floor( is_vertical and s_y/s_x or s_x/s_y )
+		for i = 1,count do
+			do_interface( x, y )
+			if( is_vertical ) then
+				y = y + width
+			else
+				x = x + width
+			end
+		end
+		local leftover = ( is_vertical and s_y or s_x ) - count*width
+		if( leftover > 0 ) then
+			local drift = width - leftover
+			if( is_vertical ) then
+				y = y - drift
+			else
+				x = x - drift
+			end
+			do_interface( x, y )
+		end
+	end
+
+	return uid, clicked, r_clicked, hovered
+end
+
+function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
+	data = data or {}
+	data.scale, data.funcs = 1, data.funcs or {}
+	local dims, is_pixel_font, new_line = {}, false, 9
+	data.font, is_pixel_font = pen.font_cancer( data.font, data.is_shadow )
+	if( pen.vld( data.dims )) then
+		data.dims = pen.get_hybrid_table( data.dims )
+		text, dims, new_line = pen.liner( text, data.dims[1]/data.scale, ( data.dims[2] or -1 )/data.scale, data.font, data.nil_val )
+	else
+		text, dims, new_line = pen.liner( text, nil, nil, data.font, data.nil_val )
+		data.dims = dims
+	end
+	for name,func in pairs( pen.FONT_MODS ) do
+		data.funcs[ name ] = func
+	end
+
+	local hash = pen.magic_parse( data.dims ).."."..pen.b2n( data.is_centered_x ).."."..pen.magic_fletcher( data.font )
+	for i,line in ipairs( text ) do
+		hash = hash.."."..pen.magic_fletcher( line )
+	end
+
+	local structure = pen.cache({ "metafont", hash }, function()
+		local out = {}
+
+		local func_list, height_counter = {}, 0
+		for i,line in ipairs( text ) do
+			local temp = line
+			local l_pos, r_pos = {0,0,0}, {0,0,0}
+			local new_element = { x = 0, y = height_counter }
+			if( data.is_centered_x ) then
+				local _,off = pen.liner( line, nil, nil, data.font )
+				new_element.x = ( data.dims[1] - off[1])/2
+			end
+
+			while( pen.vld( temp )) do
+				local gotcha = 0
+				for i = 1,2 do
+					l_pos[i], r_pos[i] = string.find( temp, pen.MARKER_FANCY_TEXT[i])
+				end
+				if( l_pos[1] ~= nil and l_pos[1] < ( l_pos[2] or #temp )) then
+					gotcha = 1
+				elseif( l_pos[2] ~= nil ) then
+					gotcha = -1
+					l_pos[1], r_pos[1] = l_pos[2], r_pos[2]
+				end
+				new_element.text = string.sub( temp, 1, ( l_pos[1] or 0 ) - 1 )
+				new_element.f = pen.magic_copy( func_list )
+				table.insert( out, pen.magic_copy( new_element ))
+				
+				if( gotcha ~= 0 ) then
+					local _,off = pen.liner( "."..new_element.text..".", nil, nil, data.font )
+					new_element.x = new_element.x + off[1] - 2*GuiGetTextDimensions( gui, ".", 1, 0, data.font, is_pixel_font )
+					
+					if( gotcha > 0 ) then
+						table.insert( func_list, string.sub( temp, l_pos[1] + 2, r_pos[1] - 2 ))
+					elseif( gotcha < 0 and pen.vld( func_list )) then
+						local _,id = pen.from_tbl_with_id( func_list, string.sub( temp, l_pos[1] + 2, r_pos[1] - 2 ))
+						if( pen.vld( id )) then
+							table.remove( func_list, id )
+						else
+							func_list = {}
+						end
+					end
+				end
+
+				l_pos[3] = 0
+				while( l_pos[3] ~= nil ) do
+					l_pos[3], r_pos[3] = string.find( temp, pen.MARKER_FANCY_TEXT[3])
+					if( l_pos[3] ~= nil ) then
+						local left = out[ #out ]
+						local is_left = l_pos[3] < ( l_pos[1] or 0 )
+						local payload = string.sub( temp, l_pos[3] + 3, r_pos[3] - 3)
+						if( is_left ) then
+							if( pen.vld( left.f )) then
+								left.extra = left.extra or {}
+								table.insert( left.extra, { l_pos[3], payload })
+							end
+
+							local delta = r_pos[3] - l_pos[3] + 1
+							l_pos[1], r_pos[1] = l_pos[1] - delta, r_pos[1] - delta
+							left.text = string.sub( left.text, 1, l_pos[3] - 1 )..string.sub( left.text, r_pos[3] + 1, -1 )
+						elseif( pen.vld( func_list )) then
+							new_element.extra = new_element.extra or {}
+							table.insert( new_element.extra, { l_pos[3] - r_pos[1], payload })
+						end
+						temp = string.sub( temp, 1, l_pos[3] - 1 )..string.sub( temp, r_pos[3] + 1, -1 )
+					end
+				end
+				temp = r_pos[1] ~= nil and string.sub( temp, r_pos[1] + 1, -1 ) or ""
+			end
+			height_counter = height_counter + new_line
+		end
+
+		return out
+	end)
+	
+	local counter_global, counter_local = 1, 1
+	local off_x = ( data.is_centered_x or false ) and -data.dims[1]/2 or 0
+	local off_y = ( data.is_centered_y or false ) and -math.max( data.dims[2] or 0, dims[2])/2 or 0
+	for i,element in ipairs( structure ) do
+		if( pen.vld( element.text )) then
+			local pos_x = pic_x + data.scale*( off_x + element.x )
+			local pos_y = pic_y + data.scale*( off_y + element.y )
+			if( pen.vld( element.f )) then
+				counter_local = 1 --local counter is kinda weird
+				local orig_x, orig_y = pos_x, pos_y
+				pen.w2c( element.text, function( id )
+					pos_x, pos_y = orig_x, orig_y
+					
+					local clr, char, font = data.color, pen.magic_byte( id ), {data.font,is_pixel_font}
+					local off = { pen.get_char_dims( char, id, font[1])}
+					for e,func in ipairs( element.f ) do
+						local new_clr, new_font, new_char = {}, {}, nil
+						if( data.funcs[func] ~= nil ) then
+							uid, pos_x, pos_y, new_clr, new_font, new_char = data.funcs[func](
+								gui, uid, {pos_x,orig_x}, {pos_y,orig_y}, pic_z,
+								{char, off, font, element.extra or {}}, clr, {counter_global, counter_local}
+							)
+						end
+						if( pen.vld( new_clr )) then clr = new_clr end
+						if( pen.vld( new_font )) then font = new_font end
+						if( new_char ~= nil ) then char = new_char end
+					end
+					
+					if( pen.vld( char )) then
+						pen.colourer( gui, clr )
+						GuiZSetForNextWidget( gui, pic_z )
+						GuiText( gui, pos_x, pos_y, char, data.scale, font[1], font[2])
+					end
+
+					orig_x = orig_x + off[1]
+					counter_global, counter_local = counter_global + 1, counter_local + 1
+				end)
+			else
+				pen.colourer( gui, data.color )
+				GuiZSetForNextWidget( gui, pic_z )
+				GuiText( gui, pos_x, pos_y, element.text, data.scale, data.font, is_pixel_font )
+			end
+		end
+	end
+
+	return uid, dims
 end
 
 --make it better
@@ -2569,20 +2625,129 @@ pen.FLAG_UPDATE_UTF = "PENMAN_UTF_MAP_UPDATE"
 pen.FLAG_USE_FANCY_FONT = "PENMAN_FANCY_FONTING"
 
 pen.DIV_0 = "@"
-pen.DIV_1 = "&"
-pen.DIV_2 = "|"
-pen.DIV_3 = "!"
-pen.DIV_4 = ":"
+pen.DIV_1 = "|"
+pen.DIV_2 = ":"
 
 pen.MARKER_TAB = "\\_"
 pen.MARKER_FANCY_TEXT = { "{>%S->{", "}<%S-<}", "{%-}%S-{%-}" }
 pen.MARKER_MAGIC_APPEND = "%-%-<{> MAGICAL APPEND MARKER <}>%-%-"
 
-pen.PALETTE = {
-	["B"] = {0,0,0},
-	["W"] = {255,255,255},
+pen.FONT_MAP = {
+	["简体中文"] = "data/fonts/generated/notosans_zhcn_24.bin",
+	["日本語"] = "data/fonts/generated/notosans_jp_24.bin",
+	["한국어"] = "data/fonts/generated/notosans_ko_24.bin",
+}
+pen.FONT_SPACING = {
+	["data/fonts/generated/notosans_zhcn_24.bin"] = 1.5,
+	["data/fonts/generated/notosans_jp_24.bin"] = 1.5,
+	["data/fonts/generated/notosans_ko_24.bin"] = 1.5,
+}
+pen.FONT_MODS = {
+	_bold = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		pen.colourer( gui, color )
+		GuiZSetForNextWidget( gui, pic_z )
+		local off_x, off_y = pen.get_char_dims( char_data[1], nil, char_data[3][1])
+		GuiText( gui, pic_x[1] - 0.25*off_x, pic_y[1] - 0.25*off_y, char_data[1], 1.25, char_data[3][1], char_data[3][2])
+		return uid, pic_x[1], pic_y[1], nil, nil, ""
+	end,
+	_italic = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		--get letter pic
+		return uid, pic_x[1], pic_y[1]
+	end,
+	shadow = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		return uid, pic_x[1], pic_y[1], nil, { "data/fonts/font_pixel.xml", true }
+	end,
 	
-	["VNL"] = {
+	wave = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		pic_y[1] = pic_y[1] + math.sin( 0.5*indexes[1] + GameGetFrameNum()/7 )
+		return uid, pic_x[1], pic_y[1]
+	end,
+	quake = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		pic_x[1] = pic_x[1] + pen.generic_random( 0, 100, nil, true )/200
+		pic_y[1] = pic_y[1] + pen.generic_random( 0, 100, nil, true )/200
+		return uid, pic_x[1], pic_y[1]
+	end,
+	cancer = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		local new_one = pen.magic_byte( pen.generic_random( 33, 127 ))
+		return uid, pic_x[1], pic_y[1], nil, nil, new_one == "$" and "!" or new_one
+	end,
+	rainbow = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		color = pen.magic_rgb( color, false, "hsv" )
+		color[1] = (( 5*indexes[1] + GameGetFrameNum())%100 )/100
+		return uid, pic_x[1], pic_y[1], pen.magic_rgb( color, true, "hsv" )
+	end,
+
+	button = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, bid )
+		bid = bid or "default"
+		local frame_num = GameGetFrameNum()
+		pen.cache({ "hyperlink_state", bid }, function( old_val )
+			local out = old_val or {0,0,0}
+			local off_x, off_y = pen.get_char_dims( char_data[1], nil, char_data[3][1])
+			local clicked, r_clicked, is_hovered = false, false, false
+			uid, clicked, r_clicked, is_hovered = pen.new_interface( gui, uid, {
+				pic_x[1] - off_x*0.25, pic_y[1], off_x*1.5, off_y
+			}, pic_z )
+			
+			if( clicked ) then out[1] = frame_num end
+			if( r_clicked ) then out[2] = frame_num end
+			if( is_hovered ) then out[3] = frame_num + 5 end
+
+			if( clicked or r_clicked ) then pen.play_sound( pen.TUNES.VNL.click ) end
+			return unpack(( clicked or r_clicked or is_hovered ) and out or {})
+		end, {
+			always_update = true,
+			reset_count = 0,
+			reset_frame = 0,
+		})
+
+		local clicked, r_clicked, is_hovered = pen.cache({ "hyperlink_state", bid })
+		if( frame_num < ( is_hovered or 0 )) then
+			color = pen.magic_rgb( color, false, "hsv" )
+			color[3] = 0.8*color[3]
+			color = pen.magic_rgb( color, true, "hsv" )
+		end
+		return uid, pic_x[1], pic_y[1], color
+	end,
+	_reactive = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		--hovering over a letter generates waves
+		return uid, pic_x[1], pic_y[1]
+	end,
+	_dialogue = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+		--char_data[4] for modifications
+		return uid, pic_x[1], pic_y[1]
+	end,
+	hyperlink = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, link_id )
+		link_id = link_id or "default"
+		local off_x, off_y = pen.get_char_dims( char_data[1], nil, char_data[3][1])
+
+		local frame_num = GameGetFrameNum()
+		local clicked, r_clicked, is_hovered = pen.cache({ "hyperlink_state", link_id })
+		color = ( clicked or 0 ) == 0 and pen.PALETTE.VNL.MANA or pen.PALETTE.VNL.RED
+		if( frame_num < ( is_hovered or 0 )) then
+			pen.colourer( gui, color )
+			uid = pen.new_image( gui, uid, pic_x[2], pic_y[2] + off_y*0.8, pic_z + 0.001, "data/ui_gfx/empty_white.png", off_x*0.5, 0.5 )
+		end
+		
+		return pen.FONT_MODS.button( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, link_id )
+	end,
+}
+
+pen.AI_COMPS = {
+	AIAttackComponent = 1,
+	AdvancedFishAIComponent = 1,
+	AnimalAIComponent = 1,
+	BossDragonComponent = 1,
+	ControllerGoombaAIComponent = 1,
+	CrawlerAnimalComponent = 1,
+	FishAIComponent = 1,
+	PhysicsAIComponent = 1,
+	WormAIComponent = 1,
+}
+
+pen.PALETTE = {
+	B = {0,0,0},
+	W = {255,255,255},
+	VNL = {
 		YELLOW = {255,255,178},
 		GREY = {150,150,150},
 		RED = {208,70,70},
@@ -2593,8 +2758,7 @@ pen.PALETTE = {
 		MANA = {66,168,226},
 		CAST = {252,138,67},
 	},
-
-	["HRMS"] = {
+	HRMS = {
 		GOLD_1 = {205,104,61},
 		GOLD_2 = {230,144,78},
 		GOLD_3 = {251,185,84},
@@ -2613,8 +2777,7 @@ pen.PALETTE = {
 		BLUE_2 = {77,101,180},
 		BLUE_3 = {77,155,230},
 	},
-
-	["PRSP"] = {
+	PRSP = {
 		PURPLE = {179,141,232},
 		BLUE = {136,121,247},
 		RED = {245,132,132},
@@ -2622,8 +2785,7 @@ pen.PALETTE = {
 		GREEN = {157,245,132},
 		GREY = {176,176,176},
 	},
-
-	["NCRS"] = {
+	NCRS = {
 		GREY_1 = {21,29,40},
 		GREY_2 = {32,46,55},
 		GREY_3 = {57,74,80},
@@ -2644,8 +2806,7 @@ pen.PALETTE = {
 		PURPLE_5 = {162,62,140},
 		PURPLE_6 = {198,81,151},
 	},
-
-	["SWRD"] = {
+	SWRD = {
 		IRON_1 = {32,46,55},
 		IRON_2 = {57,74,80},
 		IRON_3 = {87,114,119},
@@ -2677,100 +2838,22 @@ pen.PALETTE = {
 	--every color must have a comment with hex
 	--N40K: ammo types, classes, misc colors
 }
+pen.TUNES = {
+	VNL = {
+		click = {"data/audio/Desktop/ui.bank","ui/button_click"},
+		hover = {"data/audio/Desktop/ui.bank","ui/item_move_over_new_slot"},
+		error = {"data/audio/Desktop/ui.bank","ui/item_move_denied"},
+		reset = {"data/audio/Desktop/ui.bank","ui/replay_saved"},
 
-pen.FONT_MAP = {
-	["简体中文"] = "data/fonts/generated/notosans_zhcn_24.bin",
-	["日本語"] = "data/fonts/generated/notosans_jp_24.bin",
-	["한국어"] = "data/fonts/generated/notosans_ko_24.bin",
-}
-pen.FONT_SPACING = {
-	["data/fonts/generated/notosans_zhcn_24.bin"] = 1.5,
-	["data/fonts/generated/notosans_jp_24.bin"] = 1.5,
-	["data/fonts/generated/notosans_ko_24.bin"] = 1.5,
-}
-pen.FONT_MODS = {
-	_bold = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-		pen.colourer( gui, color )
-		GuiZSetForNextWidget( gui, pic_z )
-		local off_x, off_y = pen.get_char_dims( char_data[1], nil, char_data[3][1])
-		GuiText( gui, pic_x[1] - 0.25*off_x, pic_y[1] - 0.25*off_y, char_data[1], 1.25, char_data[3][1], char_data[3][2])
-		return uid, pic_x[1], pic_y[1], nil, nil, ""
-	end,
-	_italic = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-		--get letter pic
-		return uid, pic_x[1], pic_y[1]
-	end,
-	shadow = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-		return uid, pic_x[1], pic_y[1], nil, { "data/fonts/font_pixel.xml", true }
-	end,
-	cancer = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-		local new_one = pen.magic_byte( pen.generic_random( 33, 127 ))
-		return uid, pic_x[1], pic_y[1], nil, nil, new_one == "$" and "!" or new_one
-	end,
-	
-	wave = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-		pic_y[1] = pic_y[1] + math.sin( 0.5*indexes[1] + GameGetFrameNum()/7 )
-		return uid, pic_x[1], pic_y[1]
-	end,
-	quake = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-		pic_x[1] = pic_x[1] + pen.generic_random( 0, 100, nil, true )/200
-		pic_y[1] = pic_y[1] + pen.generic_random( 0, 100, nil, true )/200
-		return uid, pic_x[1], pic_y[1]
-	end,
-	rainbow = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-		color = pen.magic_rbg( color, false, "hsv" )
-		color[1] = (( 5*indexes[1] + GameGetFrameNum())%100 )/100
-		return uid, pic_x[1], pic_y[1], pen.magic_rbg( color, true, "hsv" )
-	end,
-
-	_reactive = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-		--hovering over a letter generates waves
-		return uid, pic_x[1], pic_y[1]
-	end,
-	_dialogue = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-		--make another layer of formatting that will allow to tweak the params of this one
-		return uid, pic_x[1], pic_y[1]
-	end,
-	hyperlink = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, link_id )
-		link_id = link_id or "default"
-		pen.font_hyperlink_state = pen.font_hyperlink_state or {}
-		pen.font_hyperlink_state[ link_id ] = pen.font_hyperlink_state[ link_id ] or {0,0}
-
-		local off_x, off_y = pen.get_char_dims( char_data[1], nil, char_data[3][1])
-
-		local frame_num = GameGetFrameNum()
-		local state = pen.font_hyperlink_state[ link_id ]
-		color = state[2] == 0 and pen.PALETTE.VNL.MANA or pen.PALETTE.VNL.RED
-		if( frame_num < state[1]) then
-			pen.colourer( gui, color )
-			uid = pen.new_image( gui, uid, pic_x[1], pic_y[1] + off_y*0.8, pic_z + 0.001, "data/ui_gfx/empty_white.png", off_x*0.5, 0.5 )
-		end
-		
-		uid = pen.new_image( gui, uid, pic_x[1] - off_x*0.25, pic_y[1], pic_z, "data/ui_gfx/empty.png", off_x*0.75, off_y*0.5, 1, true )
-		local clicked, _, is_hovered = GuiGetPreviousWidgetInfo( gui )
-		if( is_hovered ) then
-			pen.font_hyperlink_state[ link_id ][1] = frame_num + 5
-		end
-		if( clicked ) then
-			pen.font_hyperlink_state[ link_id ][2] = frame_num
-		end
-		
-		return uid, pic_x[1], pic_y[1], color
-	end,
-
-	--a set of standard p2k/hermes colors
-}
-
-pen.AI_COMPS = {
-	AIAttackComponent = 1,
-	AdvancedFishAIComponent = 1,
-	AnimalAIComponent = 1,
-	BossDragonComponent = 1,
-	ControllerGoombaAIComponent = 1,
-	CrawlerAnimalComponent = 1,
-	FishAIComponent = 1,
-	PhysicsAIComponent = 1,
-	WormAIComponent = 1,
+		open = {"data/audio/Desktop/ui.bank","ui/inventory_open"},
+		close = {"data/audio/Desktop/ui.bank","ui/inventory_close"},
+		buy = {"data/audio/Desktop/event_cues.bank","event_cues/shop_item/create"},
+		drop = {"data/audio/Desktop/ui.bank","ui/item_remove"},
+		pick = {"data/audio/Desktop/event_cues.bank","event_cues/pick_item_generic/create"},
+		select = {"data/audio/Desktop/ui.bank","ui/item_equipped"},
+		move_empty = {"data/audio/Desktop/ui.bank","ui/item_move_success"},
+		move_item = {"data/audio/Desktop/ui.bank","ui/item_switch_places"},
+	}
 }
 
 pen.CANCER_COMPS = {
