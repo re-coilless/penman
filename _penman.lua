@@ -4,15 +4,10 @@ pen = pen or {}
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---Add tip function that does all the display logic and dev only has to define the visuals
---figure out https://github.com/EvaisaDev/Unshackle
---shader appending func (steal from n40)
-
 --make sure all rating functions are accurate
 --interpolation lib (https://github.com/peete-q/assets/blob/master/lua-modules/lib/interpolate.lua)
 --lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
 
---update dialogsystem
 --reorder and move all the gui stuff to the very bottom
 --cleanup, make sure all the funcs reference the right stuff, variable naming consistency
 --make sure that all returned id values are 0 and not nil
@@ -890,7 +885,7 @@ function pen.magic_append( to_file, from_file )
 	ModTextFileSetContent( to_file, string.gsub( a, marker, b..line_wrecker..marker ))
 end
 
-function pen.magic_herder( new_file, default, overrides )
+function pen.add_herds( new_file, default, overrides )
 	local herd = {}
 	local old_file = "data/genome_relations.csv"
 	overrides = pen.table2list( overrides or {})
@@ -967,9 +962,29 @@ function pen.magic_herder( new_file, default, overrides )
 	return herd
 end
 
-function pen.set_translations( path ) --check if this works when new languges get added
+function pen.add_translations( path ) --check if this works when new languges get added
 	local file, main = ModTextFileGetContent( path ), "data/translations/common.csv"
 	ModTextFileSetContent( main, ModTextFileGetContent( main )..string.gsub( file, "^[^\n]*\n", "" ))
+end
+
+function pen.add_shaders( shader_path )
+	local shader_old = "data/shaders/post_final.frag"
+	local file_old = ModTextFileGetContent( shader_old )
+	local markers_old = {
+		--[[ ******[UNIFORMS]****** ]]"// %-*\r\n// utilities",
+		--[[ ******[FUNCTIONS]****** ]]"// trip \"fractals\" effect. this is based on some code from ShaderToy, which I can't find anymore.",
+		--[[ ******[WORLD]****** ]]"#ifdef TRIPPY\r\n	// drunk doublevision",
+		--[[ ******[OVERLAY]****** ]]"// ============================================================================================================\r\n// additive overlay ===========================================================================================",
+	}
+
+	local file_new = ModTextFileGetContent( shader_path ).."\n\n******[EOF]******\n"
+	local marker_new = "******[%S-]******"
+	for i,segment in ipairs( pen.ctrn( file_new, marker_new )) do
+		if( pen.vld( string.gsub( segment, "%s", "" ))) then
+			file = string.gsub( file, markers_old[i], markers_old[i].."\n"..segment )
+		end
+	end
+	ModTextFileSetContent( shader_old, file )
 end
 
 function pen.magic_byte( str ) --https://github.com/meepen/Lua-5.1-UTF-8/blob/master/utf8.lua
@@ -2433,6 +2448,49 @@ function pen.new_interface( gui, uid, pos, pic_z, is_debugging )
 	return uid, clicked, r_clicked, hovered
 end
 
+--make it better
+function pen.new_blinker( gui, colour )
+	colour = rgb2hsv( colour )
+	local fancy_index = math.abs( math.cos( math.rad( GameGetFrameNum())))
+	colour = hsv2rgb( { colour[1], fancy_index*colour[2], math.max( colour[3], ( 1 - fancy_index )), colour[3] } )
+	GuiColorSetForNextWidget( gui, colour[1], colour[2], colour[3], colour[4] )
+end
+
+function pen.new_anim( gui, uid, auid, pic_x, pic_y, pic_z, path, amount, delay, s_x, s_y, alpha, interactive )
+	anims_state = anims_state or {}
+	anims_state[auid] = anims_state[auid] or { 1, 0 }
+	
+	uid = pen.new_image( gui, uid, pic_x, pic_y, pic_z, path..anims_state[auid][1]..".png", s_x, s_y, alpha, interactive )
+	
+	anims_state[auid][2] = anims_state[auid][2] + 1
+	if( anims_state[auid][2] > delay ) then
+		anims_state[auid][2] = 0
+		anims_state[auid][1] = anims_state[auid][1] + 1
+		if( anims_state[auid][1] > amount ) then
+			anims_state[auid][1] = 1
+		end
+	end
+	
+	return uid
+end
+
+function pen.new_cutout( gui, uid, pic_x, pic_y, size_x, size_y, func, v ) --credit goes to aarvlo
+	uid = uid + 1
+	GuiIdPush( gui, uid )
+
+	local margin = 0
+	GuiAnimateBegin( gui )
+	GuiAnimateAlphaFadeIn( gui, uid, 0, 0, true )
+	GuiBeginAutoBox( gui )
+	GuiBeginScrollContainer( gui, uid, pic_x - margin, pic_y - margin, size_x, size_y, false, margin, margin )
+	GuiEndAutoBoxNinePiece( gui )
+	GuiAnimateEnd( gui )
+	uid = func( gui, uid, v )
+	GuiEndScrollContainer( gui )
+
+	return uid
+end
+
 function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	data = data or {}
 	data.scale, data.funcs = 1, data.funcs or {}
@@ -2528,7 +2586,7 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 
 		return out
 	end)
-	
+	--make char_data/counter be string indexed
 	local counter_global, counter_local = 1, 1
 	local off_x = ( data.is_centered_x or false ) and -data.dims[1]/2 or 0
 	local off_y = ( data.is_centered_y or false ) and -math.max( data.dims[2] or 0, dims[2])/2 or 0
@@ -2537,7 +2595,7 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 			local pos_x = pic_x + data.scale*( off_x + element.x )
 			local pos_y = pic_y + data.scale*( off_y + element.y )
 			if( pen.vld( element.f )) then
-				counter_local = 1 --local counter is kinda weird
+				counter_local = 1 --local counter should be unique to every individual func + add char_counter to get id of the char
 				local orig_x, orig_y = pos_x, pos_y
 				pen.w2c( element.text, function( id )
 					pos_x, pos_y = orig_x, orig_y
@@ -2577,47 +2635,78 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	return uid, dims
 end
 
---make it better
-function pen.new_blinker( gui, colour )
-	colour = rgb2hsv( colour )
-	local fancy_index = math.abs( math.cos( math.rad( GameGetFrameNum())))
-	colour = hsv2rgb( { colour[1], fancy_index*colour[2], math.max( colour[3], ( 1 - fancy_index )), colour[3] } )
-	GuiColorSetForNextWidget( gui, colour[1], colour[2], colour[3], colour[4] )
-end
+--is capable of being static
+--is capable of staying open while is hovered
+--is hard locked to never leave the screen (unless is static)
+--tooltip text mod
+function pen.new_tooltip( gui, uid, tid, z, text, is_triggered, is_right, is_up, is_fancy )
+	tid = tid or "generic"
 
-function pen.new_anim( gui, uid, auid, pic_x, pic_y, pic_z, path, amount, delay, s_x, s_y, alpha, interactive )
-	anims_state = anims_state or {}
-	anims_state[auid] = anims_state[auid] or { 1, 0 }
-	
-	uid = pen.new_image( gui, uid, pic_x, pic_y, pic_z, path..anims_state[auid][1]..".png", s_x, s_y, alpha, interactive )
-	
-	anims_state[auid][2] = anims_state[auid][2] + 1
-	if( anims_state[auid][2] > delay ) then
-		anims_state[auid][2] = 0
-		anims_state[auid][1] = anims_state[auid][1] + 1
-		if( anims_state[auid][1] > amount ) then
-			anims_state[auid][1] = 1
+	if( is_triggered == nil ) then
+		_, _, is_triggered = GuiGetPreviousWidgetInfo( gui )
+	end
+	if( is_triggered ) then
+		if( not( tip_going[tid] or false )) then
+			tip_going[tid] = true
+			tip_anim[tid] = tip_anim[tid] or {0,0,0}
+			
+			local frame_num = GameGetFrameNum()
+			tip_anim[tid][2] = frame_num
+			if( tip_anim[tid][1] == 0 ) then
+				tip_anim[tid][1] = frame_num
+				return uid
+			end
+			local anim_frame = tip_anim[tid][3]
+			
+			text = pen.get_hybrid_table( text ) --run liner here cause the data is cached anyways
+			
+			local w, h = GuiGetScreenDimensions( gui )
+			local pic_x, pic_y = get_mouse_pos()
+			local p_off_x = is_right and -5 or 5
+			local p_off_y = is_up and -5 or 5
+			pic_x, pic_y = text[2] or ( pic_x + p_off_x ), text[3] or ( pic_y + p_off_y )
+			
+			local edge_spacing, dims = 3, {0,0}
+			if( text[1] ~= "" ) then text[1], dims = font_liner( text[1], w*0.9, h - 2 ) end
+			
+			local x_offset, y_offset = text[4] or ( dims[1] + edge_spacing ), text[5] or dims[2]
+			x_offset, y_offset = x_offset + edge_spacing - 1, y_offset + edge_spacing
+			if( is_right or is_up ) then
+				if( is_right ) then
+					pic_x = pic_x - x_offset - 1
+				end
+				if( is_up ) then
+					pic_y = pic_y - y_offset + 9 + edge_spacing
+				end
+			end
+			if( is_right ) then
+				if( pic_x < 0 ) then
+					pic_x = 1
+				end
+			elseif( w < pic_x + x_offset + 1 ) then
+				pic_x = w - x_offset - 1
+			end
+			if( is_up ) then
+				if( pic_y < 0 ) then
+					pic_y = 1
+				end
+			elseif( h < pic_y + y_offset + 1 ) then
+				pic_y = h - y_offset - 1
+			end
+
+			local inter_alpha = math.sin( math.min( anim_frame, 10 )*math.pi/20 )
+			anim_frame = anim_frame + 1
+			local inter_size = 30*math.sin( anim_frame*0.3937 )/anim_frame
+			pic_x, pic_y = pic_x + 0.5*inter_size, pic_y + 0.5*inter_size
+			x_offset, y_offset = x_offset - inter_size, y_offset - inter_size
+			inter_alpha = math.max( 1 - inter_alpha/6, 0.1 )
+
+			is_fancy = is_fancy or false
+			--put visuals here
 		end
 	end
 	
-	return uid
-end
-
-function pen.new_cutout( gui, uid, pic_x, pic_y, size_x, size_y, func, v ) --credit goes to aarvlo
-	uid = uid + 1
-	GuiIdPush( gui, uid )
-
-	local margin = 0
-	GuiAnimateBegin( gui )
-	GuiAnimateAlphaFadeIn( gui, uid, 0, 0, true )
-	GuiBeginAutoBox( gui )
-	GuiBeginScrollContainer( gui, uid, pic_x - margin, pic_y - margin, size_x, size_y, false, margin, margin )
-	GuiEndAutoBoxNinePiece( gui )
-	GuiAnimateEnd( gui )
-	uid = func( gui, uid, v )
-	GuiEndScrollContainer( gui )
-
-	return uid
+	return uid, is_triggered
 end
 
 --[GLOBALS]
@@ -2678,7 +2767,7 @@ pen.FONT_MODS = {
 	end,
 
 	button = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, bid )
-		bid = bid or "default"
+		bid = bid or "dft_btn"
 		local frame_num = GameGetFrameNum()
 		pen.cache({ "hyperlink_state", bid }, function( old_val )
 			local out = old_val or {0,0,0}
@@ -2717,7 +2806,7 @@ pen.FONT_MODS = {
 		return uid, pic_x[1], pic_y[1]
 	end,
 	hyperlink = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, link_id )
-		link_id = link_id or "default"
+		link_id = link_id or "dft_lnk"
 		local off_x, off_y = pen.get_char_dims( char_data[1], nil, char_data[3][1])
 
 		local frame_num = GameGetFrameNum()
