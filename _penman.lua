@@ -7,10 +7,11 @@ pen = pen or {}
 --make sure all rating functions are accurate
 --interpolation lib (https://github.com/peete-q/assets/blob/master/lua-modules/lib/interpolate.lua)
 --lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
+--tinker with copi's spriteemitter image concept
 
 --reorder and move all the gui stuff to the very bottom
 --cleanup, make sure all the funcs reference the right stuff, variable naming consistency
---make sure that all returned id values are 0 and not nil
+--make sure that all returned id values are nil
 --actually test all the stuff
 
 --remove old penman from index
@@ -271,7 +272,7 @@ end
 function pen.cache( structure, update_func, data )
 	data = data or {}
 	data.reset_count = data.reset_count or 999
-	data.reset_frame = data.reset_frame or 36000
+	data.reset_frame = data.reset_frame or 0 --36000
 
 	local name = structure[1]
 	pen.cached = pen.cached or {}
@@ -1105,7 +1106,7 @@ function pen.get_char_dims( c, id, font )
 
 		GuiDestroy( gui )
 		return unpack( out )
-	end)
+	end, { reset_count = 0 })
 end
 
 function pen.liner( text, length, height, font, nil_val )
@@ -1261,7 +1262,7 @@ function pen.liner( text, length, height, font, nil_val )
 		end
 		
 		return formatted, { max_l - space_l, h }, font_height
-	end)
+	end, { reset_frame = 36000 })
 end
 
 function pen.magic_parse( data )
@@ -1891,11 +1892,11 @@ end
 
 function pen.catch_comp( comp_name, field_name, index, func, args, forced )
 	local will_set = index == "set"
-	pen.catch_comp_cache = pen.catch_comp_cache or {}
-	pen.catch_comp_cache[ comp_name ] = pen.catch_comp_cache[ comp_name ] or {}
-	pen.catch_comp_cache[ comp_name ][ field_name ] = pen.catch_comp_cache[ comp_name ][ field_name ] or {}
+	pen.cached.catch_comp = pen.cached.catch_comp or {}
+	pen.cached.catch_comp[ comp_name ] = pen.cached.catch_comp[ comp_name ] or {}
+	pen.cached.catch_comp[ comp_name ][ field_name ] = pen.cached.catch_comp[ comp_name ][ field_name ] or {}
 
-	local v = pen.catch_comp_cache[ comp_name ][ field_name ][ index ]
+	local v = pen.cached.catch_comp[ comp_name ][ field_name ][ index ]
 	if( forced ) then
 		v = nil
 	end
@@ -1921,7 +1922,7 @@ function pen.catch_comp( comp_name, field_name, index, func, args, forced )
 		v = out[1] ~= nil --cannot check write
 		table.insert( out, 1, v )
 
-		pen.catch_comp_cache[ comp_name ][ field_name ][ index ] = v or will_set
+		pen.cached.catch_comp[ comp_name ][ field_name ][ index ] = v or will_set
 		pen.silent_catch = nil
 	end
 
@@ -2046,7 +2047,7 @@ function pen.clone_entity( entity_id, x, y, mutators )
 	end
 	
 	if( pen.clone_comp_debug == true ) then
-		for name,fields in pen.magic_sorter( pen.catch_comp_cache ) do
+		for name,fields in pen.magic_sorter( pen.cached.catch_comp ) do
 			print( "**************"..name )
 			for field,tbl in pen.magic_sorter( fields ) do
 				if( tbl.get == false ) then
@@ -2585,7 +2586,7 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 		end
 
 		return out
-	end)
+	end, { reset_frame = 36000 })
 	--make char_data/counter be string indexed
 	local counter_global, counter_local = 1, 1
 	local off_x = ( data.is_centered_x or false ) and -data.dims[1]/2 or 0
@@ -2786,7 +2787,6 @@ pen.FONT_MODS = {
 		end, {
 			always_update = true,
 			reset_count = 0,
-			reset_frame = 0,
 		})
 
 		local clicked, r_clicked, is_hovered = pen.cache({ "hyperlink_state", bid })
@@ -2803,6 +2803,7 @@ pen.FONT_MODS = {
 	end,
 	_dialogue = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
 		--char_data[4] for modifications
+		--letters appear through alpha sin interpolating top down 
 		return uid, pic_x[1], pic_y[1]
 	end,
 	hyperlink = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, link_id )
