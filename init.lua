@@ -1,3 +1,5 @@
+ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
+
 function OnPlayerSpawned( hooman )
 	GlobalsSetValue( "PROSPERO_IS_REAL", "1" )
 	
