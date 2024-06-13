@@ -15,7 +15,8 @@ if( hooman == 0 or pen.testing_done ) then
         -- pen.testing_done = 1
         
         -- misc_tests()
-        tipping()
+        input()
+        -- tipping()
         -- fonting()
         -- entity_cloner()
         -- text2func()
@@ -100,6 +101,18 @@ pen.magic_comp( hooman, { "DamageModelComponent", "balls" }, function( comp_id, 
 end)
 
 ]]end
+-- *************************************************************************
+
+function input()
+
+gui = gui or GuiCreate()
+GuiStartFrame( gui )
+
+uid = pen.new_input( gui, 1, "balls", 100, 100, 5, {
+
+})
+
+end
 
 -- *************************************************************************
 

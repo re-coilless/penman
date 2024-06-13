@@ -48,7 +48,7 @@ function OnWorldPostUpdate()
 
 	local request = ComponentGetValue2( storage_request, "value_string" )
 	if( request ~= pen.DIV_1 ) then
-		local stuff = pen.magic_parse( request )
+		local stuff = pen.magic_parse( request ) --transition this to new parser
 		for i,v in ipairs( stuff ) do
 			local storage_file = pen.get_storage( ctrl_body, v[2])
 			penman_w( v[1], string.gsub( ComponentGetValue2( storage_file, "value_string" ), "\\([nt])", { n = "\n", t = "\t", }))

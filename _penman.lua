@@ -1,9 +1,11 @@
 dofile_once( "data/scripts/lib/utilities.lua" )
 
 pen = pen or {}
+pen.cached = pen.cached or {}
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
+--custom scroller (static tip as background, cutout, custom graphics for all elements, sine smoothing of scrolling, mouse wheel support)
 --make sure all rating functions are accurate
 --interpolation lib (https://github.com/peete-q/assets/blob/master/lua-modules/lib/interpolate.lua)
 --lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
@@ -313,7 +315,7 @@ function pen.chrono( f, input, storage_comp, name )
 
 	if( pen.vld( storage_comp, true )) then
 		pen.magic_comp( storage_comp, { value_string = function( old_val )
-			return old_val..name..pen.DIV_1..check..pen.DIV_1
+			return table.concat({ old_val, name, pen.DIV_1, check, pen.DIV_1 }) --special thanks to Copi
 		end})
 	else
 		print( check.."ms" )
@@ -566,6 +568,16 @@ function pen.drop_em_frames( count )
 	end
 end
 
+function pen.is_game_restarted()
+	local is_nil = pen.cached.restart_check == nil
+	local has_flag = GameHasFlagRun( pen.FLAG_RESTART_CHECK )
+
+	pen.cached.restart_check = 1
+	GameAddFlagRun( pen.FLAG_RESTART_CHECK )
+	
+	return is_nil and has_flag
+end
+
 function pen.table_init( amount, value )
 	local tbl = {}
 	local temp = value
@@ -808,7 +820,7 @@ function pen.get_killable_stuff( c_x, c_y, r )
 end
 
 function pen.ptrn( id )
-	return "([^"..( type( id ) == "number" and pen[ "DIV_"..( id or 1 )] or tostring( id )).."]+)"
+	return table.concat({ "([^", type( id ) == "number" and pen[ "DIV_"..( id or 1 )] or tostring( id ), "]+)" })
 end
 function pen.ctrn( str, marker, string_indexed )
 	local t = {}
@@ -872,7 +884,7 @@ function pen.get_translated_line( text )
 	local out = ""
 	local markers = pen.t2w( pen.get_hybrid_function( text ))
 	for i,mark in ipairs( markers ) do
-		out = out..( out == "" and out or " " )..GameTextGetTranslatedOrNot( mark )
+		out = table.concat({ out, out == "" and out or " ", GameTextGetTranslatedOrNot( mark )})
 	end
 	return out
 end
@@ -1078,7 +1090,7 @@ function pen.magic_byte( str ) --https://github.com/meepen/Lua-5.1-UTF-8/blob/ma
 			end
 		end
 
-		return table.concat( ret, "" )
+		return table.concat( ret )
 	end
 end
 
@@ -1275,13 +1287,13 @@ function pen.magic_parse( data )
 		return ({
 			["nil"] = function( v ) return tostring( v ) end,
 			["number"] = function( v ) return tostring( v ) end,
-			["string"] = function( v ) return "\""..v.."\"" end,
+			["string"] = function( v ) return table.concat({ "\"", v, "\"" }) end,
 			["boolean"] = function( v ) return tostring( v ) end,
 			["table"] = function( t )
 				local s, i = "{", 1
 				local l = pen.get_table_count( t )
 				for k,v in pairs( t ) do
-					s = s.."["..ser( k ).."]="..ser( v )..( i < l and "," or "" )
+					s = table.concat({ s, "[", ser( k ), "]=", ser( v ), i < l and "," or "" })
 					i = i + 1
 				end
 				return s.."}"
@@ -1521,7 +1533,7 @@ function pen.magic_comp( id, data, func )
 	elseif( type( func or 0 ) ~= "function" ) then
 		local will_get = func == nil
 		local is_object = data[2] ~= nil
-		local method = "Component"..( is_object and "Object" or "" )..( will_get and "Get" or "Set" ).."Value2"
+		local method = table.concat({ "Component", is_object and "Object" or "", will_get and "Get" or "Set", "Value2" })
 
 		local field = ""
 		func = pen.get_hybrid_table( func )
@@ -2516,9 +2528,9 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 		data.funcs[ name ] = func
 	end
 
-	local hash = pen.magic_parse( data.dims ).."."..pen.b2n( data.is_centered_x ).."."..pen.magic_fletcher( data.font )
+	local hash = table.concat({ pen.magic_parse( data.dims ), ".", pen.b2n( data.is_centered_x ), ".", pen.magic_fletcher( data.font )})
 	for i,line in ipairs( text ) do
-		hash = hash.."."..pen.magic_fletcher( line )
+		hash = table.concat({ hash, ".", pen.magic_fletcher( line )})
 	end
 
 	local structure = pen.cache({ "metafont", hash }, function()
@@ -2657,12 +2669,12 @@ function pen.new_tooltip( gui, uid, text, data, func ) --remove the testing inde
 	
 	local frame_num = GameGetFrameNum()
 	pen.cached.ttips = pen.cached.ttips or {}
-	pen.cached.ttips[data.tid] = pen.cached.ttips[data.tid] or { going = 0, anim = {frame_num,0,0}, is_hovered = false }
+	pen.cached.ttips[data.tid] = pen.cached.ttips[data.tid] or { going = 0, anim = {frame_num,0,0}, inter_state = {}}
 	if( data.is_active == nil ) then
 		_,_,data.is_active = GuiGetPreviousWidgetInfo( gui )
 	end
 	if( data.allow_hover ) then
-		data.is_active = data.is_active or pen.cached.ttips[data.tid].is_hovered
+		data.is_active = data.is_active or pen.cached.ttips[data.tid].inter_state[3]
 	end
 	if( not( data.is_active )) then
 		return uid
@@ -2673,7 +2685,7 @@ function pen.new_tooltip( gui, uid, text, data, func ) --remove the testing inde
 
 		local tip_anim = pen.cached.ttips[data.tid].anim
 		if(( frame_num - tip_anim[2]) > ( data.anim_frames + 5 )) then
-			tip_anim[1] = frame_num
+			tip_anim[1] = frame_num -1
 		end
 		tip_anim[2] = frame_num
 		tip_anim[3] = math.min( frame_num - tip_anim[1], data.anim_frames )
@@ -2683,11 +2695,10 @@ function pen.new_tooltip( gui, uid, text, data, func ) --remove the testing inde
 			_,data.dims = pen.liner( text, w*0.5, h, nil, {
 				line_offset = data.line_offset or -2,
 			})
-
-			data.dims = pen.magic_copy( data.dims )
-			data.dims[1] = data.dims[1] + 2*data.edging - 1
-			data.dims[2] = data.dims[2] + 2*data.edging - 1
 		end
+		data.dims = pen.magic_copy( data.dims )
+		data.dims[1] = data.dims[1] + 2*data.edging - 1
+		data.dims[2] = data.dims[2] + 2*data.edging - 1
 		
 		--check the size above and flip these if they are nil and there's no enough space on-screen
 		--data.is_left = data.is_left or false
@@ -2725,9 +2736,10 @@ function pen.new_tooltip( gui, uid, text, data, func ) --remove the testing inde
 
 				local inter_alpha = math.sin( math.min( anim_frame, 10 )*math.pi/20 )--this should be interpolation libbed
 				uid = pen.new_text( gui, uid, pic_x + data.edging, pic_y + data.edging - 2, pic_z, text, {
-					dims = data.dims,
+					dims = { size_x - data.edging, size_y },
 					line_offset = data.line_offset or -2,
 					funcs = data.font_mods,
+					color = {255,255,255,inter_alpha},
 				})
 				
 				local inter_size = 30*math.sin(( anim_frame + 1 )*0.3937 )/( anim_frame + 1 )
@@ -2735,10 +2747,10 @@ function pen.new_tooltip( gui, uid, text, data, func ) --remove the testing inde
 				size_x, size_y = size_x - inter_size, size_y - inter_size
 				inter_alpha = math.max( 1 - inter_alpha/6, 0.1 )
 				
-				local hold_up = false
 				local gui_core = "mods/index_core/files/pics/vanilla_tooltip_"
 				uid = pen.new_image( gui, uid, pic_x, pic_y, pic_z + 0.01, gui_core.."0.xml", size_x, size_y, 1.15*inter_alpha )
-				uid,_,_,hold_up = pen.new_interface( gui, uid, {pic_x,pic_y,size_x,size_y}, pic_z )
+				local clicked, r_clicked, is_hovered = false, false, false
+				uid, clicked, r_clicked, is_hovered = pen.new_interface( gui, uid, {pic_x,pic_y,size_x,size_y}, pic_z )
 				
 				local lines = {{0,-1,size_x-1,1},{-1,0,1,size_y-1},{1,size_y,size_x-1,1},{size_x,1,1,size_y-1}}
 				for i,line in ipairs( lines ) do
@@ -2761,21 +2773,48 @@ function pen.new_tooltip( gui, uid, text, data, func ) --remove the testing inde
 					end
 				end
 				
-				return uid, hold_up
+				return uid, { clicked, r_clicked, is_hovered }
 			end
 		end
 		
-		uid, pen.cached.ttips[data.tid].is_hovered = func( gui, uid, text, data )
+		uid, pen.cached.ttips[data.tid].inter_state = func( gui, uid, text, data )
 	else
-		pen.cached.ttips[data.tid].is_hovered = false
+		pen.cached.ttips[data.tid].inter_state = {}
 	end
 	
 	return uid, data.is_active
 end
 
+function pen.new_input( gui, uid, iid, pic_x, pic_y, pic_z, data )
+	data = data or {}
+	local _,default_dims = pen.liner( "T__________T", nil, nil, nil, { line_offset = data.line_offset or -2, })
+	data.dims = data.dims or default_dims
+	
+	local text = ""
+
+	--put input state to global var (comes with frame num, and if frame num there is higher than current frame num – nuke it)
+	--right click to disable vanilla input
+	--enter/rmb to confirm
+	--legit full keyboard that is stolen from mnee
+	--copypaste support (through global var)
+	--multiline cursor with arrow control
+
+	uid = pen.new_tooltip( gui, uid, text, {
+		is_active = true,
+		tid = iid, pic_z = pic_z, pos = {pic_x,pic_y},
+		dims = data.dims or default_dims,
+		edging = data.edging, line_offset = data.line_offset
+	}, data.tip_func )
+
+	print( tostring( pen.cached.ttips[iid].inter_state[1]))
+	
+	return uid
+end
+
 --[GLOBALS]
 pen.FLAG_UPDATE_UTF = "PENMAN_UTF_MAP_UPDATE"
 pen.FLAG_USE_FANCY_FONT = "PENMAN_FANCY_FONTING"
+pen.FLAG_RESTART_CHECK = "PENMAN_GAME_HAS_STARTED"
 
 pen.DIV_0 = "@"
 pen.DIV_1 = "|"

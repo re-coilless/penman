@@ -43,7 +43,7 @@ function lib.magic_write( path, file )
     local ctrl_body = pen.get_hooman_child( GameGetWorldStateEntity(), "pen_ctrl" )
     local storage_request = pen.get_storage( ctrl_body, "request" )
 	local request = ComponentGetValue2( storage_request, "value_string" )
-	ComponentSetValue2( storage_request, "value_string", request..pen.DIV_2..path..pen.DIV_2.."file"..id..pen.DIV_2..pen.DIV_1 )
+	ComponentSetValue2( storage_request, "value_string", table.concat({ request, pen.DIV_2, path, pen.DIV_2, "file", id, pen.DIV_2, pen.DIV_1 }))
 
     local storage_new = pen.get_storage( ctrl_body, "free" )
     if( not( pen.vld( storage_new ))) then
