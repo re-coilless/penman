@@ -15,8 +15,9 @@ if( hooman == 0 or pen.testing_done ) then
         -- pen.testing_done = 1
         
         -- misc_tests()
-        input()
-        -- tipping()
+        -- raters()
+        -- input()
+        tipping()
         -- fonting()
         -- entity_cloner()
         -- text2func()
@@ -35,9 +36,18 @@ local test_input = {
 
 function misc_tests()
 
-pen.print_table( pen.magic_parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
+local dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
+pen.magic_comp( dmg_comp, "materials_how_much_damage", { "acid", 69 })
+local tbl = pen.magic_comp( dmg_comp, "materials_that_damage" )
+print( tbl.acid )
+
+local gene_comp = EntityGetFirstComponentIncludingDisabled( hooman, "GenomeDataComponent" )
+pen.magic_comp( gene_comp, "friend_firemage", 0 )
+print( tostring( pen.magic_comp( gene_comp, "friend_firemage" )))
 
 --[[
+
+pen.print_table( pen.magic_parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
 
 pen.matter_fabricator( 0, -100, {
     matter = "sand",
@@ -101,6 +111,18 @@ pen.magic_comp( hooman, { "DamageModelComponent", "balls" }, function( comp_id, 
 end)
 
 ]]end
+
+-- *************************************************************************
+
+function raters()
+
+pen.rate_creature( enemy_id, hooman, data )
+pen.rate_wand( wand_id, data )
+pen.rate_spell( spell_id, data )
+pen.rate_projectile( projectile_id, hooman, data )
+
+end
+
 -- *************************************************************************
 
 function input()
@@ -123,10 +145,10 @@ GuiStartFrame( gui )
 
 pen.new_image( gui, 1, 300, 200, 5, "data/ui_gfx/empty_white.png", 50, 50, 1, true )
 local _,_,yep = GuiGetPreviousWidgetInfo( gui )
-pen.new_tooltip( gui, 5, test_input[1], { is_active = yep, tid = "bs2", is_over = true })
+-- pen.new_tooltip( gui, 5, test_input[1], { is_active = yep, tid = "bs2", is_over = true })
 pen.new_tooltip( gui, 5, test_input[2], { is_active = yep, tid = "bs1" })
-pen.new_tooltip( gui, 5, test_input[1], { is_active = yep, tid = "bs3", is_left = true })
-pen.new_tooltip( gui, 5, test_input[2], { is_active = yep, tid = "bs4", is_over = true, is_left = true })
+-- pen.new_tooltip( gui, 5, test_input[1], { is_active = yep, tid = "bs3", is_left = true })
+-- pen.new_tooltip( gui, 5, test_input[2], { is_active = yep, tid = "bs4", is_over = true, is_left = true })
 pen.new_tooltip( gui, 5, "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", { is_active = yep, pos = {390,200}, allow_hover = true, do_corrections = true, font_mods = {
     e1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
         return pen.FONT_MODS.tip( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, "balls", "LESSS GOOOOOO" )

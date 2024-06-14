@@ -5,23 +5,25 @@ pen.cached = pen.cached or {}
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---custom scroller (static tip as background, cutout, custom graphics for all elements, sine smoothing of scrolling, mouse wheel support)
---make sure all rating functions are accurate
 --interpolation lib (https://github.com/peete-q/assets/blob/master/lua-modules/lib/interpolate.lua)
 --lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
---tinker with copi's spriteemitter image concept
 
+--try putting some of the stuff inside internal lua global tables
 --reorder and move all the gui stuff to the very bottom
 --cleanup, make sure all the funcs reference the right stuff, variable naming consistency
 --make sure that all returned id values are nil
 --actually test all the stuff
 
+--add api doc to mnee + make mnee main propero mod (p2k must pull all the sounds and such from it)
 --remove old penman from index
 --transition mrshll to penman
+
+--[TODO]
+--make sure all rating functions are accurate
+--custom scroller (static tip as background, cutout, custom graphics for all elements, sine smoothing of scrolling, mouse wheel support)
+--tinker with copi's spriteemitter image concept
 --add sfxes (separate banks for prospero, hermes, trigger) + pics
---try putting some of the stuff inside internal lua global tables
---add api doc to mnee + make mnee main propero mod (p2k must pull all the sounds and such from it)
--- make heres ferrei be compatible with controller and upload it to steam
+--make heres ferrei be compatible with controller and upload it to steam
 
 --[MATH]
 function pen.b2n( a )
@@ -1671,15 +1673,6 @@ function pen.get_phys_mass( entity_id )
 	return mass
 end
 
-function pen.set_transform( entity_id, off_x, off_y, scale_x, scale_y, angle )
-	local trans_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "InheritTransformComponent" )
-	local origs = { ComponentGetValue2( trans_comp, "Transform" )}
-	if( off_x or off_y or scale_x or scale_y or angle ) then
-		ComponentSetValue2( trans_comp, "Transform", off_x or origs[1], off_y or origs[2], scale_x or origs[3], scale_y or origs[4], angle or origs[5])
-	end
-	return origs
-end
-
 function pen.delayed_kill( entity_id, delay, comp_id )
 	EntityAddComponent( entity_id, "LifetimeComponent", {
 		lifetime = delay + 1,
@@ -1807,11 +1800,11 @@ function pen.is_wand_useless( wand_id )
 end
 
 function pen.get_tinker_state( hooman, x, y )
-	for n = 1,2 do
-		local v = GameGetGameEffectCount( hooman, n == 1 and "EDIT_WANDS_EVERYWHERE" or "NO_WAND_EDITING" ) > 0
-		v = v and n or pen.child_play( hooman, function( parent, child )
-			if( GameGetGameEffectCount( child, n == 1 and "EDIT_WANDS_EVERYWHERE" or "NO_WAND_EDITING" ) > 0 ) then
-				return n
+	for i = 1,2 do
+		local v = GameGetGameEffectCount( hooman, i == 1 and "EDIT_WANDS_EVERYWHERE" or "NO_WAND_EDITING" ) > 0
+		v = v and i or pen.child_play( hooman, function( parent, child )
+			if( GameGetGameEffectCount( child, i == 1 and "EDIT_WANDS_EVERYWHERE" or "NO_WAND_EDITING" ) > 0 ) then
+				return i
 			end
 		end)
 
@@ -1876,36 +1869,6 @@ function pen.get_custom_effect( hooman, effect_name, effect_id )
 	end
 end
 
-function pen.access_matter_damage( entity_id, matter, damage ) --make this a magic comp thing
-	if( damage ~= nil ) then
-		EntitySetDamageFromMaterial( entity_id, matter, damage )
-	else
-		local dmg_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "DamageModelComponent" )
-		local mtrs = ComponentGetValue2( dmg_comp, "materials_that_damage" )
-		local mtrs_dmg = ComponentGetValue2( dmg_comp, "materials_how_much_damage" )
-		
-		local tbl_mtr = {}
-		for mtr in string.gmatch( mtrs, pen.ptrn( "," )) do
-			table.insert( tbl_mtr, mtr )
-		end
-		local tbl_dmg = {}
-		for mtr_dmg in string.gmatch( mtrs_dmg, pen.ptrn( "," )) do
-			table.insert( tbl_dmg, mtr_dmg )
-		end
-		
-		local tbl = {}
-		for i,mtr in ipairs( tbl_mtr ) do
-			tbl[mtr] = tbl_dmg[i]
-		end
-	
-		if( matter ~= nil ) then
-			return tonumber( tbl[matter])
-		else
-			return tbl
-		end
-	end
-end
-
 function pen.catch_comp( comp_name, field_name, index, func, args, forced )
 	local will_set = index == "set"
 	pen.cached.catch_comp = pen.cached.catch_comp or {}
@@ -1921,9 +1884,9 @@ function pen.catch_comp( comp_name, field_name, index, func, args, forced )
 		check_val = pen.CANCER_COMPS[ comp_name ][ field_name ] or (( index == "obj" ) and -2 or check_val )
 	end
 
-	local out = {v}
+	local out = { v }
 	if( type( check_val ) == "function" ) then
-		out = {check_val( args[1], args[#args], index )}
+		out = { check_val( args[1], args[#args], index )}
 	elseif( check_val < 0 and index == "obj" ) then
 		out[1] = check_val == -1
 	elseif( check_val > 0 and ( check_val > 2 or not( will_set ))) then
@@ -1934,14 +1897,14 @@ function pen.catch_comp( comp_name, field_name, index, func, args, forced )
 	if( not( pen.vld( v ))) then
 		pen.silent_catch = true
 
-		out = {pen.catch( func, args )}
+		out = { pen.catch( func, args )}
 		v = out[1] ~= nil --cannot check write
 		table.insert( out, 1, v )
 
 		pen.cached.catch_comp[ comp_name ][ field_name ][ index ] = v or will_set
 		pen.silent_catch = nil
 	end
-
+	
 	return unpack( out )
 end
 
@@ -1959,7 +1922,7 @@ function pen.clone_comp( entity_id, comp_id, mutators )
 	}
 	local object_values = {}
 	local extra_values = {}
-
+	
 	local function is_supported( field_name, is_obj )
 		local f = ComponentGetValue2
 		local input = { comp_id, field_name }
@@ -2013,9 +1976,7 @@ function pen.clone_comp( entity_id, comp_id, mutators )
 		end
 	end
 
-	if( pen.clone_comp_debug ) then
-		print( comp_name )
-	end
+	if( pen.clone_comp_debug ) then print( comp_name ) end
 	get_stuff()
 	if(( pen.clone_comp_debug or 1 ) == 1 ) then
 		comp_id = EntityAddComponent2( entity_id, comp_name, main_values )
@@ -2093,21 +2054,22 @@ function pen.is_sapient( entity_id )
 	return false
 end
 
-function pen.rate_creature( enemy_id, hooman, check_gene )
-	if( EntityGetRootEntity( enemy_id ) ~= enemy_id ) then
+function pen.rate_creature( entity_id, hooman, data )--hamis at 20m is 1
+	if( EntityGetRootEntity( entity_id ) ~= entity_id ) then
 		return 0
 	end
-
-	local custom_points = pen.get_storage( enemy_id, "creature_rating", "value_int" )
+	local custom_points = pen.get_storage( entity_id, "custom_rating", "value_float" )
 	if( pen.vld( custom_points )) then
 		return custom_points
 	end
 
-	local dmg_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "DamageModelComponent" )
-	local gene_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "GenomeDataComponent" )
+	data = data or {}
+	hooman = hooman or pen.get_hooman()
+	local dmg_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "DamageModelComponent" )
+	local gene_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "GenomeDataComponent" )
 	if( pen.vld( dmg_comp, true ) or pen.vld( gene_comp, true )) then
 		return 0
-	elseif( check_gene and EntityGetHerdRelation( enemy_id, hooman ) < 90 ) then
+	elseif( check_gene and EntityGetHerdRelation( entity_id, hooman ) < 90 ) then
 		return 0
 	end
 
@@ -2115,7 +2077,7 @@ function pen.rate_creature( enemy_id, hooman, check_gene )
 	local f_php = 1
 	if( pen.vld( hooman, true )) then
 		local char_x, char_y = EntityGetTransform( hooman )
-		local enemy_x, enemy_y = EntityGetTransform( enemy_id )
+		local enemy_x, enemy_y = EntityGetTransform( entity_id )
 		dist = math.min( math.sqrt(( enemy_x - char_x )^2 + ( enemy_y - char_y )^2 ), 300 )
 		
 		local p_dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
@@ -2144,7 +2106,7 @@ function pen.rate_creature( enemy_id, hooman, check_gene )
 	end
 	
 	local violence = 0
-	local animal_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "AnimalAIComponent" )
+	local animal_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "AnimalAIComponent" )
 	if( pen.vld( animal_comp, true )) then
 		if( ComponentGetValue2( animal_comp, "attack_melee_enabled" )) then
 			violence = violence + ( ComponentGetValue2( animal_comp, "attack_melee_damage_min" ) + ComponentGetValue2( animal_comp, "attack_melee_damage_max" ))/2
@@ -2155,13 +2117,15 @@ function pen.rate_creature( enemy_id, hooman, check_gene )
 			violence = violence*( 1 + 0.5*pen.b2n( ComponentGetValue2( animal_comp, "attack_ranged_predict" )))
 		end
 	end
-	if( EntityHasTag( enemy_id, "boss" ) or EntityHasTag( enemy_id, "miniboss" )) then
+	if( EntityHasTag( entity_id, "boss" ) or EntityHasTag( entity_id, "miniboss" )) then
 		violence = violence + 5
 	end
 	
+	--add projectile rater by getting xml
+
 	local overall_speed = 0
-	local plat_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "CharacterPlatformingComponent" )
-	local path_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "PathFindingComponent" )
+	local plat_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterPlatformingComponent" )
+	local path_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "PathFindingComponent" )
 	if( pen.vld( plat_comp, true ) and pen.vld( path_comp, true )) then
 		if( ComponentGetValue2( path_comp, "can_walk" )) then
 			overall_speed = overall_speed + ComponentGetValue2( plat_comp, "run_velocity" )
@@ -2172,14 +2136,15 @@ function pen.rate_creature( enemy_id, hooman, check_gene )
 			overall_speed = overall_speed + ComponentGetValue2( plat_comp, "fly_velocity_x" ) + 20
 		end
 	end
-	if( overall_speed == 0 and EntityHasTag( enemy_id, "helpless_animal" )) then
-		local fish_comp = EntityGetFirstComponentIncludingDisabled( enemy_id, "AdvancedFishAIComponent" ) or EntityGetFirstComponentIncludingDisabled( enemy_id, "FishAIComponent" )
+	if( overall_speed == 0 and EntityHasTag( entity_id, "helpless_animal" )) then
+		local fish_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "AdvancedFishAIComponent" ) or EntityGetFirstComponentIncludingDisabled( entity_id, "FishAIComponent" )
 		if( pen.vld( fish_comp, true )) then
 			overall_speed = 300
 		end
 	end
+
+	--add wand check for stuff in-hand
 	
-	--hamis at 20m is 1
 	local f_speed = ( overall_speed + 0.01 )/10
 	local f_vulner = 0.77 + ( 3 - 0.26 )/( 1 + ( vulnerability/5 )^2.9 )
 	local f_supremacy = math.min( supremacy, 20 )/20
@@ -2191,134 +2156,147 @@ function pen.rate_creature( enemy_id, hooman, check_gene )
 	return pen.vld( final_value ) and final_value or 0
 end
 
-function pen.rate_wand( wand_id, shuffle, can_reload, capacity, reload_time, cast_delay, mana_max, mana_charge, spell_cast, spread )
+function pen.rate_wand( wand_id, data )--sollex is 1
+	if( not( pen.vld( wand_id, true ))) then
+		return 0	
+	end
+	local custom_points = pen.get_storage( wand_id, "custom_rating", "value_float" )
+	if( pen.vld( custom_points )) then
+		return custom_points
+	end
+
+	data = data or {}
 	local abil_comp = EntityGetFirstComponentIncludingDisabled( wand_id, "AbilityComponent" )
-	
-	if( shuffle == nil ) then
-		shuffle = pen.b2n( ComponentObjectGetValue2( abil_comp, "gun_config", "shuffle_deck_when_empty" ))
+	if( not( pen.vld( abil_comp, true ))) then
+		return 0	
 	end
-	if( can_reload == nil ) then
-		can_reload = not( ComponentGetValue2( abil_comp, "never_reload" ))
+
+	if( data.shuffle == nil ) then
+		data.shuffle = pen.b2n( ComponentObjectGetValue2( abil_comp, "gun_config", "shuffle_deck_when_empty" ))
 	end
-	if( capacity == nil ) then
-		capacity = ComponentObjectGetValue2( abil_comp, "gun_config", "deck_capacity" )
+	if( data.can_reload == nil ) then
+		data.can_reload = not( ComponentGetValue2( abil_comp, "never_reload" ))
 	end
-	
-	if( reload_time == nil ) then
-		reload_time = ComponentObjectGetValue2( abil_comp, "gun_config", "reload_time" )
-	end
-	if( cast_delay == nil ) then
-		cast_delay = ComponentObjectGetValue2( abil_comp, "gunaction_config", "fire_rate_wait" )
+	if( data.capacity == nil ) then
+		data.capacity = ComponentObjectGetValue2( abil_comp, "gun_config", "deck_capacity" )
 	end
 	
-	if( mana_max == nil ) then
-		mana_max = ComponentGetValue2( abil_comp, "mana_max" )
+	if( data.reload_time == nil ) then
+		data.reload_time = ComponentObjectGetValue2( abil_comp, "gun_config", "reload_time" )
 	end
-	if( mana_charge == nil ) then
-		mana_charge = ComponentGetValue2( abil_comp, "mana_charge_speed" )
-	end
-	
-	if( spell_cast == nil ) then
-		spell_cast = ComponentObjectGetValue2( abil_comp, "gun_config", "actions_per_round" )
-	end
-	if( spread == nil ) then
-		spread = ComponentObjectGetValue2( abil_comp, "gunaction_config", "spread_degrees" )
+	if( data.cast_delay == nil ) then
+		data.cast_delay = ComponentObjectGetValue2( abil_comp, "gunaction_config", "fire_rate_wait" )
 	end
 	
-	--sollex is 1
-	local f_shuffle = 1 - 0.7*shuffle
+	if( data.mana_max == nil ) then
+		data.mana_max = ComponentGetValue2( abil_comp, "mana_max" )
+	end
+	if( data.mana_charge == nil ) then
+		data.mana_charge = ComponentGetValue2( abil_comp, "mana_charge_speed" )
+	end
+	
+	if( data.spell_cast == nil ) then
+		data.spell_cast = ComponentObjectGetValue2( abil_comp, "gun_config", "actions_per_round" )
+	end
+	if( data.spread == nil ) then
+		data.spread = ComponentObjectGetValue2( abil_comp, "gunaction_config", "spread_degrees" )
+	end
+	
+	local f_shuffle = 1 - 0.7*data.shuffle
+	local f_capacity = 3.47 + ( 0.05 - 3.47 )/( 1 + (( data.capacity + 3 )/13.67 )^3.05 )
+	local f_delay = 2 - ( 0.044/0.024 )*( 1 - math.exp( -0.024*data.cast_delay ))
+	local f_mana_max = 1.5 + ( 0.06 - 1.5 )/( 1 + ( data.mana_max/6074441 )^1.416 )^237023
+	local f_mana_charge = 3.41 + ( 0.07 - 3.41 )/( 1 + ( data.mana_charge/14641850 )^1.314 )^251693
+	local f_multi = 2.58 + ( 1.017 - 2.58 )/( 1 + ( data.spell_cast/48023 )^1.63 )^983676
+	local f_spread = math.rad( 45 - data.spread )
+	
 	local f_reloading = 2
-	if( can_reload ) then
-		f_reloading = 2 - ( 0.044/0.024 )*( 1 - math.exp( -0.024*reload_time ))
+	if( data.can_reload ) then
+		f_reloading = f_reloading - ( 0.044/0.024 )*( 1 - math.exp( -0.024*data.reload_time ))
 	end
-	local f_capacity = 3.47 + ( 0.05 - 3.47 )/( 1 + (( capacity + 3 )/13.67 )^3.05 )
-	local f_delay = 2 - ( 0.044/0.024 )*( 1 - math.exp( -0.024*cast_delay ))
-	local f_mana_max = 1.5 + ( 0.06 - 1.5 )/( 1 + ( mana_max/6074441 )^1.416 )^237023
-	local f_mana_charge = 3.41 + ( 0.07 - 3.41 )/( 1 + ( mana_charge/14641850 )^1.314 )^251693
-	local f_multi = 2.58 + ( 1.017 - 2.58 )/( 1 + ( spell_cast/48023 )^1.63 )^983676
-	local f_spread = math.rad( 45 - spread )
-	
+
+	--add spells
+
 	local final_value = 1500*f_delay*f_reloading*f_mana_max*f_mana_charge*math.sqrt( f_spread*f_multi )*f_shuffle*f_capacity^1.5
 	return pen.vld( final_value ) and final_value or 0
 end
 
-function pen.rate_spell( spell_id )
+function pen.rate_spell( spell_id, data )--sparkbolt is 1
 	if( not( pen.vld( spell_id, true ))) then
 		return 0	
 	end
 	
-	local t_item_comp = EntityGetFirstComponentIncludingDisabled( spell_id, "ItemComponent" )
-	local t_act_comp = EntityGetFirstComponentIncludingDisabled( spell_id, "ItemActionComponent" )
-	local action_data = pen.get_action_with_id( ComponentGetValue2( t_act_comp, "action_id" ))
+	local act_comp = EntityGetFirstComponentIncludingDisabled( spell_id, "ItemActionComponent" )
+	local action_data = data or pen.get_action_with_id( ComponentGetValue2( act_comp, "action_id" ))
 	if( not( pen.vld( action_data ))) then
 		return 0
+	elseif( pen.vld( action_data.custom_rating )) then
+		return action_data.custom_rating
 	end
-	
-	local price = action_data.price
+
+	local price = action_data.price or 1
 	local uses_max = action_data.max_uses or -1
 	local mana = math.abs( action_data.mana or 0 )
-	local is_perma = pen.b2n( ComponentGetValue2( t_item_comp, "permanently_attached" ))
-	local uses_left = ComponentGetValue2( t_item_comp, "uses_remaining" )
+	local item_comp = EntityGetFirstComponentIncludingDisabled( spell_id, "ItemComponent" )
+	local is_perma = action_data.is_perma or pen.b2n( ComponentGetValue2( item_comp, "permanently_attached" ))
+	local uses_left = action_data.uses_left or ComponentGetValue2( item_comp, "uses_remaining" )
 	
-	--sparkbolt is 1
 	local f_perma = 1 + 4*is_perma
 	local f_price = price/100
-	local f_uses = uses_left/uses_max
-	if( uses_left < 0 and uses_max > 0 ) then
-		f_uses = 2
-	end
 	local f_mana = 5.4 + ( 0.1 - 5.4 )/( 1 + ( mana/8420.3 )^0.367 )
 	
+	local f_uses = 2
+	if( uses_left >= 0 and uses_max > 0 ) then
+		f_uses = uses_left/uses_max
+	end
+
 	local final_value = 2.5*f_perma*f_price*f_uses*f_mana
 	return pen.vld( final_value ) and final_value or 0
 end
 
-function pen.rate_projectile( hooman, projectile_id )
-	if( EntityGetRootEntity( projectile_id ) ~= projectile_id ) then
+function pen.rate_projectile( proj_id, hooman, data )--sparkbolt at 20m is ~1
+	if( EntityGetRootEntity( proj_id ) ~= proj_id ) then
 		return 0
 	end
+	local custom_points = pen.get_storage( proj_id, "custom_rating", "value_float" )
+	if( pen.vld( custom_points )) then
+		return custom_points
+	end
 	
-	local proj_comp = EntityGetFirstComponentIncludingDisabled( projectile_id, "ProjectileComponent" )
+	data = data or {}
+	hooman = hooman or pen.get_hooman()
 	local char_x, char_y = EntityGetTransform( hooman )
-	local proj_x, proj_y = EntityGetTransform( projectile_id )
+	local proj_x, proj_y = EntityGetTransform( proj_id )
+	local proj_comp = EntityGetFirstComponentIncludingDisabled( proj_id, "ProjectileComponent" )
 	
-	local proj_vel_x, proj_vel_y = GameGetVelocityCompVelocity( projectile_id )
+	local proj_vel_x, proj_vel_y = GameGetVelocityCompVelocity( proj_id )
 	local char_vel_x, char_vel_y = GameGetVelocityCompVelocity( hooman )
 	local proj_v = math.sqrt(( char_vel_x - proj_vel_x )^2 + ( char_vel_y - proj_vel_y )^2 )
 	
 	local d_x = proj_x - char_x
 	local d_y = proj_y - char_y
+	local distance = math.sqrt( d_x^2 + d_y^2 )
 	local direction = math.abs( math.rad( 180 ) - math.abs( math.atan2( proj_vel_x, proj_vel_y ) - math.atan2( d_x, d_y )))
-	local distance = math.sqrt(( d_x )^2 + ( d_y )^ 2 )
 	
 	local is_real = pen.b2n( ComponentGetValue2( proj_comp, "collide_with_entities" ))
 	local lifetime = ComponentGetValue2( proj_comp, "lifetime" )
-	if( lifetime < 2 and lifetime > -1 ) then
-		lifetime = 1
-	end
+	lifetime = lifetime < 0 and 9999 or math.max( lifetime, 1 )
 	
 	local total_damage = 0
-	local damage_types = { "curse", "drill", "electricity", "explosion", "fire", "ice", "melee", "overeating", "physics_hit", "poison", "projectile", "radioactive", "slice", }
-	for i = 1,#damage_types do
-		local dmg = ComponentObjectGetValue2( proj_comp, "damage_by_type", damage_types[i] )
-		if( dmg > 0 ) then
-			total_damage = total_damage + dmg
-		end
+	local damage_types = ComponentObjectGetMembers( proj_comp, "damage_by_type" )
+	for field in pairs( damage_types ) do
+		local dmg = ComponentObjectGetValue2( proj_comp, "damage_by_type", field )
+		if( dmg > 0 ) then total_damage = total_damage + dmg end
 	end
 	total_damage = total_damage + ComponentGetValue2( proj_comp, "damage" )
 	
 	local explosion_dmg = ComponentObjectGetValue2( proj_comp, "config_explosion", "damage" )
 	local explosion_rad = ComponentObjectGetValue2( proj_comp, "config_explosion", "explosion_radius" )
 	if( explosion_dmg > 0 ) then
-		explosion_dmg = explosion_dmg + explosion_rad/25
-		
-		if( distance <= explosion_rad ) then
-			explosion_dmg = explosion_dmg + ( explosion_rad - distance + 1 )/25
-		end
+		explosion_dmg = explosion_dmg + ( explosion_rad + math.max( explosion_rad - distance + 1, 0 ))/25
 	end
 	total_damage = total_damage + explosion_dmg
 	
-	--sparkbolt at 20m is ~1
 	local f_distance = 1 + 4/2^( distance/10 )
 	local f_direction = 0.02 + 1.08/2^( direction/0.6 )
 	local f_velocity = 0.1847 + ( 1 - math.exp( -0.0021*proj_v ))
@@ -2608,28 +2586,35 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 		return out
 	end, { reset_frame = 36000 })
 	
-	local counter_global, counter_local = 1, 1
+	local c_gbl, c_lcl, c_chr = 1, {}, 1
 	local off_x = ( data.is_centered_x or false ) and -data.dims[1]/2 or 0
 	local off_y = ( data.is_centered_y or false ) and -math.max( data.dims[2] or 0, dims[2])/2 or 0
 	for i,element in ipairs( structure ) do
+		c_chr = 1
 		if( pen.vld( element.text )) then
 			local pos_x = pic_x + data.scale*( off_x + element.x )
 			local pos_y = pic_y + data.scale*( off_y + element.y )
 			if( pen.vld( element.f )) then
-				counter_local = 1 --local counter should be unique to every individual func + add char_counter to get id of the char
+				local new_lcl = {}
+				for e,func in ipairs( element.f ) do
+					new_lcl[func] = c_lcl[func]
+				end
+				c_lcl = new_lcl
+
 				local orig_x, orig_y = pos_x, pos_y
 				pen.w2c( element.text, function( id )
 					pos_x, pos_y = orig_x, orig_y
-					
+
 					local clr, char, font = data.color, pen.magic_byte( id ), {data.font,is_pixel_font}
 					local off = { pen.get_char_dims( char, id, font[1])}
 					for e,func in ipairs( element.f ) do
 						local new_clr, new_font, new_char = {}, {}, nil
 						if( data.funcs[func] ~= nil ) then
+							c_lcl[func] = ( c_lcl[func] or 0 ) + 1
 							uid, pos_x, pos_y, new_clr, new_font, new_char = data.funcs[func](
 								gui, uid, {pos_x,orig_x}, {pos_y,orig_y}, pic_z,
 								{ char = char, dims = off, font = font, extra = ( element.extra or {})},
-								clr, { gbl = counter_global, lcl = counter_local }
+								clr, { gbl = c_gbl, lcl = c_lcl[func], chr = c_chr }
 							)
 						end
 						if( pen.vld( new_clr )) then clr = new_clr end
@@ -2644,9 +2629,10 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 					end
 
 					orig_x = orig_x + off[1]
-					counter_global, counter_local = counter_global + 1, counter_local + 1
+					c_gbl, c_chr = c_gbl + 1, c_chr + 1
 				end)
 			else
+				counter_local = {}
 				pen.colourer( gui, data.color )
 				GuiZSetForNextWidget( gui, pic_z )
 				GuiText( gui, pos_x, pos_y, element.text, data.scale, data.font, is_pixel_font )
@@ -2657,7 +2643,7 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	return uid, dims
 end
 
-function pen.new_tooltip( gui, uid, text, data, func ) --remove the testing index pic references (probably just put autobox)
+function pen.new_tooltip( gui, uid, text, data, func )
 	data = data or {}
 	data.pos = data.pos or {}
 	data.tid = data.tid or "dft"
@@ -2699,15 +2685,17 @@ function pen.new_tooltip( gui, uid, text, data, func ) --remove the testing inde
 		data.dims = pen.magic_copy( data.dims )
 		data.dims[1] = data.dims[1] + 2*data.edging - 1
 		data.dims[2] = data.dims[2] + 2*data.edging - 1
-		
-		--check the size above and flip these if they are nil and there's no enough space on-screen
-		--data.is_left = data.is_left or false
-		--data.is_over = data.is_over or false
 
 		local mouse_drift = 5
 		if( not( pen.vld( data.pos ))) then
 			data.pos = { pen.get_mouse_pos()}
+			if( data.is_left == nil ) then
+				data.is_left = w < data.pos[1] + data.dims[1] + 1
+			end
 			data.pos[1] = data.pos[1] + ( data.is_left and -1 or 1 )*mouse_drift
+			if( data.is_over == nil ) then
+				data.is_over = h < data.pos[2] + data.dims[2] + 1
+			end
 			data.pos[2] = data.pos[2] + ( data.is_over and -1 or 1 )*mouse_drift
 		end
 		if( data.is_left ) then
@@ -2747,31 +2735,13 @@ function pen.new_tooltip( gui, uid, text, data, func ) --remove the testing inde
 				size_x, size_y = size_x - inter_size, size_y - inter_size
 				inter_alpha = math.max( 1 - inter_alpha/6, 0.1 )
 				
-				local gui_core = "mods/index_core/files/pics/vanilla_tooltip_"
-				uid = pen.new_image( gui, uid, pic_x, pic_y, pic_z + 0.01, gui_core.."0.xml", size_x, size_y, 1.15*inter_alpha )
+				uid = pen.new_image( gui, uid, pic_x, pic_y, pic_z, "data/ui_gfx/empty.png", size_x, size_y )
 				local clicked, r_clicked, is_hovered = false, false, false
 				uid, clicked, r_clicked, is_hovered = pen.new_interface( gui, uid, {pic_x,pic_y,size_x,size_y}, pic_z )
 				
-				local lines = {{0,-1,size_x-1,1},{-1,0,1,size_y-1},{1,size_y,size_x-1,1},{size_x,1,1,size_y-1}}
-				for i,line in ipairs( lines ) do
-					uid = pen.new_image( gui, uid, pic_x + line[1], pic_y + line[2], pic_z, gui_core.."1.xml", line[3], line[4], inter_alpha )
-				end
-				local dots = {{-1,-1},{size_x-1,-1},{size_x,size_y},{-1,size_y-1}, {size_x,0},{0,size_y}}
-				for i,dot in ipairs( dots ) do
-					uid = pen.new_image( gui, uid, pic_x + dot[1], pic_y + dot[2], pic_z, gui_core.."2.xml", 1, 1, inter_alpha )
-				end
-				local shadow_core = "mods/index_core/files/pics/tooltip_shadow_"
-				local shadows = {
-					{-2,-2,1,1},{4,-2,-1,1},{3,3,-1,-1},{-2,4,1,-1},
-					{1.5,-2,size_x-1.5,1},{4,2,-1,size_y-1.5},{-0.5,3,1.5-size_x,-1},{-2,0,1,1.5-size_y},
-				}
-				for k = 1,2 do
-					for e = 1,4 do
-						local i = e + ( k - 1 )*4
-						local name = e%2 == 0 and ( k > 1 and "B_alt.png" or "A_alt.png" ) or ( k > 1 and "B.png" or "A.png" )
-						uid = pen.new_image( gui, uid, pic_x + dots[e][1] + shadows[i][1], pic_y + dots[e][2] + shadows[i][2], pic_z + 0.011, shadow_core..name, 0.5*shadows[i][3], 0.5*shadows[i][4], inter_alpha )
-					end
-				end
+				uid = uid + 1
+				GuiZSetForNextWidget( gui, pic_z + 0.01 )
+				GuiImageNinePiece( gui, uid, pic_x, pic_y, size_x, size_y, 1.15*inter_alpha )
 				
 				return uid, { clicked, r_clicked, is_hovered }
 			end
@@ -2849,6 +2819,8 @@ pen.FONT_MODS = {
 	shadow = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
 		return uid, pic_x[1], pic_y[1], nil, { "data/fonts/font_pixel.xml", true }
 	end,
+	--crossed out text
+	--separate underscore from hyperlink
 	
 	wave = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
 		pic_y[1] = pic_y[1] + math.sin( 0.5*index.gbl + GameGetFrameNum()/7 )
@@ -2921,7 +2893,7 @@ pen.FONT_MODS = {
 		return uid, pic_x[1], pic_y[1]
 	end,
 	_dialogue = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
-		--char_data.extra for modifications
+		--char_data.extra for modifications (compare the index num with index.chr)
 		--letters appear through alpha sin interpolating top down 
 		return uid, pic_x[1], pic_y[1]
 	end,
@@ -3146,6 +3118,41 @@ pen.CANCER_COMPS = {
 		mDamageMaterials = 1,
 		mMaterialDamageThisFrame = 1,
 		mCollisionMessageMaterialCountsThisFrame = 1,
+
+		materials_that_damage = function( comp_id, value, index )
+			local out = true
+			if( index == "get" ) then
+				local tbl_mtr = {}
+				for mtr in string.gmatch( ComponentGetValue2( comp_id, "materials_that_damage" ), pen.ptrn( "," )) do
+					table.insert( tbl_mtr, mtr )
+				end
+				local tbl_dmg = {}
+				for mtr_dmg in string.gmatch( ComponentGetValue2( comp_id, "materials_how_much_damage" ), pen.ptrn( "," )) do
+					table.insert( tbl_dmg, tonumber( mtr_dmg ))
+				end
+				
+				out = {}
+				for i,mtr in ipairs( tbl_mtr ) do
+					out[mtr] = tbl_dmg[i]
+				end
+			end
+			
+			local index_tbl = { set = nil, obj = false, get = true }
+			return index_tbl[ index ], out
+		end,
+		materials_how_much_damage = function( comp_id, value, index )
+			local out = true
+			if( index == "set" ) then
+				if( type( value ) == "table" ) then
+					EntitySetDamageFromMaterial( ComponentGetEntity( comp_id ), value[1], value[2])
+				else
+					ComponentSetValue2( comp_id, "materials_how_much_damage", value )
+				end
+			end
+			
+			local index_tbl = { set = true, get = false, obj = nil }
+			return index_tbl[ index ], out
+		end,
 	},
 	DamageNearbyEntitiesComponent = {},
 	DebugFollowMouseComponent = {},
@@ -3195,7 +3202,7 @@ pen.CANCER_COMPS = {
 				ComponentSetValue2( comp_id, "friend_firemage", value == 1 )
 			end
 			
-			local index_tbl = { true, false, true }
+			local index_tbl = { set = true, obj = false, get = nil }
 			return index_tbl[ index ], true
 		end,
 		friend_thundermage = function( comp_id, value, index )
@@ -3203,7 +3210,7 @@ pen.CANCER_COMPS = {
 				ComponentSetValue2( comp_id, "friend_thundermage", value == 1 )
 			end
 
-			local index_tbl = { true, false, true }
+			local index_tbl = { set = true, obj = false, get = nil }
 			return index_tbl[ index ], true
 		end,
 	},
@@ -3230,7 +3237,28 @@ pen.CANCER_COMPS = {
 	IngestionComponent = {
 		m_ingestion_satiation_material_cache = 3,
 	},
-	InheritTransformComponent = {},
+	InheritTransformComponent = {
+		Transform = function( comp_id, value, index )
+			local out = true
+			if( index == "set" ) then
+				local entity_id = ComponentGetEntity( comp_id )
+				local trans_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "InheritTransformComponent" )
+				local origs = { ComponentGetValue2( trans_comp, "Transform" )}
+				if( pen.get_table_count( value, true ) > 0 ) then
+					ComponentSetValue2( trans_comp, "Transform",
+						value.x or origs[1],
+						value.y or origs[2],
+						value.s_x or origs[3],
+						value.s_y or origs[4],
+						value.angle or origs[5]
+					)
+				end
+			end
+
+			local index_tbl = { set = true, obj = false, get = nil }
+			return index_tbl[ index ], out
+		end,
+	},
 	InteractableComponent = {},
 	Inventory2Component = {},
 	InventoryComponent = {
@@ -3287,7 +3315,7 @@ pen.CANCER_COMPS = {
 				end
 			end
 
-			local index_tbl = { true, false, true }
+			local index_tbl = { set = true, obj = false, get = nil }
 			return index_tbl[ index ]
 		end,
 	},
