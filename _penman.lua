@@ -5,11 +5,12 @@ pen.cached = pen.cached or {}
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
+--reorder and move all the gui stuff to the very bottom
+
+--figure out ImmortalDamned's filesetting trick
 --interpolation lib (https://github.com/peete-q/assets/blob/master/lua-modules/lib/interpolate.lua)
 --lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
 
---try putting some of the stuff inside internal lua global tables
---reorder and move all the gui stuff to the very bottom
 --cleanup, make sure all the funcs reference the right stuff, variable naming consistency
 --make sure that all returned id values are nil
 --actually test all the stuff

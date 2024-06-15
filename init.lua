@@ -10,7 +10,7 @@ function OnPlayerSpawned( hooman )
 end
 
 penman_w = penman_w or ModTextFileSetContent
-function OnWorldPreUpdate()
+function OnWorldPreUpdate() --this too can probably be done legitimately
 	if( HasFlagPersistent( "one_shall_not_spawn" )) then
 		RemoveFlagPersistent( "one_shall_not_spawn" )
 	end
@@ -48,7 +48,7 @@ function OnWorldPostUpdate()
 
 	local request = ComponentGetValue2( storage_request, "value_string" )
 	if( request ~= pen.DIV_1 ) then
-		local stuff = pen.magic_parse( request ) --transition this to new parser
+		local stuff = pen.magic_parse( request ) --swap this to new filesetting trick
 		for i,v in ipairs( stuff ) do
 			local storage_file = pen.get_storage( ctrl_body, v[2])
 			penman_w( v[1], string.gsub( ComponentGetValue2( storage_file, "value_string" ), "\\([nt])", { n = "\n", t = "\t", }))
