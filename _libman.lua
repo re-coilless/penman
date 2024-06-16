@@ -40,7 +40,7 @@ function lib.magic_write( path, file )
 	local id = tonumber( GlobalsGetValue( "PENMAN_WRITE_INDEX", "0" ))
     GlobalsSetValue( "PENMAN_WRITE_INDEX", id + 1 )
 
-    local ctrl_body = pen.get_hooman_child( GameGetWorldStateEntity(), "pen_ctrl" )
+    local ctrl_body = pen.get_child( GameGetWorldStateEntity(), "pen_ctrl" )
     local storage_request = pen.get_storage( ctrl_body, "request" )
 	local request = ComponentGetValue2( storage_request, "value_string" )
 	ComponentSetValue2( storage_request, "value_string", table.concat({ request, pen.DIV_2, path, pen.DIV_2, "file", id, pen.DIV_2, pen.DIV_1 }))

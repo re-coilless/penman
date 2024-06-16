@@ -47,7 +47,7 @@ print( tostring( pen.magic_comp( gene_comp, "friend_firemage" )))
 
 --[[
 
-pen.print_table( pen.magic_parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
+pen.t.print( pen.t.parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
 
 pen.matter_fabricator( 0, -100, {
     matter = "sand",
@@ -89,7 +89,7 @@ print( tostring( herd.trap.hmmmm ))
 print( tostring( herd.balls.trap ))
 print( tostring( herd.hmmmm.healer ))
 
-pen.print_table({
+pen.t.print({
     1,
     2,
     7,
@@ -323,7 +323,7 @@ local function add_comp( entity_id, comp_name, vals )
 end
 
 local counter = 1
-for comp in pen.magic_sorter( literally_every_comp ) do
+for comp in pen.t.order( literally_every_comp ) do
     if( counter > 170 ) then break end
     counter = counter + 1
 
@@ -334,7 +334,7 @@ for comp in pen.magic_sorter( literally_every_comp ) do
 
     add_comp( dummy, comp, patch )
 end
-GamePrint( pen.get_table_count( EntityGetAllComponents( dummy )).."/"..pen.get_table_count( literally_every_comp ))
+GamePrint( pen.t.count( EntityGetAllComponents( dummy )).."/"..pen.t.count( literally_every_comp ))
 
 pen.magic_comp( dummy, "GenomeDataComponent", function( comp_id, v, is_enabled )
     pen.magic_comp( comp_id, {
