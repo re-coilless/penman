@@ -5,6 +5,6 @@
 
 	<VariableStorageComponent
 		name="request"
-		value_string="&"
+		value_string="|"
 	></VariableStorageComponent>
 </Entity>

@@ -8,18 +8,19 @@ if( dummy == 0 ) then
 end
 
 hooman = pen.get_hooman()
-if( hooman == 0 or pen.testing_done ) then
+if( pen.testing_done ) then
     if( pen.testing_done == 1 ) then
         return
     else
-        -- pen.testing_done = 1
+        pen.testing_done = 1
         
-        -- misc_tests()
+        misc_tests()
+        -- filing()
         -- raters()
         -- input()
-        tipping()
+        -- tipping()
         -- fonting()
-        -- entity_cloner()
+        -- cloner()
         -- text2func()
 
         return
@@ -36,6 +37,10 @@ local test_input = {
 
 function misc_tests()
 
+print( tostring( pen.is_game_restarted()))
+pen.t.print({ GameGetDateAndTimeUTC()})
+
+--[[
 local dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
 pen.magic_comp( dmg_comp, "materials_how_much_damage", { "acid", 69 })
 local tbl = pen.magic_comp( dmg_comp, "materials_that_damage" )
@@ -44,8 +49,6 @@ print( tbl.acid )
 local gene_comp = EntityGetFirstComponentIncludingDisabled( hooman, "GenomeDataComponent" )
 pen.magic_comp( gene_comp, "friend_firemage", 0 )
 print( tostring( pen.magic_comp( gene_comp, "friend_firemage" )))
-
---[[
 
 pen.t.print( pen.t.parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
 
@@ -111,6 +114,21 @@ pen.magic_comp( hooman, { "DamageModelComponent", "balls" }, function( comp_id, 
 end)
 
 ]]end
+
+-- *************************************************************************
+
+function filing()
+
+local the_one = GetUpdatedEntityID()
+if( hooman == the_one ) then
+    local path = "mods/penman/extra/write_test.lua"
+    pen.magic_write( path, "print(\"ass\")" )
+    dofile( path )
+else
+    EntityAddComponent2( hooman, "LuaComponent", { script_source_file = "mods/penman/extra/check_em.lua" })
+end
+
+end
 
 -- *************************************************************************
 
@@ -199,7 +217,7 @@ end
 
 -- *************************************************************************
 
-function entity_cloner()
+function cloner()
 
 local literally_every_comp = dofile_once( "mods/penman/extra/lists/every_comp.lua" )
 local comp_patches = {

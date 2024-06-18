@@ -1,12 +1,25 @@
-dofile_once( "data/scripts/lib/utilities.lua" )
-
 pen = pen or {}
 pen.t = pen.t or {}
 pen.cached = pen.cached or {}
 
+--[WRITING]
+pen.magic_write = pen.magic_write or ModTextFileSetContent
+if( pen.magic_write ~= nil ) then --dofile_once within OnModInit for this to work
+	pen.t2f = function( name, text )
+		if( pen[ name ] == nil ) then
+			local num = tonumber( GlobalsGetValue( "PENMAN_VIRTUAL_INDEX", "0" ))
+			GlobalsSetValue( "PENMAN_VIRTUAL_INDEX", num + 1 )
+			local path = table.concat({ pen.FILE_T2F, num, ".lua" })
+			pen.magic_write( path, "return "..text )
+			pen[ name ] = dofile( path )
+		end
+		return pen[ name ]
+	end
+end
+
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---figure out ImmortalDamned's filesetting trick
+--transition all the stuff to child_play + t.loop that has table protection integrated
 --implant penman into mnee (and test it with most disgusting malformed data possible)
 
 --new_dragger (fully virtual)
@@ -75,22 +88,16 @@ function pen.rounder( num, k )
 end
 
 function pen.limiter( value, limit, max_mode )
-	max_mode = max_mode or false
 	limit = math.abs( limit )
-	
 	if(( max_mode and math.abs( value ) < limit ) or ( not( max_mode ) and math.abs( value ) > limit )) then
 		return pen.get_sign( value )*limit
 	end
-	
 	return value
 end
 
 function pen.get_angular_delta( a, b, get_max )
-	get_max = get_max or false
-
 	local pi, pi4 = math.rad( 90 ), math.rad( 360 )
-	local d360 = a - b
-	local d180 = ( a + pi )%pi4 - ( b + pi )%pi4
+	local d360, d180 = a - b, ( a + pi )%pi4 - ( b + pi )%pi4
 	if( get_max ) then
 		return math.abs( d360 ) > math.abs( d180 ) and d360 or d180
 	else
@@ -110,7 +117,7 @@ end
 function pen.hash_me( str, is_huge )
 	is_huge = is_huge or false
 	
-	local a, b, c = 0, 0, ( is_huge and 65535 or 4294967295 )
+	local a, b, c = 0, 0, is_huge and 4294967295 or 65535
 	for i = 1,#str do
 		a = ( a + string.byte( str, i ))%c
 		b = ( a + b )%c
@@ -141,14 +148,10 @@ end
 
 --[TECHNICAL]
 function pen.catch( f, input, fallback )
-	local out = { pcall(f, unpack( input or {}))}
+	local out = { pcall( f, unpack( input or {}))}
 	if( not( out[1])) then
-		if( not( pen.silent_catch )) then
-			print( out[2])
-		end
-		if( pen.vld( fallback )) then
-			return unpack( fallback )
-		end
+		if( not( pen.silent_catch )) then print( out[2]) end
+		if( pen.vld( fallback )) then return unpack( fallback ) end
 	else
 		table.remove( out, 1 )
 		return unpack( out )
@@ -166,12 +169,13 @@ function pen.cache( structure, update_func, data )
 	pen.cached[ name ].cache_reset_count = pen.cached[ name ].cache_reset_count or 0
 	pen.cached[ name ].cache_reset_frame = pen.cached[ name ].cache_reset_frame or 0
 
+	local frame_num = GameGetFrameNum()
 	local is_too_many = data.reset_count > 0 and pen.cached[ name ].cache_reset_count > data.reset_count
-	local is_too_long = data.reset_frame > 0 and GameGetFrameNum() > data.reset_frame
+	local is_too_long = data.reset_frame > 0 and frame_num > data.reset_frame
 	if( data.reset_now or ( update_func ~= nil and ( is_too_many or is_too_long ))) then
 		pen.cached[ name ] = {}
 		pen.cached[ name ].cache_reset_count = 0
-		pen.cached[ name ].cache_reset_frame = GameGetFrameNum() + data.reset_frame
+		pen.cached[ name ].cache_reset_frame = frame_num + data.reset_frame
 	end
 
 	local the_one = pen.cached[ name ]
@@ -209,62 +213,50 @@ function pen.chrono( f, input, storage_comp, name )
 end
 
 function pen.t.init( amount, value )
-	local tbl = {}
-	local temp = value
+	local is_tbl = type( value ) == "table"
+	local tbl, temp = {}, value
 	for i = 1,amount do
-		if( type( value ) == "table" ) then
-			temp = {}
-		end
-		tbl[i] = temp
+		tbl[i] = is_tbl and {} or temp
 	end
-	
 	return tbl
 end
 
 function pen.t.count( tbl, just_checking )
-	tbl = tbl or 0
-	if( type( tbl ) ~= "table" ) then
-		return 0
-	end
-	
-	local table_count = 0
-	for i,element in pairs( tbl ) do
-		table_count = table_count + 1
-		if( just_checking ) then
-			break
+	local count = 0
+	if( type( tbl or 0 ) == "table" ) then
+		for k,v in pairs( tbl ) do
+			count = count + 1
+			if( just_checking ) then
+				break
+			end
 		end
 	end
-	return table_count
+	return count
 end
 
 function pen.t.depth( tbl, d )
-	tbl, d = tbl or 0, d or 0
-
-	if( type( tbl ) == "table" ) then
-		for n,v in pairs( tbl ) do
+	d = d or 0
+	if( type( tbl or 0 ) == "table" ) then
+		for k,v in pairs( tbl ) do
 			d = pen.t.depth( v, d + 1 )
 			break
 		end
 	end
-
 	return d
 end
 
-function pen.t.find( tbl, value ) --order the table first
-	local low = 1
-	local high = #tbl
-	
+function pen.t.bins( tbl, value )
+	local low, high = 1, #tbl
 	while( high >= low ) do
 		local middle = math.floor(( low + high )/2 + 0.5 )
-		if( tbl[middle] < value ) then
+		if( tbl[ middle ] < value ) then
 			low = middle + 1
-		elseif( tbl[middle] > value ) then
+		elseif( tbl[ middle ] > value ) then
 			high = middle - 1
-		elseif( tbl[middle] == value ) then
+		elseif( tbl[ middle ] == value ) then
 			return middle
 		end
 	end
-	
 	return nil
 end
 
@@ -280,46 +272,7 @@ function pen.t.unarray( tbl, dft )
 	return new_tbl
 end
 
-function pen.t.add( a, b ) --should work for unarrays
-	if( pen.vld( b )) then
-		table.sort( b )
-		if( pen.vld( a )) then
-			for m,new in ipairs( b ) do 
-				if( pen.t.find( a, new ) == nil ) then
-					table.insert( a, new )
-				end
-			end
-			
-			table.sort( a )
-		else
-			a = b
-		end
-	end
-	
-	return a
-end
-
-function pen.t.add_new( lst, name )
-	for i,item in ipairs( lst ) do
-		if( item == name ) then
-			return
-		end
-	end
-	
-	table.insert( lst, name )
-end
-
-function pen.t.add_dynamic( tbl, fields ) --thanks to ImmortalDamned
-    setmetatable( tbl, {
-        __index = function( _, k )
-            local f = fields[k]
-            return f and f()
-        end
-    })
-    return tbl
-end
-
-function pen.t.get( tbl, id, will_nuke, custom_key )
+function pen.t.get( tbl, id, custom_key, will_nuke )
 	if( not( pen.vld( tbl ))) then
 		return
 	end
@@ -336,6 +289,7 @@ function pen.t.get( tbl, id, will_nuke, custom_key )
 			if( not( is_multi )) then break end
 		end
 	end
+
 	if( will_nuke ) then
 		for i,v in ipairs( out ) do
 			table.remove( tbl, v )
@@ -346,31 +300,68 @@ function pen.t.get( tbl, id, will_nuke, custom_key )
 	end
 end
 
-function pen.t.get_most( tbl )
-	local count = {}
-	for n,v in pairs( tbl ) do
-		count[v] = ( count[v] or 0 ) + 1
-	end
+function pen.t.get_max( tbl )
 	local best = {0,0}
-	for n,v in pairs( count ) do
+	for k,v in pairs( tbl ) do
 		if( best[2] < v ) then
-			best = {n,v}
+			best = {k,v}
 		end
 	end
-	return unpack( best )
+	return tbl[ best[1]], best[1]
+end
+
+function pen.t.get_most( tbl )
+	local count = {}
+	for k,v in pairs( tbl ) do
+		count[i] = ( count[i] or 0 ) + 1
+	end
+	return pen.t.get_max( count )
+end
+
+function pen.t.add( a, b )
+	a, b = a or {}, b or {}
+	if( pen.vld( a )) then
+		local is_weird = pen.t.is_unarray( a )
+		for k,v in pairs( b ) do
+			if( is_weird ) then
+				if( a[k] == nil ) then a[k] = v end
+			elseif( not( pen.vld( pen.t.get( a, v )))) then
+				table.insert( a, v )
+			end
+		end
+	else
+		a = b
+	end
+	return a
+end
+
+function pen.t.add_dynamic( tbl, fields ) --thanks to ImmortalDamned
+    setmetatable( tbl, {
+        __index = function( _, k )
+            local f = fields[k]
+            return f and f()
+        end
+    })
+    return tbl
+end
+
+function pen.t.insert_new( tbl, new )
+	for i,v in ipairs( tbl ) do
+		if( v == new ) then return end
+	end
+	table.insert( tbl, new )
 end
 
 function pen.t.clone( orig, copies )
+	local copy = {}
     copies = copies or {}
-    local orig_type = type( orig )
-    local copy = {}
-    if( orig_type == "table" ) then
-        if( copies[orig]) then
-            copy = copies[orig]
+    if( type( orig ) == "table" ) then
+        if( copies[ orig ]) then
+            copy = copies[ orig ]
         else
             copy = {}
-            copies[orig] = copy
-            for orig_key, orig_value in next, orig, nil do
+            copies[ orig ] = copy
+            for orig_key,orig_value in next,orig,nil do
                 copy[ pen.t.clone( orig_key, copies )] = pen.t.clone( orig_value, copies )
             end
             setmetatable( copy, pen.t.clone( getmetatable( orig ), copies ))
@@ -381,13 +372,13 @@ function pen.t.clone( orig, copies )
     return copy
 end
 
-function pen.t.parse( data )
+function pen.t.parse( data, is_pretty )
 	if( not( pen.vld( data ))) then return end
-	local function ser( tbl )--special thanks to ImmortalDamned
+	local function ser( tbl ) --special thanks to ImmortalDamned
 		return ({
 			["nil"] = function( v ) return tostring( v ) end,
-			["number"] = function( v ) return string.format( "%a", v ) end,
-			["string"] = function( v ) return string.format( "%q", v ) end,
+			["number"] = function( v ) return ( is_pretty or false ) and v or string.format( "%a", v ) end,
+			["string"] = function( v ) return ( is_pretty or false ) and v or string.format( "%q", v ) end,
 			["boolean"] = function( v ) return tostring( v ) end,
 			["table"] = function( t )
 				local s, i = "{", 1
@@ -451,33 +442,33 @@ function pen.t.parse( data )
 end
 
 function pen.t.order( tbl, func )
-    local out_tbl = {}
-    for n in pairs( tbl ) do
-        table.insert( out_tbl, n )
+    local out = {}
+    for k,v in pairs( tbl ) do
+        table.insert( out, k )
     end
-    table.sort( out_tbl, func )
+    table.sort( out, func )
 	
     local i = 0
     local iter = function ()
         i = i + 1
-        if( out_tbl[i] == nil ) then
+        if( out[i] == nil ) then
             return nil
         else
-            return out_tbl[i], tbl[out_tbl[i]]
+            return out[i], tbl[ out[i]]
         end
     end
     return iter
 end
 
 function pen.t.print( tbl )
-	print( pen.t.parse( tbl ))
+	print( pen.t.parse( tbl, true ))
 end
 
 --[TEXT]
 function pen.ptrn( id )
 	return table.concat({ "([^", type( id ) == "number" and pen[ "DIV_"..( id or 1 )] or tostring( id ), "]+)" })
 end
-function pen.ctrn( str, marker, string_indexed )
+function pen.ctrn( str, marker, is_unarrayed )
 	local t = {}
 
 	for word in string.gmatch( str, pen.ptrn( marker or "%s" )) do
@@ -559,9 +550,9 @@ function pen.magic_byte( str ) --https://github.com/meepen/Lua-5.1-UTF-8/blob/ma
 				return nil
 			end
 			
-			local contByteCount =	b1 >= 0xF0 and 3 or
-									b1 >= 0xE0 and 2 or
-									b1 >= 0xC0 and 1
+			local contByteCount = b1 >= 0xF0 and 3 or
+								  b1 >= 0xE0 and 2 or
+								  b1 >= 0xC0 and 1
 			local endPos = startPos + contByteCount
 			for _, bX in ipairs({ str:byte( startPos + 1, endPos )}) do
 				if( bit.band( bX, 0xC0 ) ~= 0x80 ) then
@@ -924,54 +915,23 @@ function pen.add_shaders( shader_path )
 	local file_new = ModTextFileGetContent( shader_path ).."\n\n******[EOF]******\n"
 	local marker_new = "******[%S-]******"
 	for i,segment in ipairs( pen.ctrn( file_new, marker_new )) do
-		if( pen.vld( string.gsub( segment, "%s", "" ))) then
+		if( pen.vld( string.gsub( segment, "%s", "" )) and markers_old[i] ~= nil ) then
 			file = string.gsub( file, markers_old[i], markers_old[i].."\n"..segment )
 		end
 	end
 	ModTextFileSetContent( shader_old, file )
 end
 
-function pen.add_translations( path ) --check if this works when new languges get added
-	local file, main = ModTextFileGetContent( path ), "data/translations/common.csv"
+function pen.add_translations( path )
+	local main = "data/translations/common.csv"
+	local file = string.gsub( string.gsub( ModTextFileGetContent( path ), "\r", "" ), "\n\n+", "\n" )
 	ModTextFileSetContent( main, ModTextFileGetContent( main )..string.gsub( file, "^[^\n]*\n", "" ))
-end
-
-function pen.get_time( secs )
-	secs = math.floor( secs )
-	local mins = math.floor( secs/60 )
-	secs = secs - mins*60
-	local hrs = math.floor( mins/60 )
-	mins = mins - hrs*60
-	local t = { hrs, mins, secs }
-
-	local out = tostring( hrs )
-	for i = 2,3 do
-		out = out..":"..string.sub( "0"..t[i], -2 )
-	end
-	return out
 end
 
 --[ECS]
 function pen.get_hooman()
 	local cam_x, cam_y = GameGetCameraPos()
 	return EntityGetClosestWithTag( cam_x, cam_y, "player_unit" ) or 0
-end
-
-function pen.get_child( hooman, tag, ignore_id )
-	if( not( pen.vld( hooman, true ))) then
-		return -1
-	end
-	
-	local children = EntityGetAllChildren( hooman )
-	if( pen.vld( children )) then
-		for i,child in ipairs( children ) do
-			if( child ~= ignore_id and ( EntityGetName( child ) == tag or EntityHasTag( child, tag ))) then
-				return child
-			end
-		end
-	end
-	
-	return nil
 end
 
 function pen.child_play( entity_id, action, sorter )
@@ -981,17 +941,15 @@ function pen.child_play( entity_id, action, sorter )
 			table.sort( children, sorter )
 		end
 
-		for i,child in ipairs( children ) do
-			local value = action( entity_id, child, i ) or false
-			if( value ) then
-				return value
-			end
+		for i,v in ipairs( children ) do
+			local value = action( entity_id, v, i )
+			if( value ) then return value end
 		end
 	end
 end
 
 function pen.child_play_full( dude_id, func, params )
-	local ignore = func( dude_id, params ) or false
+	local ignore = func( dude_id, params )
 	return pen.child_play( dude_id, function( parent, child )
 		if( ignore ) then
 			return func( child, params )
@@ -999,6 +957,21 @@ function pen.child_play_full( dude_id, func, params )
 			return pen.child_play_full( child, func, params )
 		end
 	end)
+end
+
+function pen.get_child( entity_id, tag, ignore_id )
+	if( not( pen.vld( entity_id, true ))) then
+		return
+	end
+	
+	local children = EntityGetAllChildren( entity_id )
+	if( pen.vld( children )) then
+		for i,child in ipairs( children ) do
+			if( child ~= ignore_id and ( EntityGetName( child ) == tag or EntityHasTag( child, tag ))) then
+				return child
+			end
+		end
+	end
 end
 
 function pen.catch_comp( comp_name, field_name, index, func, args, forced )
@@ -1058,8 +1031,8 @@ function pen.magic_comp( id, data, func )
 
 	data = pen.get_hybrid_table( data, true )
 	if( pen.t.is_unarray( data )) then
-		for field,val in pairs( data ) do
-			local v = val
+		for field,value in pairs( data ) do
+			local v = value
 			if( type( v ) == "function" ) then
 				v = { v( pen.magic_comp( id, field ))}
 			else
@@ -1094,8 +1067,8 @@ function pen.magic_comp( id, data, func )
 				local edit_tbl = {}
 				local done = func( comp, edit_tbl, ComponentGetIsEnabled( comp ))
 				if( pen.vld( edit_tbl )) then
-					for field,val in pairs( edit_tbl ) do
-						pen.magic_comp( comp, field, val )
+					for field,value in pairs( edit_tbl ) do
+						pen.magic_comp( comp, field, value )
 					end
 				end
 
@@ -1107,10 +1080,10 @@ function pen.magic_comp( id, data, func )
 	end
 end
 
-function pen.get_storage( hooman, name, field, value )
-	local out = 0
+function pen.get_storage( entity_id, name, field, value )
+	local out = nil
 
-	local comps = EntityGetComponentIncludingDisabled( hooman, "VariableStorageComponent" )
+	local comps = EntityGetComponentIncludingDisabled( entity_id, "VariableStorageComponent" )
 	if( pen.vld( comps )) then
 		for i,comp in ipairs( comps ) do
 			if( ComponentGetValue2( comp, "name" ) == name ) then
@@ -1120,7 +1093,7 @@ function pen.get_storage( hooman, name, field, value )
 		end
 	end
 	
-	if( out > 0 and field ~= nil ) then
+	if( pen.vld( out, true ) and field ~= nil ) then
 		if( value == nil ) then
 			out = { pen.magic_comp( out, field )}
 			return unpack( out )
@@ -1140,17 +1113,15 @@ function pen.clone_comp( entity_id, comp_id, mutators )
 	mutators = mutators or {}
 	
 	local comp_name = ComponentGetTypeName( comp_id )
-	local main_values = {
+	local main_values, object_values, extra_values = {
 		_enabled = ComponentGetIsEnabled( comp_id ),
 		_tags = ( mutators._tags or ComponentGetTags( comp_id ))..( mutators.add_tags or "" ),
-	}
-	local object_values = {}
-	local extra_values = {}
+	}, {}, {}
 	
 	local function is_supported( field_name, is_obj )
 		local f = ComponentGetValue2
 		local input = { comp_id, field_name }
-		if( type( is_obj or false ) == "string" ) then
+		if( type( is_obj or 0 ) == "string" ) then
 			field_name = is_obj..field_name
 			table.insert( input, input[2])
 			input[2] = is_obj
@@ -1300,23 +1271,22 @@ function pen.lua_callback( entity_id, func_names, input )
 	return got_some
 end
 
-function pen.get_effect( hooman, effect_name, effect_id )
-	local children = EntityGetAllChildren( hooman )
+function pen.get_effect( entity_id, effect_name, effect_id )
+	local children = EntityGetAllChildren( entity_id )
 	if( pen.vld( children )) then
 		if( pen.vld( effect_id, true )) then
 			if( type( effect_id ) == "string" ) then
 				dofile_once( "data/scripts/status_effects/status_list.lua" )
-				for i,effect in ipairs( status_effects ) do
-					if( effect.ui_name == effect_id ) then
-						effect_id = i
-						break
-					end
-				end
+				_,effect_id = pen.t.get( status_effects, effect_id, "ui_name" )
 			end
 			
 			for i,child in ipairs( children ) do			
 				local effect_comp = EntityGetFirstComponentIncludingDisabled( child, "GameEffectComponent" )
-				if( effect_comp ~= nil and ( ComponentGetValue2( effect_comp, "effect" ) == effect_name or ComponentGetValue2( effect_comp, "causing_status_effect" ) == effect_id or ComponentGetValue2( effect_comp, "ragdoll_effect" ) == effect_name )) then
+				if( effect_comp ~= nil and (
+					ComponentGetValue2( effect_comp, "effect" ) == effect_name or
+					ComponentGetValue2( effect_comp, "causing_status_effect" ) == effect_id or
+					ComponentGetValue2( effect_comp, "ragdoll_effect" ) == effect_name
+				)) then
 					return child, effect_comp, effect_id
 				end
 			end
@@ -1349,21 +1319,17 @@ function pen.get_item_owner( item_id, figure_it_out )
 			end
 		end
 	end
-	
-	return 0
 end
 
-function pen.get_active_item( hooman )
-	local inv_comp = EntityGetFirstComponentIncludingDisabled( hooman, "Inventory2Component" )
+function pen.get_active_item( entity_id )
+	local inv_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "Inventory2Component" )
 	if( pen.vld( inv_comp, true )) then
 		return tonumber( ComponentGetValue2( inv_comp, "mActiveItem" ) or 0 )
 	end
-	
-	return 0
 end
 
-function pen.reset_active_item( hooman )
-	local inv_comp = EntityGetFirstComponentIncludingDisabled( hooman, "Inventory2Component" )
+function pen.reset_active_item( entity_id )
+	local inv_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "Inventory2Component" )
 	if( pen.vld( inv_comp, true )) then
 		ComponentSetValue2( inv_comp, "mActiveItem", 0 )
 		ComponentSetValue2( inv_comp, "mActualActiveItem", 0 )
@@ -1381,13 +1347,9 @@ function pen.random_sign( var )
 	return pen.random_bool( var ) and 1 or -1
 end
 
-function pen.get_hybrid_table( table, allow_weird )
-	if( not( pen.vld( table ))) then
-		return {}
-	end
-	
-	allow_weird = allow_weird or false
-	if( type( table ) == "table" and ( allow_weird or not( pen.t.is_unarray( table )))) then
+function pen.get_hybrid_table( table, allow_unarray )
+	if( not( pen.vld( table ))) then return {} end
+	if( type( table ) == "table" and ( allow_unarray or not( pen.t.is_unarray( table )))) then
 		return table
 	else
 		return { table }
@@ -1395,10 +1357,7 @@ function pen.get_hybrid_table( table, allow_weird )
 end
 
 function pen.get_hybrid_function( func, input )
-	if( not( pen.vld( func ))) then
-		return
-	end
-	
+	if( not( pen.vld( func ))) then return end
 	if( type( func ) == "function" ) then
 		return pen.catch( func, input )
 	else
@@ -1406,12 +1365,32 @@ function pen.get_hybrid_function( func, input )
 	end
 end
 
+function pen.get_time( secs )
+	secs = math.floor( secs )
+	local mins = math.floor( secs/60 )
+	secs = secs - mins*60
+	local hrs = math.floor( mins/60 )
+	mins = mins - hrs*60
+	local t = { hrs, mins, secs }
+
+	local out = tostring( hrs )
+	for i = 2,3 do
+		out = out..":"..string.sub( "0"..t[i], -2 )
+	end
+	return out
+end
+
+function pen.get_seconds()
+	local tm = { GameGetDateAndTimeUTC()}
+	return ((((( tm[1] - 2000 )*12 + tm[2])*30 + tm[3])*24 + tm[4])*60 + tm[5])*60 + tm[6]
+end
+
 function pen.seed_gen( values )
 	local metaseed = "msd"..GameGetRealWorldTimeSinceStarted().."."
-	if( #( values or {}) > 0 ) then
-		for i,value in ipairs( values ) do
-			if( type( value ) ~= "boolean" ) then
-				metaseed = metaseed..tostring( value )
+	if( pen.vld( values )) then
+		for i,v in ipairs( values ) do
+			if( type( v ) ~= "boolean" ) then
+				metaseed = metaseed..tostring( v )
 			end
 		end
 	end
@@ -1422,35 +1401,29 @@ function pen.seed_gen( values )
 end
 
 function pen.seeded_random( event_id, mutator, a, b, bidirectional, seed_container )
-	bidirectional = bidirectional or false
-	seed_container = seed_container or "19_abiding.WHITE_SEED"
-	
+	if( seed_container == nil ) then return 0 end
 	local seed = tonumber( pen.hash_me( ModSettingGetNextValue( seed_container )..tostring( pen.hash_me( event_id..tostring( mutator )))))
 	math.randomseed( seed )
 	math.random();math.random();math.random()
-	return bidirectional and ( math.random( a, b*2 ) - b ) or math.random( a, b )
+	return ( bidirectional or false ) and ( math.random( a, b*2 ) - b ) or math.random( a, b )
 end
 
-function pen.generic_random( a, b, macro_drift, bidirectional ) --separate get_seconds into a legit func
-	bidirectional = bidirectional or false
-	
+function pen.generic_random( a, b, macro_drift, bidirectional )
 	if( macro_drift == nil ) then
-		macro_drift = GetUpdatedEntityID() or 0
-		if( macro_drift > 0 ) then
+		macro_drift = GetUpdatedEntityID() or 1
+		if( macro_drift > 1 ) then
 			local drft_a, drft_b = EntityGetTransform( macro_drift )
-			macro_drift = macro_drift + tonumber( macro_drift ) + ( drft_a*1000 + drft_b )
-		else
-			macro_drift = 1
+			macro_drift = { drft_a, tonumber( macro_drift ) + drft_b }
 		end
-	elseif( type( macro_drift ) == "table" ) then
+	end
+
+	if( type( macro_drift ) == "table" ) then
 		macro_drift = macro_drift[1]*1000 + macro_drift[2]
 	end
 	macro_drift = math.floor( macro_drift + 0.5 )
-	
-	local tm = { GameGetDateAndTimeUTC()}
-	SetRandomSeed( math.random( GameGetFrameNum(), macro_drift ), (((( tm[2]*30 + tm[3])*24 + tm[4])*60 + tm[5])*60 + tm[6])%macro_drift )
+	SetRandomSeed( math.random( GameGetFrameNum(), macro_drift ), pen.get_seconds()%macro_drift )
 	Random( 1, 5 );Random( 1, 5 );Random( 1, 5 )
-	return bidirectional and ( Random( a, b*2 ) - b ) or Random( a, b )
+	return ( bidirectional or false ) and ( Random( a, b*2 ) - b ) or Random( a, b )
 end
 
 function pen.is_game_restarted()
@@ -1493,11 +1466,9 @@ function pen.is_wand_useless( wand_id )
 	local children = EntityGetAllChildren( wand_id )
 	if( pen.vld( children )) then
 		for i,child in ipairs( children ) do
-			local itm_comp = EntityGetFirstComponentIncludingDisabled( child, "ItemComponent" )
-			if( pen.vld( itm_comp, true )) then
-				if( ComponentGetValue2( itm_comp, "uses_remaining" ) ~= 0 ) then
-					return false
-				end
+			local item_comp = EntityGetFirstComponentIncludingDisabled( child, "ItemComponent" )
+			if( pen.vld( item_comp, true ) and ComponentGetValue2( item_comp, "uses_remaining" ) ~= 0 ) then
+				return false
 			end
 		end
 	end
@@ -1505,63 +1476,60 @@ function pen.is_wand_useless( wand_id )
 end
 
 function pen.get_closest( x, y, stuff, check_sight, limits, extra_check )
-	check_sight = check_sight or false
 	limits = limits or { 0, 0, }
 	if( not( pen.vld( stuff ))) then
 		return 0
 	end
 	
-	local actual_thing = 0
-	local min_dist = -1
+	local min_dist, actual_thing = -1, nil
 	for i,raw_thing in ipairs( stuff ) do
-		local thing = type( raw_thing ) == "table" and raw_thing[1] or raw_thing
-
-		local t_x, t_y = EntityGetTransform( thing )
+		local t_x, t_y = EntityGetTransform( type( raw_thing ) == "table" and raw_thing[1] or raw_thing )
 		if( not( check_sight ) or not( RaytracePlatforms( x, y, t_x, t_y ))) then
 			local d_x, d_y = math.abs( t_x - x ), math.abs( t_y - y )
 			if(( d_x < limits[1] or limits[1] == 0 ) and ( d_y < limits[2] or limits[2] == 0 )) then
 				local dist = math.sqrt( d_x^2 + d_y^2 )
-				if( min_dist == -1 or dist < min_dist ) then
-					if( extra_check == nil or extra_check( raw_thing )) then
-						min_dist = dist
-						actual_thing = raw_thing
-					end
+				if(( min_dist == -1 or dist < min_dist ) and ( extra_check == nil or extra_check( raw_thing ))) then
+					min_dist, actual_thing = dist, raw_thing
 				end
 			end
 		end
 	end
-	
 	return actual_thing
 end
 
 function pen.get_killable( c_x, c_y, r )
-	local stuff = {}
-	return pen.t.add( pen.t.add( stuff, EntityGetInRadiusWithTag( c_x, c_y, r, "hittable" ) or {} ), EntityGetInRadiusWithTag( c_x, c_y, r, "mortal" ) or {} )
+	return pen.t.add( EntityGetInRadiusWithTag( c_x, c_y, r, "hittable" ) or {}, EntityGetInRadiusWithTag( c_x, c_y, r, "mortal" ) or {})
 end
 
-function pen.get_creature_centre( hooman, x, y ) --get xy if is nil
-	local char_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterDataComponent" )
+function pen.get_creature_centre( entity_id, x, y )
+	if( x == nil or y == nil ) then
+		x, y = EntityGetTransform( entity_id )
+	end
+
+	local char_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterDataComponent" )
 	if( pen.vld( char_comp, true )) then
 		y = y + ComponentGetValue2( char_comp, "buoyancy_check_offset_y" )
 	end
 	return x, y
 end
 
-function pen.get_creature_head( entity_id, x, y ) --get xy if nil
+function pen.get_creature_head( entity_id, x, y )
+	if( x == nil or y == nil ) then
+		x, y = EntityGetTransform( entity_id )
+	end
+
 	local custom_off = pen.get_storage( entity_id, "head_offset", "value_int" )
 	if( pen.vld( custom_off )) then
 		return x, y + custom_off
 	end
 
 	local ai_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "AnimalAIComponent" )
+	local crouch_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "HotspotComponent", "crouch_sensor" )
 	if( pen.vld( ai_comp, true )) then
 		y = y + ComponentGetValue2( ai_comp, "eye_offset_y" )
-	else
-		local crouch_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "HotspotComponent", "crouch_sensor" )
-		if( pen.vld( crouch_comp, true )) then
-			local off_x, off_y = ComponentGetValue2( crouch_comp, "offset" )
-			y = y + off_y + 3
-		end
+	elseif( pen.vld( crouch_comp, true )) then
+		local off_x, off_y = ComponentGetValue2( crouch_comp, "offset" )
+		y = y + off_y + 3
 	end
 	return x, y
 end
@@ -1569,16 +1537,7 @@ end
 function pen.get_spell( action_id )
 	dofile_once( "data/scripts/gun/gun_enums.lua")
 	dofile_once( "data/scripts/gun/gun_actions.lua" )
-	
-	local action_data = nil
-	for i,action in ipairs( actions ) do
-		if( action.id == action_id ) then
-			action_data = action
-			break
-		end
-	end
-
-	return action_data
+	return pen.t.get( actions, action_id )
 end
 
 function pen.get_card_id()
@@ -1627,12 +1586,11 @@ function pen.get_tinker_state( hooman, x, y )
 		for i,workshop in ipairs( workshops ) do
 			local w_x, w_y = EntityGetTransform( workshop )
 			local box_comp = EntityGetFirstComponent( workshop, "HitboxComponent" )
-			if( pen.vld( box_comp, true ) and pen.check_bounds({x,y}, {w_x,w_y}, box_comp )) then
+			if( pen.vld( box_comp, true ) and pen.check_bounds({ x, y }, { w_x, w_y }, box_comp )) then
 				return true
 			end
 		end
 	end
-
 	return false
 end
 
@@ -1657,9 +1615,8 @@ function pen.get_matter( matters, id )
 			for i,matter in ipairs( matters ) do
 				if( id ~= nil and id == i - 1 ) then
 					return { id, matter }
-				elseif( matter > mttrs[2] ) then
-					mttrs[1] = i - 1
-					mttrs[2] = matter
+				elseif( matter > mttrs[2]) then
+					mttrs = { i - 1, matter }
 				end
 			end
 		end
@@ -1667,10 +1624,12 @@ function pen.get_matter( matters, id )
 	return mttrs, total
 end
 
-function pen.get_mass( entity_id ) --get velocity mass if no phys comp
+function pen.get_mass( entity_id )
 	local mass = 0
 	
 	local shape_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "PhysicsImageShapeComponent" )
+	local char_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterDataComponent" )
+	local vel_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "VelocityComponent" )
 	if( pen.vld( shape_comp, true )) then
 		local x, y = EntityGetTransform( entity_id )
 		local drift_x, drift_y = ComponentGetValue2( shape_comp, "offset_x" ), ComponentGetValue2( shape_comp, "offset_y" )
@@ -1684,6 +1643,10 @@ function pen.get_mass( entity_id ) --get velocity mass if no phys comp
 			return body_x, body_y, 0, 0, 0
 		end
 		PhysicsApplyForceOnArea( calculate_force_for_body, nil, x - drift_x, y - drift_y, x + drift_x, y + drift_y )
+	elseif( pen.vld( char_comp, true )) then
+		mass = ComponentGetValue2( char_comp, "mass" )
+	elseif( pen.vld( vel_comp, true )) then
+		mass = ComponentGetValue2( vel_comp, "mass" )
 	end
 	
 	return mass
@@ -1702,13 +1665,65 @@ function pen.get_item_num( inv_id, item_id )
 	return 0
 end
 
+function pen.get_xy_matter_file()
+	local full_list = ""
+	local full_matters = {
+		CellFactory_GetAllLiquids(),
+		CellFactory_GetAllSands(),
+		CellFactory_GetAllGases(),
+		CellFactory_GetAllFires(),
+		CellFactory_GetAllSolids(),
+	}
+	for	i,list in ipairs( full_matters ) do
+		for e,mtr in ipairs( list ) do
+			full_list = full_list..mtr..","
+		end
+	end
+	return string.gsub( pen.FILE_XML_MATTER, "_MATTERLISTHERE_", string.sub( full_list, 1, -2 ))
+end
+function pen.get_xy_matter( x, y, duration )
+	if( not( ModDoesFileExist( pen.FILE_MATTER ))) then
+		if( pen.magic_write ~= nil and not( pen.matter_test_file )) then
+			pen.matter_test_file = true
+			pen.magic_write( pen.FILE_MATTER, pen.get_xy_matter_file())
+		else
+			return 0
+		end
+	end
+
+	pen.get_xy_matter_memo = pen.get_xy_matter_memo or {
+		probe = EntityLoad( pen.FILE_MATTER, x, y ),
+		frames = GameGetFrameNum() + ( duration or 5 ),
+		mtr_list = {},
+	}
+	
+    local data = pen.get_xy_matter_memo
+	if( data.frames > GameGetFrameNum()) then
+		local jitter_mag = 0.5
+        EntityApplyTransform( data.probe, x + jitter_mag*pen.get_sign( math.random(-1,0)), y + jitter_mag*pen.get_sign( math.random(-1,0)))
+        
+        local dmg_comp = EntityGetFirstComponentIncludingDisabled( data.probe, "DamageModelComponent" )
+        local matter = ComponentGetValue2( dmg_comp, "mCollisionMessageMaterials" )
+        local count = ComponentGetValue2( dmg_comp, "mCollisionMessageMaterialCountsThisFrame" )
+        for i,v in ipairs( count ) do
+            if( v > 0 ) then
+                local id = matter[i]
+                pen.get_xy_matter_memo.mtr_list[id] = ( data.mtr_list[id] or 0 ) + v
+            end
+        end
+	else
+		local _,mtr = pen.t.get_max( data.mtr_list )
+		EntityKill( data.probe )
+		pen.get_xy_matter_memo = nil
+		return mtr
+	end
+end
+
 function pen.debug_dot( x, y, frames )
 	GameCreateSpriteForXFrames( "data/ui_gfx/debug_marker.png", x, y, true, 0, 0, frames or 1, true )
 end
 
-function pen.lag_me( count )
-	local frame_time = count
-	
+function pen.lag_me( frame_time )
 	local current_time = GameGetRealWorldTimeSinceStarted()*1000
 	local prev_time = current_time
 	while(( current_time - prev_time ) < frame_time ) do
@@ -1716,36 +1731,41 @@ function pen.lag_me( count )
 	end
 end
 
-function pen.magic_shooter( who_shot, entity_file, x, y, v_x, v_y, do_it, proj_mods, custom_values )
-	local entity_id = EntityLoad( entity_file, x, y )
-	local herd_id = get_herd_id( who_shot )
-	
-	if( do_it ) then
-		GameShootProjectile( who_shot, x, y, x + v_x, y + v_y, entity_id, false )
-	end
-	pen.magic_comp( entity_id, "ProjectileComponent", function( comp_id, v, is_enabled )
-		v.mWhoShot = who_shot
-		v.mShooterHerdId = herd_id
+function pen.magic_shooter( who_shot, path, x, y, v_x, v_y, do_it, proj_mods, custom_values )
+	who_shot = pen.get_hybrid_table( who_shot )
+	pen.magic_comp( who_shot[1], "ProjectileComponent", function( comp_id, v, is_enabled )
+		who_shot[2] = ComponentGetValue2( comp_id, "mWhoShot" )
+		who_shot[3] = ComponentGetValue2( comp_id, "mShooterHerdId" )
+		v.mEntityThatShot = who_shot[2] or who_shot[1]
 	end)
-	pen.magic_comp( entity_id, "VelocityComponent", function( comp_id, v, is_enabled )
+
+	local proj_id = EntityLoad( path, x, y )
+	local gene_comp = EntityGetFirstComponentIncludingDisabled( who_shot[1], "GenomeDataComponent" )
+	if( pen.vld( gene_comp, true )) then who_shot[3] = ComponentGetValue2( gene_comp, "herd_id" ) end
+	if( do_it ) then GameShootProjectile( who_shot[1], x, y, x + v_x, y + v_y, proj_id, true, who_shot[2]) end
+
+	local do_ff = EntityHasTag( who_shot[1], "friendly_fire_enabled" )
+	pen.magic_comp( proj_id, "ProjectileComponent", function( comp_id, v, is_enabled )
+		v.mWhoShot = who_shot[2] or who_shot[1]
+		v.mShooterHerdId = who_shot[3] or 0
+
+		if( do_ff ) then
+			EntityAddTag( proj_id, "friendly_fire_enabled" )
+			v.friendly_fire = true
+			v.collide_with_shooter_frames = 6
+		end
+	end)
+	pen.magic_comp( proj_id, "VelocityComponent", function( comp_id, v, is_enabled )
 		v.mVelocity = { v_x, v_y }
 	end)
-	
-	if( proj_mods ~= nil ) then
-		proj_mods( entity_id, custom_values )
-	end
-	
-	return entity_id
+
+	if( proj_mods ~= nil ) then proj_mods( proj_id, custom_values ) end
+	return proj_id
 end
 
 function pen.delayed_kill( entity_id, delay, comp_id )
-	EntityAddComponent( entity_id, "LifetimeComponent", {
-		lifetime = delay + 1,
-	})
-	
-	if( pen.vld( comp_id, true )) then
-		EntityRemoveComponent( entity_id, comp_id )
-	end
+	EntityAddComponent( entity_id, "LifetimeComponent", { lifetime = delay + 1 })
+	if( pen.vld( comp_id, true )) then EntityRemoveComponent( entity_id, comp_id ) end
 end
 
 function pen.check_bounds( dot, pos, box )
@@ -1763,9 +1783,13 @@ function pen.check_bounds( dot, pos, box )
 			ComponentGetValue2( box, "aabb_max_y" ),
 		}
 	end
-	return dot[1]>=(pos[1]+box[1]) and dot[2]>=(pos[2]+box[3]) and dot[1]<=(pos[1]+box[2]) and dot[2]<=(pos[2]+box[4])
+	return dot[1] >= ( pos[1] + box[1])
+		and dot[2] >= ( pos[2] + box[3])
+		and dot[1] <= ( pos[1] + box[2])
+		and dot[2] <= ( pos[2] + box[4])
 end
 
+--checkpoint
 function pen.scale_emitter( hooman, emit_comp, advanced ) --separate the collider getting part into get_creature_dimensions
 	advanced = advanced or false
 	local borders = { 0, 0, 0, 0, }
@@ -2118,8 +2142,19 @@ function pen.rate_projectile( proj_id, hooman, data )--sparkbolt at 20m is ~1
 end
 
 --[INTERFACE]
-function pen.uint2color( color )
-	return { bit.band( color, 0xff ), bit.band( bit.rshift( color, 8 ), 0xff ), bit.band( bit.rshift( color, 16 ), 0xff )}
+function pen.magic_uint( color )
+	if( type( color ) == "table" ) then
+		color[2] = bit.lshift( color[2], 8 )
+		color[3] = bit.lshift( color[3], 16 )
+		color[4] = bit.lshift( color[4] or 1, 24 )
+		return bit.bor( unpack( color ))
+	end
+	return {
+		bit.band( color, 0xff ),
+		bit.band( bit.rshift( color, 8 ), 0xff ),
+		bit.band( bit.rshift( color, 16 ), 0xff ),
+		bit.band( bit.rshift( color, 24 ), 0xff )
+	}
 end
 
 function pen.magic_rgb( c, to_rbg, mode )
@@ -2781,13 +2816,28 @@ pen.FLAG_UPDATE_UTF = "PENMAN_UTF_MAP_UPDATE"
 pen.FLAG_USE_FANCY_FONT = "PENMAN_FANCY_FONTING"
 pen.FLAG_RESTART_CHECK = "PENMAN_GAME_HAS_STARTED"
 
+pen.MARKER_TAB = "\\_"
+pen.MARKER_FANCY_TEXT = { "{>%S->{", "}<%S-<}", "{%-}%S-{%-}" }
+pen.MARKER_MAGIC_APPEND = "%-%-<{> MAGICAL APPEND MARKER <}>%-%-"
+
+pen.FILE_MATTER = "data/debug/matter_test.xml"
+pen.FILE_T2F = "data/debug/vpn"
+
 pen.DIV_0 = "@"
 pen.DIV_1 = "|"
 pen.DIV_2 = ":"
 
-pen.MARKER_TAB = "\\_"
-pen.MARKER_FANCY_TEXT = { "{>%S->{", "}<%S-<}", "{%-}%S-{%-}" }
-pen.MARKER_MAGIC_APPEND = "%-%-<{> MAGICAL APPEND MARKER <}>%-%-"
+pen.AI_COMPS = {
+	AIAttackComponent = 1,
+	AdvancedFishAIComponent = 1,
+	AnimalAIComponent = 1,
+	BossDragonComponent = 1,
+	ControllerGoombaAIComponent = 1,
+	CrawlerAnimalComponent = 1,
+	FishAIComponent = 1,
+	PhysicsAIComponent = 1,
+	WormAIComponent = 1,
+}
 
 pen.FONT_MAP = {
 	["简体中文"] = "data/fonts/generated/notosans_zhcn_24.bin",
@@ -2906,18 +2956,6 @@ pen.FONT_MODS = {
 		
 		return pen.FONT_MODS.button( gui, uid, pic_x, pic_y, pic_z, char_data, color, index, link_id )
 	end,
-}
-
-pen.AI_COMPS = {
-	AIAttackComponent = 1,
-	AdvancedFishAIComponent = 1,
-	AnimalAIComponent = 1,
-	BossDragonComponent = 1,
-	ControllerGoombaAIComponent = 1,
-	CrawlerAnimalComponent = 1,
-	FishAIComponent = 1,
-	PhysicsAIComponent = 1,
-	WormAIComponent = 1,
 }
 
 pen.PALETTE = {
@@ -4733,3 +4771,89 @@ pen.BYTE_TO_ID = {
 	[242378925]=30381,	[244512930]=40866,	[244501668]=40164,	[239265977]=20153,	[242402469]=31845,	[244510903]=40759,	[179464365]=177837,
 	[242366595]=29571,	[244455614]=37310,	[244511879]=40775,	[243440831]=35327,	[243433660]=34876,
 }
+
+pen.FILE_XML_MATTER = [[
+<Entity serialize="0" >
+	<CharacterDataComponent
+		buoyancy_check_offset_y="0"
+		check_collision_max_size_x="4"
+		check_collision_max_size_y="4"
+		climb_over_y="0"
+		collision_aabb_max_x="0.1"
+		collision_aabb_max_y="0.1"
+		collision_aabb_min_x="-0.1"
+		collision_aabb_min_y="-0.1"
+		destroy_ground="0"
+		effect_hit_ground="0"
+		fly_recharge_spd="0"
+		fly_recharge_spd_ground="0"
+		fly_time_max="0"
+		flying_in_air_wait_frames="0"
+		flying_needs_recharge="0"
+		flying_recharge_removal_frames="0"
+		gravity="0"
+		ground_stickyness="0"
+		is_on_ground="1"
+		is_on_slippery_ground="0"
+		liquid_velocity_coeff="0"
+		mass="1"
+		platforming_type="0"
+		send_transform_update_message="0"
+	></CharacterDataComponent>
+	
+	<DamageModelComponent
+		air_needed="0"
+		blood_material="blood"
+		blood_multiplier="0"
+		blood_spray_create_some_cosmetic="0"
+		blood_spray_material="blood"
+		blood_sprite_directional=""
+		blood_sprite_large=""
+		create_ragdoll="0"
+		critical_damage_resistance="0"
+		drop_items_on_death="0"
+		falling_damages="0"
+		fire_damage_amount="0"
+		fire_damage_ignited_amount="0"
+		fire_how_much_fire_generates="0"
+		fire_probability_of_ignition="0"
+		healing_particle_effect_entity=""
+		hp="-1"
+		materials_create_messages="1"
+		materials_that_create_messages="_MATTERLISTHERE_"
+		materials_damage="0"
+		max_hp="-1"
+		physics_objects_damage="0"
+		ragdoll_blood_amount_absolute="0"
+		ragdoll_filenames_file=""
+		ragdoll_fx_forced="NONE"
+		ragdoll_material="blood"
+		ragdoll_offset_x="0"
+		ragdoll_offset_y="0"
+		ragdollify_child_entity_sprites="0"
+		ragdollify_disintegrate_nonroot="0"
+		ragdollify_root_angular_damping="0"
+		ui_force_report_damage="0"
+		ui_report_damage="0"
+		wait_for_kill_flag_on_death="1"
+		wet_status_effect_damage="0"
+		><damage_multipliers
+			curse="0"
+			drill="0"
+			electricity="0"
+			explosion="0"
+			fire="0"
+			healing="0"
+			ice="0"
+			melee="0"
+			overeating="0"
+			physics_hit="0"
+			poison="0"
+			projectile="0"
+			radioactive="0"
+			slice="0"
+			holy="0"
+		></damage_multipliers>
+	</DamageModelComponent>
+</Entity>
+]]
