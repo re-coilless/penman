@@ -19,11 +19,10 @@ end
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---new_dragger
---interpolation lib (https://github.com/peete-q/assets/blob/master/lua-modules/lib/interpolate.lua)
 --implant penman into mnee (and test it with most disgusting malformed data possible)
---lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
 
+--basic plotter (highres, autoscaling, extremum highlight)
+--lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
 --transition all the stuff to child_play
 --cleanup, make sure all the funcs reference the right stuff, variable naming consistency
 --make sure that all returned id values are nil
@@ -124,26 +123,144 @@ function pen.hash_me( str, is_huge )
 	return is_huge and tostring( b*c + a ) or ( b*c + a )
 end
 
---make this a proper interpolation func
--- function magic_trig( value, goal )
--- 	local a = 2*goal/math.pi
--- 	return math.sin( value/a )
--- end
+function pen.pid( pid, delta, k ) --https://www.robotsforroboticists.com/pid-control/
+	k = k or {}
+	pen.cached.pid_memo = pen.cached.pid_memo or {}
+	pen.cached.pid_memo[ pid ] = pen.cached.pid_memo[ pid ] or {0,0}
+	k.p, k.i, k.d, k.bias = k.p or 1, k.i or 0, k.d or 0, k.bias or 0
 
--- function magic_trig_clean( value, goal )
--- 	return magic_trig( value - 1, goal - 1 )
--- end
+	-- Tuning guide:
+	-- The k.i and k.d gains are first set to zero.
+	-- The proportional gain is increased until it reaches the ultimate gain, KU, at which the output of the loop starts to oscillate.
+	-- KU and the oscillation period PU are used to set the gains as shown: k.p = 0.6*KU; k.i = 2*k.p/PU; k.d = k.p*PU/8
 
--- function magic_euler( value, goal )
--- 	return math.log(( math.exp(1) - 1 )*value/goal + 1 )
--- end
+	local time = 1
+	local int = pen.cached.pid_memo[ pid ][2] + delta*time
+	local der = ( delta - pen.cached.pid_memo[ pid ][1])/time
+	pen.cached.pid_memo[ pid ] = { delta, int }
+	return k.p*delta + k.i*int + k.d*der + k.bias
+end
 
--- function magic_exp( value, goal, base )
--- 	base = base or math.exp(1)
+function pen.animate( delta, frame, data ) --https://easings.net/
+	data = data or {}
+	data.type = data.type or "lerp"
+	data.params = data.params or {}
+	data.frames = data.frames or 20
+	data.ease_int = data.ease_int or "lerp"
+	data.params_ease = data.params_ease or {}
+	data.ease_in = pen.get_hybrid_table( data.ease_in or "" )
+	data.ease_out = pen.get_hybrid_table( data.ease_out or "" )
+
+	local easings = {
+		flp = function( t )
+			return 1 - t
+		end,
+		pow = function( t, a )
+			return math.pow( t, ( a or 2 ))
+		end,
+		sin = function( t, a )
+			return math.cos( t*math.pi/2 )
+		end,
+		exp = function( t, a )
+			return math.pow(( a or 2 ), 10*( t - 1 ))
+		end,
+		crc = function( t, a )
+			return math.sqrt( 1 - math.pow( t, ( a or 2 )))
+		end,
+		bck = function( t, a )
+			a = a or 1
+			return t*t*(( a + 1 )*t - a )
+		end,
+		rbr = function( t, a )
+			t, a = t - 1, a or 12
+			local temp = 10*math.floor( a/10 )
+			return -( math.pow( 2, t*temp )*math.sin(( a - temp )*t*math.pi ))
+		end,
+		bnc = function( t, a )
+			local n, d = 7.5625, 2.75
+			if( t < 1/d ) then
+				return n*t*t
+			elseif( t < 2/d ) then
+				t = t - 1.5/d
+				return n*t*t + 0.75
+			elseif( t < 2.5/d ) then
+				t = t - 2.25/d
+				return n*t*t + 0.9375
+			else
+				t = t - 2.625/d
+				return n*t*t + 0.984375
+			end
+		end,
+	}
+	local inters = {
+		lerp = function( t, delta )
+			return delta[2] + delta[1]*t
+		end,
+		sine = function( t, delta )
+			return delta[2] + delta[1]*( 1 + math.sin( math.pi*( t - 0.5 )))/2
+		end,
+		bzir = function( t, delta, params )
+			return delta[2]*( 1 - t )^3
+				+ ( params[1] or 1 )*3*t*( 1 - t )^2
+				+ ( params[2] or 0 )*3*( 1 - t )*t^2
+				+ delta[1]*t^3
+		end,
+		lgrn = function( t, delta, params ) --https://www.geeksforgeeks.org/lagranges-interpolation/
+			local out = 0
+			for i,v1 in ipairs( params ) do
+				local temp = v1[2]
+				for e,v2 in ipairs( params ) do
+					if( e ~= i ) then
+						temp = temp*( t - v2[1])/( v1[1] - v2[1])
+					end
+				end
+				out = out + temp
+			end
+			return delta[2] + delta[1]*out
+		end,
+	}
 	
--- 	local drift = base^( -goal )
--- 	return ( base^( value - goal ) - drift )*( drift + 1 )
--- end
+	delta = pen.get_hybrid_table( delta )
+	if( delta[2] ~= nil ) then
+		local a, b = unpack( delta )
+		delta = { b - a, a }
+	else delta[2] = 0 end
+	
+	local time = frame/data.frames
+	if( time == 0 ) then return delta[2] end
+	if( time == 1 ) then return delta[1] end
+
+	local orig_t = t
+	for i = 1,math.max( #data.ease_in, #data.ease_out ) do
+		local eases = {}
+		for k = 1,2 do
+			local ease = data[ k == 1 and "ease_in" or "ease_out" ][i]
+			if( pen.vld( ease )) then
+				local func = {}
+				if( type( ease ) == "function" ) then func = { ease, data } else
+					func = { easings[ string.sub( ease, 1, 3 )], tonumber( string.sub( ease, 4, -1 ))}
+				end
+				if( k == 1 ) then
+					eases[k] = func[1]( t, func[2])
+				else
+					eases[k] = easings.flp( func[1]( easings.flp( t ), func[2]))
+				end
+			end
+		end
+
+		if( eases[1] ~= nil and eases[2] ~= nil ) then
+			t = inters[ data.ease_int ]( orig_t, eases, data.params_ease )
+		else
+			t = eases[1] or eases[2]
+		end
+	end
+	
+	if( data.type == "function" ) then
+		return data.type( time, delta, data.params )
+	else
+		return inters[ data.type ]( time, delta, data.params )
+	end
+end
 
 --[TECHNICAL]
 function pen.catch( f, input, fallback )
@@ -2419,6 +2536,26 @@ function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, is_debugging )
 		if( not( is_new )) then clicked, r_clicked = false, false end
 	end
 	return uid, clicked, r_clicked, is_hovered
+end
+
+function pen.new_dragger( guid, uid, did, pic_x, pic_y, s_x, s_y, is_debugging )
+	pen.cached.dragger_data = pen.cached.dragger_data or {}
+	pen.cached.dragger_data[ did ] = pen.cached.dragger_data[ did ] or { false, 0, 0 }
+	
+	local m_x, m_y = pen.get_mouse_pos()
+	local clicked, r_clicked, is_hovered = false, false, false
+	uid, clicked, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, is_debugging )
+	if( clicked ) then pen.cached.dragger_data[ did ] = { true, m_x - pic_x, m_y - pic_y } end
+	if( pen.cached.dragger_data[ did ][1]) then
+		if( InputIsMouseButtonDown( 1 )) then
+			pic_x = m_x + pen.cached.dragger_data[ did ][2]
+			pic_y = m_y + pen.cached.dragger_data[ did ][3]
+		else
+			pen.cached.dragger_data[ did ] = { false, 0, 0 }
+		end
+	end
+	
+	return pic_x, pic_y, pen.cached.dragger_data[ did ][1], r_clicked, is_hovered
 end
 
 function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
