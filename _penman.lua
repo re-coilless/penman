@@ -7,8 +7,8 @@ pen.magic_write = pen.magic_write or ModTextFileSetContent
 if( pen.magic_write ~= nil ) then --dofile_once within OnModInit for this to work
 	pen.t2f = function( name, text )
 		if( pen[ name ] == nil ) then
-			local num = tonumber( GlobalsGetValue( "PENMAN_VIRTUAL_INDEX", "0" ))
-			GlobalsSetValue( "PENMAN_VIRTUAL_INDEX", num + 1 )
+			local num = tonumber( GlobalsGetValue( pen.GLOBAL_VIRTUAL_ID, "0" ))
+			GlobalsSetValue( pen.GLOBAL_VIRTUAL_ID, num + 1 )
 			local path = table.concat({ pen.FILE_T2F, num, ".lua" })
 			pen.magic_write( path, "return "..text )
 			pen[ name ] = dofile( path )
@@ -19,13 +19,12 @@ end
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---transition all the stuff to child_play + t.loop that has table protection integrated
---implant penman into mnee (and test it with most disgusting malformed data possible)
-
---new_dragger (fully virtual)
+--new_dragger
 --interpolation lib (https://github.com/peete-q/assets/blob/master/lua-modules/lib/interpolate.lua)
+--implant penman into mnee (and test it with most disgusting malformed data possible)
 --lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
 
+--transition all the stuff to child_play
 --cleanup, make sure all the funcs reference the right stuff, variable naming consistency
 --make sure that all returned id values are nil
 --actually test all the stuff
@@ -219,6 +218,13 @@ function pen.t.init( amount, value )
 		tbl[i] = is_tbl and {} or temp
 	end
 	return tbl
+end
+
+function pen.t.loop( tbl, func )
+	if( not( pen.vld( tbl ))) then return end
+	for i,v in ipairs( tbl ) do
+		func(i,v)
+	end
 end
 
 function pen.t.count( tbl, just_checking )
@@ -1534,6 +1540,42 @@ function pen.get_creature_head( entity_id, x, y )
 	return x, y
 end
 
+function pen.get_creature_dimensions( entity_id, is_simple )
+	local borders = { 0, 0, 0, 0 }
+
+	local char_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterDataComponent" )
+	local has_collision = pen.vld( char_comp, true )
+	if( has_collision ) then
+		borders[1] = ComponentGetValue2( char_comp, "collision_aabb_min_x" )
+		borders[2] = ComponentGetValue2( char_comp, "collision_aabb_max_x" )
+		borders[3] = ComponentGetValue2( char_comp, "collision_aabb_min_y" )
+		borders[4] = ComponentGetValue2( char_comp, "collision_aabb_max_y" )
+	end
+
+	local sprite_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "SpriteComponent", "character" )
+	if( not( is_simple ) and pen.vld( sprite_comp, true )) then
+		local offset_x = ComponentGetValue2( sprite_comp, "offset_x" )
+		if( offset_x == 0 ) then
+			offset_x = has_collision and ( math.abs( borders[1]) + math.abs( borders[2]))/2 or 3
+		end
+		local offset_y = ComponentGetValue2( sprite_comp, "offset_y" )
+		if( offset_y == 0 ) then
+			offset_y = has_collision and borders[3] or 3
+		end
+
+		local temp = { -offset_x, offset_x, -offset_y, offset_y }
+		for i,v in ipairs( borders ) do
+			if( has_collision ) then
+				borders[i] = ( temp[i] + v )/2
+			else
+				borders[i] = temp[i]*( i == 4 and 0.5 or 1 )
+			end
+		end
+	end
+
+	return borders
+end
+
 function pen.get_spell( action_id )
 	dofile_once( "data/scripts/gun/gun_enums.lua")
 	dofile_once( "data/scripts/gun/gun_actions.lua" )
@@ -1773,105 +1815,57 @@ function pen.check_bounds( dot, pos, box )
 		return false
 	end
 	
+	pos = pos or {}
 	if( type( box ) ~= "table" ) then
 		local off_x, off_y = ComponentGetValue2( box, "offset" )
-		pos = { pos[1] + off_x, pos[2] + off_y }
+		pos = {( pos[1] or 0 ) + off_x, ( pos[2] or 0 ) + off_y }
 		box = {
 			ComponentGetValue2( box, "aabb_min_x" ),
 			ComponentGetValue2( box, "aabb_max_x" ),
 			ComponentGetValue2( box, "aabb_min_y" ),
 			ComponentGetValue2( box, "aabb_max_y" ),
 		}
+	elseif( #box == 2 ) then
+		box = {0,box[1],0,box[2]}
 	end
+
 	return dot[1] >= ( pos[1] + box[1])
 		and dot[2] >= ( pos[2] + box[3])
 		and dot[1] <= ( pos[1] + box[2])
 		and dot[2] <= ( pos[2] + box[4])
 end
 
---checkpoint
-function pen.scale_emitter( hooman, emit_comp, advanced ) --separate the collider getting part into get_creature_dimensions
-	advanced = advanced or false
-	local borders = { 0, 0, 0, 0, }
-	local gonna_update = false
-	
-	local sprite_comp = EntityGetFirstComponentIncludingDisabled( hooman, "SpriteComponent", "character" )
-	local char_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterDataComponent" )
-	if( advanced and pen.vld( sprite_comp, true )) then
-		local offset_x = ComponentGetValue2( sprite_comp, "offset_x" )
-		local offset_y = ComponentGetValue2( sprite_comp, "offset_y" )
-		if( pen.vld( char_comp, true )) then
-			local temp = {}
-			temp[1] = ComponentGetValue2( char_comp, "collision_aabb_min_x" )
-			temp[2] = ComponentGetValue2( char_comp, "collision_aabb_max_x" )
-			temp[3] = ComponentGetValue2( char_comp, "collision_aabb_min_y" )
-			temp[4] = ComponentGetValue2( char_comp, "collision_aabb_max_y" )
-			
-			if( offset_x == 0 ) then
-				offset_x = ( math.abs( temp[1] ) + math.abs( temp[2] ))/2
-			end
-			if( offset_y == 0 ) then
-				offset_y = temp[3]
-			end
-			
-			borders[1] = ( -offset_x + temp[1] )/2
-			borders[2] = ( offset_x + temp[2] )/2
-			borders[3] = ( -offset_y + temp[3] )/2
-			borders[4] = ( offset_y + temp[3] )/2
-		else
-			if( offset_x == 0 ) then
-				offset_x = 3
-			end
-			if( offset_y == 0 ) then
-				offset_y = 3
-			end
-			borders[1] = -offset_x
-			borders[2] = offset_x
-			borders[3] = -offset_y
-			borders[4] = offset_y*0.5
-		end
-
-		gonna_update = true
-	elseif( pen.vld( char_comp, true )) then
-		borders[1] = ComponentGetValue2( char_comp, "collision_aabb_min_x" )
-		borders[2] = ComponentGetValue2( char_comp, "collision_aabb_max_x" )
-		borders[3] = ComponentGetValue2( char_comp, "collision_aabb_min_y" )
-		borders[4] = ComponentGetValue2( char_comp, "collision_aabb_max_y" )
-
-		gonna_update = true
-	end
-	
-	if( gonna_update ) then
-		ComponentSetValue2( emit_comp, "x_pos_offset_min", borders[1])
-		ComponentSetValue2( emit_comp, "x_pos_offset_max", borders[2])
-		ComponentSetValue2( emit_comp, "y_pos_offset_min", borders[3])
-		ComponentSetValue2( emit_comp, "y_pos_offset_max", borders[4])
-	end
+function pen.scale_emitter( entity_id, emit_comp )
+	local borders = pen.get_creature_dimensions( entity_id )
+	ComponentSetValue2( emit_comp, "x_pos_offset_min", borders[1])
+	ComponentSetValue2( emit_comp, "x_pos_offset_max", borders[2])
+	ComponentSetValue2( emit_comp, "y_pos_offset_min", borders[3])
+	ComponentSetValue2( emit_comp, "y_pos_offset_max", borders[4])
 end
 
 function pen.matter_fabricator( x, y, data )
 	data = data or {}
-	local size = ( type( data.size or 0 ) == "table" ) and data.size or { 0, data.size or 0.5 }
-	local count = ( type( data.count or 0 ) == "table" ) and data.count or { data.count or 1, data.count or 1 }
-	local delay = ( type( data.delay or 0 ) == "table" ) and data.delay or { data.delay or 1, data.delay or 1 }
-	local lifetime = ( type( data.time or 0 ) == "table" ) and data.time or { data.time or 60, data.time or 60 }
+	local size = pen.get_hybrid_table( data.size or 0 ); size[2] = size[2] or 0.5
+	local count = pen.get_hybrid_table( data.count or 1 )
+	local delay = pen.get_hybrid_table( data.delay or 1 )
+	local lifetime = pen.get_hybrid_table( data.time or 60 )
 	
-	local mtrr = EntityCreateNew( "matterer" )
+	local mtrr = EntityCreateNew( "matter_fabricator" )
 	EntitySetTransform( mtrr, x, y )
 	
 	local comp = EntityAddComponent2( mtrr, "ParticleEmitterComponent", {
 		emitted_material_name = data.matter or "blood",
 		emission_interval_min_frames = delay[1],
-		emission_interval_max_frames = delay[2],
+		emission_interval_max_frames = delay[2] or delay[1],
 		lifetime_min = lifetime[1],
-		lifetime_max = lifetime[2],
+		lifetime_max = lifetime[2] or lifetime[1],
 		create_real_particles = data.is_real or false,
 		emit_real_particles = data.is_real2 or false,
 		emit_cosmetic_particles = data.is_fake or false,
 		render_on_grid = data.is_grid or false,
 	})
 	ComponentSetValue2( comp, "count_min", count[1])
-	ComponentSetValue2( comp, "count_max", count[2])
+	ComponentSetValue2( comp, "count_max", count[2] or count[1])
 
 	if( #size < 4 ) then
 		ComponentSetValue2( comp, "area_circle_radius", size[1], size[2])
@@ -1885,6 +1879,158 @@ function pen.matter_fabricator( x, y, data )
 	EntityAddComponent2( mtrr, "LifetimeComponent", {
 		lifetime = data.frames or 1,
 	})
+end
+
+function pen.rate_projectile( proj_id, hooman, data )--sparkbolt at 20m is ~1
+	if( EntityGetRootEntity( proj_id ) ~= proj_id ) then
+		return 0
+	end
+	local custom_points = pen.get_storage( proj_id, "custom_rating", "value_float" )
+	if( pen.vld( custom_points )) then
+		return custom_points
+	end
+	
+	data = data or {}
+	hooman = hooman or pen.get_hooman()
+	local char_x, char_y = EntityGetTransform( hooman )
+	local proj_x, proj_y = EntityGetTransform( proj_id )
+	local proj_comp = EntityGetFirstComponentIncludingDisabled( proj_id, "ProjectileComponent" )
+	
+	local proj_vel_x, proj_vel_y = GameGetVelocityCompVelocity( proj_id )
+	local char_vel_x, char_vel_y = GameGetVelocityCompVelocity( hooman )
+	local proj_v = math.sqrt(( char_vel_x - proj_vel_x )^2 + ( char_vel_y - proj_vel_y )^2 )
+	
+	local d_x = proj_x - char_x
+	local d_y = proj_y - char_y
+	local distance = math.sqrt( d_x^2 + d_y^2 )
+	local direction = math.abs( math.rad( 180 ) - math.abs( math.atan2( proj_vel_x, proj_vel_y ) - math.atan2( d_x, d_y )))
+	
+	local is_real = pen.b2n( ComponentGetValue2( proj_comp, "collide_with_entities" ))
+	local lifetime = ComponentGetValue2( proj_comp, "lifetime" )
+	lifetime = lifetime < 0 and 9999 or math.max( lifetime, 1 )
+	
+	local total_damage = 0
+	local damage_types = ComponentObjectGetMembers( proj_comp, "damage_by_type" )
+	for field in pairs( damage_types ) do
+		local dmg = ComponentObjectGetValue2( proj_comp, "damage_by_type", field )
+		if( dmg > 0 ) then total_damage = total_damage + dmg end
+	end
+	total_damage = total_damage + ComponentGetValue2( proj_comp, "damage" )
+	
+	local explosion_dmg = ComponentObjectGetValue2( proj_comp, "config_explosion", "damage" )
+	local explosion_rad = ComponentObjectGetValue2( proj_comp, "config_explosion", "explosion_radius" )
+	if( explosion_dmg > 0 ) then
+		explosion_dmg = explosion_dmg + ( explosion_rad + math.max( explosion_rad - distance + 1, 0 ))/25
+	end
+	total_damage = total_damage + explosion_dmg
+	
+	local f_distance = 1 + 4/2^( distance/10 )
+	local f_direction = 0.02 + 1.08/2^( direction/0.6 )
+	local f_velocity = 0.1847 + ( 1 - math.exp( -0.0021*proj_v ))
+	local f_lifetime = ( 1.8*( lifetime - 1 )/lifetime + 0.3 )/2
+	local f_is_real = 0.5 + 0.5*is_real
+	local f_damage = total_damage*25
+	
+	local final_value = 0.15*f_distance*f_direction*f_lifetime*f_is_real*f_velocity*f_damage
+	return pen.vld( final_value ) and final_value or 0
+end
+
+function pen.rate_spell( spell_id, data )--sparkbolt is 1
+	if( not( pen.vld( spell_id, true ))) then
+		return 0	
+	end
+	
+	local act_comp = EntityGetFirstComponentIncludingDisabled( spell_id, "ItemActionComponent" )
+	local action_data = data or pen.get_spell( ComponentGetValue2( act_comp, "action_id" ))
+	if( not( pen.vld( action_data ))) then
+		return 0
+	elseif( pen.vld( action_data.custom_rating )) then
+		return action_data.custom_rating
+	end
+
+	local price = action_data.price or 1
+	local uses_max = action_data.max_uses or -1
+	local mana = math.abs( action_data.mana or 0 )
+	local item_comp = EntityGetFirstComponentIncludingDisabled( spell_id, "ItemComponent" )
+	local is_perma = action_data.is_perma or pen.b2n( ComponentGetValue2( item_comp, "permanently_attached" ))
+	local uses_left = action_data.uses_left or ComponentGetValue2( item_comp, "uses_remaining" )
+	
+	local f_perma = 1 + 4*is_perma
+	local f_price = price/100
+	local f_mana = 5.4 + ( 0.1 - 5.4 )/( 1 + ( mana/8420.3 )^0.367 )
+	
+	local f_uses = 2
+	if( uses_left >= 0 and uses_max > 0 ) then
+		f_uses = uses_left/uses_max
+	end
+
+	local final_value = 2.5*f_perma*f_price*f_uses*f_mana
+	return pen.vld( final_value ) and final_value or 0
+end
+
+function pen.rate_wand( wand_id, data )--sollex is 1
+	if( not( pen.vld( wand_id, true ))) then
+		return 0	
+	end
+	local custom_points = pen.get_storage( wand_id, "custom_rating", "value_float" )
+	if( pen.vld( custom_points )) then
+		return custom_points
+	end
+
+	data = data or {}
+	local abil_comp = EntityGetFirstComponentIncludingDisabled( wand_id, "AbilityComponent" )
+	if( not( pen.vld( abil_comp, true ))) then
+		return 0	
+	end
+
+	if( data.shuffle == nil ) then
+		data.shuffle = pen.b2n( ComponentObjectGetValue2( abil_comp, "gun_config", "shuffle_deck_when_empty" ))
+	end
+	if( data.can_reload == nil ) then
+		data.can_reload = not( ComponentGetValue2( abil_comp, "never_reload" ))
+	end
+	if( data.capacity == nil ) then
+		data.capacity = ComponentObjectGetValue2( abil_comp, "gun_config", "deck_capacity" )
+	end
+	
+	if( data.reload_time == nil ) then
+		data.reload_time = ComponentObjectGetValue2( abil_comp, "gun_config", "reload_time" )
+	end
+	if( data.cast_delay == nil ) then
+		data.cast_delay = ComponentObjectGetValue2( abil_comp, "gunaction_config", "fire_rate_wait" )
+	end
+	
+	if( data.mana_max == nil ) then
+		data.mana_max = ComponentGetValue2( abil_comp, "mana_max" )
+	end
+	if( data.mana_charge == nil ) then
+		data.mana_charge = ComponentGetValue2( abil_comp, "mana_charge_speed" )
+	end
+	
+	if( data.spell_cast == nil ) then
+		data.spell_cast = ComponentObjectGetValue2( abil_comp, "gun_config", "actions_per_round" )
+	end
+	if( data.spread == nil ) then
+		data.spread = ComponentObjectGetValue2( abil_comp, "gunaction_config", "spread_degrees" )
+	end
+	
+	local f_shuffle = 1 - 0.7*data.shuffle
+	local f_capacity = 3.47 + ( 0.05 - 3.47 )/( 1 + (( data.capacity + 3 )/13.67 )^3.05 )
+	local f_delay = 2 - ( 0.044/0.024 )*( 1 - math.exp( -0.024*data.cast_delay ))
+	local f_mana_max = 1.5 + ( 0.06 - 1.5 )/( 1 + ( data.mana_max/6074441 )^1.416 )^237023
+	local f_mana_charge = 3.41 + ( 0.07 - 3.41 )/( 1 + ( data.mana_charge/14641850 )^1.314 )^251693
+	local f_multi = 2.58 + ( 1.017 - 2.58 )/( 1 + ( data.spell_cast/48023 )^1.63 )^983676
+	local f_spread = math.rad( 45 - data.spread )
+	
+	local f_reloading = 2
+	if( data.can_reload ) then
+		f_reloading = f_reloading - ( 0.044/0.024 )*( 1 - math.exp( -0.024*data.reload_time ))
+	end
+
+	--add spells
+
+	local final_value = 1500*f_delay*f_reloading*f_mana_max*f_mana_charge*math.sqrt( f_spread*f_multi )*f_shuffle*f_capacity^1.5
+	return pen.vld( final_value ) and final_value or 0
 end
 
 function pen.rate_creature( entity_id, hooman, data )--hamis at 20m is 1
@@ -1986,158 +2132,6 @@ function pen.rate_creature( entity_id, hooman, data )--hamis at 20m is 1
 	
 	local main = f_distance*f_speed*f_vulner*f_hp
 	local final_value = f_php*0.5*( 0.08*( main - ( main > f_supremacy and f_supremacy or 0 )) + f_violence )
-	return pen.vld( final_value ) and final_value or 0
-end
-
-function pen.rate_wand( wand_id, data )--sollex is 1
-	if( not( pen.vld( wand_id, true ))) then
-		return 0	
-	end
-	local custom_points = pen.get_storage( wand_id, "custom_rating", "value_float" )
-	if( pen.vld( custom_points )) then
-		return custom_points
-	end
-
-	data = data or {}
-	local abil_comp = EntityGetFirstComponentIncludingDisabled( wand_id, "AbilityComponent" )
-	if( not( pen.vld( abil_comp, true ))) then
-		return 0	
-	end
-
-	if( data.shuffle == nil ) then
-		data.shuffle = pen.b2n( ComponentObjectGetValue2( abil_comp, "gun_config", "shuffle_deck_when_empty" ))
-	end
-	if( data.can_reload == nil ) then
-		data.can_reload = not( ComponentGetValue2( abil_comp, "never_reload" ))
-	end
-	if( data.capacity == nil ) then
-		data.capacity = ComponentObjectGetValue2( abil_comp, "gun_config", "deck_capacity" )
-	end
-	
-	if( data.reload_time == nil ) then
-		data.reload_time = ComponentObjectGetValue2( abil_comp, "gun_config", "reload_time" )
-	end
-	if( data.cast_delay == nil ) then
-		data.cast_delay = ComponentObjectGetValue2( abil_comp, "gunaction_config", "fire_rate_wait" )
-	end
-	
-	if( data.mana_max == nil ) then
-		data.mana_max = ComponentGetValue2( abil_comp, "mana_max" )
-	end
-	if( data.mana_charge == nil ) then
-		data.mana_charge = ComponentGetValue2( abil_comp, "mana_charge_speed" )
-	end
-	
-	if( data.spell_cast == nil ) then
-		data.spell_cast = ComponentObjectGetValue2( abil_comp, "gun_config", "actions_per_round" )
-	end
-	if( data.spread == nil ) then
-		data.spread = ComponentObjectGetValue2( abil_comp, "gunaction_config", "spread_degrees" )
-	end
-	
-	local f_shuffle = 1 - 0.7*data.shuffle
-	local f_capacity = 3.47 + ( 0.05 - 3.47 )/( 1 + (( data.capacity + 3 )/13.67 )^3.05 )
-	local f_delay = 2 - ( 0.044/0.024 )*( 1 - math.exp( -0.024*data.cast_delay ))
-	local f_mana_max = 1.5 + ( 0.06 - 1.5 )/( 1 + ( data.mana_max/6074441 )^1.416 )^237023
-	local f_mana_charge = 3.41 + ( 0.07 - 3.41 )/( 1 + ( data.mana_charge/14641850 )^1.314 )^251693
-	local f_multi = 2.58 + ( 1.017 - 2.58 )/( 1 + ( data.spell_cast/48023 )^1.63 )^983676
-	local f_spread = math.rad( 45 - data.spread )
-	
-	local f_reloading = 2
-	if( data.can_reload ) then
-		f_reloading = f_reloading - ( 0.044/0.024 )*( 1 - math.exp( -0.024*data.reload_time ))
-	end
-
-	--add spells
-
-	local final_value = 1500*f_delay*f_reloading*f_mana_max*f_mana_charge*math.sqrt( f_spread*f_multi )*f_shuffle*f_capacity^1.5
-	return pen.vld( final_value ) and final_value or 0
-end
-
-function pen.rate_spell( spell_id, data )--sparkbolt is 1
-	if( not( pen.vld( spell_id, true ))) then
-		return 0	
-	end
-	
-	local act_comp = EntityGetFirstComponentIncludingDisabled( spell_id, "ItemActionComponent" )
-	local action_data = data or pen.get_spell( ComponentGetValue2( act_comp, "action_id" ))
-	if( not( pen.vld( action_data ))) then
-		return 0
-	elseif( pen.vld( action_data.custom_rating )) then
-		return action_data.custom_rating
-	end
-
-	local price = action_data.price or 1
-	local uses_max = action_data.max_uses or -1
-	local mana = math.abs( action_data.mana or 0 )
-	local item_comp = EntityGetFirstComponentIncludingDisabled( spell_id, "ItemComponent" )
-	local is_perma = action_data.is_perma or pen.b2n( ComponentGetValue2( item_comp, "permanently_attached" ))
-	local uses_left = action_data.uses_left or ComponentGetValue2( item_comp, "uses_remaining" )
-	
-	local f_perma = 1 + 4*is_perma
-	local f_price = price/100
-	local f_mana = 5.4 + ( 0.1 - 5.4 )/( 1 + ( mana/8420.3 )^0.367 )
-	
-	local f_uses = 2
-	if( uses_left >= 0 and uses_max > 0 ) then
-		f_uses = uses_left/uses_max
-	end
-
-	local final_value = 2.5*f_perma*f_price*f_uses*f_mana
-	return pen.vld( final_value ) and final_value or 0
-end
-
-function pen.rate_projectile( proj_id, hooman, data )--sparkbolt at 20m is ~1
-	if( EntityGetRootEntity( proj_id ) ~= proj_id ) then
-		return 0
-	end
-	local custom_points = pen.get_storage( proj_id, "custom_rating", "value_float" )
-	if( pen.vld( custom_points )) then
-		return custom_points
-	end
-	
-	data = data or {}
-	hooman = hooman or pen.get_hooman()
-	local char_x, char_y = EntityGetTransform( hooman )
-	local proj_x, proj_y = EntityGetTransform( proj_id )
-	local proj_comp = EntityGetFirstComponentIncludingDisabled( proj_id, "ProjectileComponent" )
-	
-	local proj_vel_x, proj_vel_y = GameGetVelocityCompVelocity( proj_id )
-	local char_vel_x, char_vel_y = GameGetVelocityCompVelocity( hooman )
-	local proj_v = math.sqrt(( char_vel_x - proj_vel_x )^2 + ( char_vel_y - proj_vel_y )^2 )
-	
-	local d_x = proj_x - char_x
-	local d_y = proj_y - char_y
-	local distance = math.sqrt( d_x^2 + d_y^2 )
-	local direction = math.abs( math.rad( 180 ) - math.abs( math.atan2( proj_vel_x, proj_vel_y ) - math.atan2( d_x, d_y )))
-	
-	local is_real = pen.b2n( ComponentGetValue2( proj_comp, "collide_with_entities" ))
-	local lifetime = ComponentGetValue2( proj_comp, "lifetime" )
-	lifetime = lifetime < 0 and 9999 or math.max( lifetime, 1 )
-	
-	local total_damage = 0
-	local damage_types = ComponentObjectGetMembers( proj_comp, "damage_by_type" )
-	for field in pairs( damage_types ) do
-		local dmg = ComponentObjectGetValue2( proj_comp, "damage_by_type", field )
-		if( dmg > 0 ) then total_damage = total_damage + dmg end
-	end
-	total_damage = total_damage + ComponentGetValue2( proj_comp, "damage" )
-	
-	local explosion_dmg = ComponentObjectGetValue2( proj_comp, "config_explosion", "damage" )
-	local explosion_rad = ComponentObjectGetValue2( proj_comp, "config_explosion", "explosion_radius" )
-	if( explosion_dmg > 0 ) then
-		explosion_dmg = explosion_dmg + ( explosion_rad + math.max( explosion_rad - distance + 1, 0 ))/25
-	end
-	total_damage = total_damage + explosion_dmg
-	
-	local f_distance = 1 + 4/2^( distance/10 )
-	local f_direction = 0.02 + 1.08/2^( direction/0.6 )
-	local f_velocity = 0.1847 + ( 1 - math.exp( -0.0021*proj_v ))
-	local f_lifetime = ( 1.8*( lifetime - 1 )/lifetime + 0.3 )/2
-	local f_is_real = 0.5 + 0.5*is_real
-	local f_damage = total_damage*25
-	
-	local final_value = 0.15*f_distance*f_direction*f_lifetime*f_is_real*f_velocity*f_damage
 	return pen.vld( final_value ) and final_value or 0
 end
 
@@ -2252,6 +2246,7 @@ end
 function pen.colourer( gui, c )
 	if( not( pen.vld( c ))) then return end
 	c = pen.get_hybrid_table( c )
+
 	local color = {
 		r = c[1] or 0,
 		g = c[2] or c[1] or 0,
@@ -2262,14 +2257,12 @@ function pen.colourer( gui, c )
 end
 
 function pen.play_sound( event, x, y, no_bullshit )
-	if( type( event ) ~= "table" ) then
-		event = { "mods/penman/sfx/penman.bank", event }
-	end
-	
-	if( not( no_bullshit or false )) then
-		local sfx_id = tostring( GameGetFrameNum())..event[2]
-		if( pen.sound_played == sfx_id ) then return end
-		pen.sound_played = sfx_id
+	if( not( no_bullshit )) then
+		local frame_num = GameGetFrameNum()
+		local sfx_id = table.concat({ event[1], event[2]})
+		pen.cached.play_sound_memo = pen.cached.play_sound_memo or {}
+		if( pen.cached.play_sound_memo[ sfx_id ] == frame_num ) then return end
+		pen.cached.play_sound_memo[ sfx_id ] = frame_num
 	end
 	
 	if( x == nil ) then x, y = GameGetCameraPos() end
@@ -2278,36 +2271,41 @@ end
 
 function pen.play_entity_sound( entity_id, x, y, event_mutator, no_bullshit )
 	local sound_table = {
-		ComponentGetValue2( get_storage( entity_id, "sound_bank" ), "value_string" ),
-		ComponentGetValue2( get_storage( entity_id, "sound_event" ), "value_string" )..( event_mutator or "" ),
+		pen.get_storage( entity_id, "sound_bank", "value_string" ),
+		pen.get_storage( entity_id, "sound_event", "value_string" ),
 	}
-	if( not( pen.vld( sound_table[1]))) then
-		return
-	end
+
+	if( pen.vld( sound_table[2])) then
+		sound_table[2] = sound_table[2]..( event_mutator or "" )
+	else return end
 	pen.play_sound( sound_table, x, y, no_bullshit )
 end
 
----Returns both GUI grid size and window size (the latter one is hardcoded to 720p for now).
+function pen.get_pic_dims( path )
+	return pen.cache({ "pic_dimensions", path }, function()
+		local gui = GuiCreate()
+		GuiStartFrame( gui )
+		local w, h = GuiGetImageDimensions( gui, path, 1 )
+		GuiDestroy( gui )
+		return w, h
+	end, { reset_count = 0 })
+end
+
+---Returns both GUI grid size and window size.
 ---@return number w, number h, number real_w, number real_h
-function pen.get_screen_data() --track mouse coords and update the res if they go over defined screen size
+function pen.get_screen_data()
 	local gui = GuiCreate()
 	GuiStartFrame( gui )
 
 	local w, h = GuiGetScreenDimensions( gui )
-	-- GuiOptionsAddForNextWidget( gui, 51 ) --IsExtraDraggable
-	-- GuiOptionsAddForNextWidget( gui, 6 ) --NoPositionTween
-	-- GuiOptionsAddForNextWidget( gui, 4 ) --ClickCancelsDoubleClick
-	-- GuiOptionsAddForNextWidget( gui, 21 ) --DrawNoHoverAnimation
-	-- GuiOptionsAddForNextWidget( gui, 47 ) --NoSound
-	-- GuiZSetForNextWidget( gui, 1 )
-	-- GuiIdPush( gui, 1 )
-	-- GuiImageButton( gui, 1, w, h, "", "data/ui_gfx/empty.png" )
-	-- local _,_,_,_,_,_,_,real_w,real_h = GuiGetPreviousWidgetInfo( gui )
-	local real_w, real_h = 1280, 720 -- thanks Horscht
+	local m_x, m_y = InputGetMousePosOnScreen()
+	pen.cached.screen_data = pen.cached.screen_data or { 1280, 720 } -- thanks Horscht
+	if( m_x > pen.cached.screen_data[1]) then pen.cached.screen_data[1] = m_x end
+	if( m_y > pen.cached.screen_data[2]) then pen.cached.screen_data[2] = m_y end
 
 	GuiDestroy( gui )
 
-	return w, h, real_w, real_h
+	return w, h, pen.cached.screen_data[1], pen.cached.screen_data[2]
 end
 
 ---Returns delta in GUI units between in-world and on-screen pointer position.
@@ -2317,11 +2315,7 @@ end
 ---@param real_h? number
 ---@return number delta_x, number delta_y
 function pen.get_camera_shake( w, h, real_w, real_h, k )
-	if( w == nil ) then
-		w, h, real_w, real_h = pen.get_screen_data()
-	end
-	k = k or 1
-
+	if( w == nil ) then w, h, real_w, real_h = pen.get_screen_data() end
 	local function purify( a, max )
 		return math.min( math.max( pen.rounder( a, -2 ), 0 ), max )
 	end
@@ -2346,6 +2340,7 @@ function pen.get_camera_shake( w, h, real_w, real_h, k )
 		screen_y = screen_y + 0.5
 	end
 	
+	k = k or 1
 	local delta_x, delta_y = screen_x - world_x, screen_y - world_y
 	if( math.abs( delta_x ) < k and math.abs( delta_y ) < k ) then
 		return 0, 0
@@ -2356,7 +2351,7 @@ end
 ---Returns on-screen pointer position.
 ---@return number pointer_x, number pointer_y
 function pen.get_mouse_pos()
-	local w,h,screen_w,screen_h = pen.get_screen_data()
+	local w, h, screen_w, screen_h = pen.get_screen_data()
 	local m_x, m_y = InputGetMousePosOnScreen()
 	return w*m_x/screen_w, h*m_y/screen_h
 end
@@ -2368,9 +2363,6 @@ end
 ---@param no_shake? boolean
 ---@return number pic_x, number pic_y, table screen_scale
 function pen.world2gui( x, y, is_raw, no_shake ) --thanks to ImmortalDamned for the fix
-	is_raw = is_raw or false
-	no_shake = no_shake or is_raw
-	
 	local w, h, real_w, real_h = pen.get_screen_data()
 	local view_x = MagicNumbersGetValue( "VIRTUAL_RESOLUTION_X" ) + MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_X" )
 	local view_y = MagicNumbersGetValue( "VIRTUAL_RESOLUTION_Y" ) + MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_Y" )
@@ -2380,44 +2372,19 @@ function pen.world2gui( x, y, is_raw, no_shake ) --thanks to ImmortalDamned for 
 		local cam_x, cam_y = GameGetCameraPos()
 		x, y = ( x - ( cam_x - view_x/2 )), ( y - ( cam_y - view_y/2 ))
 	end
-	if( not( no_shake )) then
+	if( not( no_shake or is_raw )) then
 		local shake_x, shake_y = pen.get_camera_shake( w, h, real_w, real_h, view_x/421 )
 		x, y = x + shake_x, y + shake_y
 	end
 	x, y = massive_balls_x*x, massive_balls_y*y
 	
-	return x, y, {massive_balls_x,massive_balls_y}
-end
-
-function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, s_x, s_y, alpha, interactive, angle )
-	if( s_x == nil ) then
-		s_x = 1
-	end
-	if( s_y == nil ) then
-		s_y = 1
-	end
-	if( alpha == nil ) then
-		alpha = 1
-	end
-	if( interactive == nil ) then
-		interactive = false
-	end
-	
-	if( not( interactive )) then
-		GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
-	end
-
-	GuiZSetForNextWidget( gui, pic_z )
-	uid = uid + 1
-	GuiIdPush( gui, uid )
-	GuiImage( gui, uid, pic_x, pic_y, pic, alpha, s_x, s_y, angle, 2 )
-	return uid
+	return x, y, { massive_balls_x, massive_balls_y }
 end
 
 function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic )
-	GuiZSetForNextWidget( gui, pic_z )
 	uid = uid + 1
 	GuiIdPush( gui, uid )
+	GuiZSetForNextWidget( gui, pic_z )
 	GuiOptionsAddForNextWidget( gui, 4 ) --ClickCancelsDoubleClick
 	GuiOptionsAddForNextWidget( gui, 6 ) --NoPositionTween
 	GuiOptionsAddForNextWidget( gui, 8 ) --HandleDoubleClickAsClick
@@ -2427,68 +2394,51 @@ function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic )
 	return uid, clicked, r_clicked
 end
 
-function pen.new_interface( gui, uid, pos, pic_z, is_debugging ) --this must be fully virtual (full screen button)
-	local x, y, s_x, s_y = pos[1], pos[2], math.abs( pos[3] or 1 ), math.abs( pos[4] or 1 )
+function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, is_debugging )
+	local frame_num = GameGetFrameNum()
+	local m_x, m_y = pen.get_mouse_pos()
+	local clicked, r_clicked, is_hovered = false, false, false
+	local is_new = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_SAFETY, "0" )) ~= frame_num
+	if( pen.check_bounds({ m_x, m_y }, { pic_x, pic_y }, { s_x, s_y })) then
+		GlobalsSetValue( pen.GLOBAL_INTERFACE_SAFETY, frame_num )
 
-	local is_vertical = s_x < s_y
-	local width = is_vertical and s_x or s_y
-	local clicked, r_clicked, hovered = false, false, false
-	
-	local function do_interface( p_x, p_y )
-		uid = pen.new_image( gui, uid, p_x, p_y, pic_z, "data/ui_gfx/empty"..( is_debugging and "_black" or "" )..".png", width/2, width/2, 0.75, true )
-		local c, r_c, h = GuiGetPreviousWidgetInfo( gui )
-		clicked, r_clicked, hovered = clicked or c, r_clicked or r_c, hovered or h
-	end
-	
-	if( s_x ~= 0 and s_y ~= 0 ) then
-		local count = math.floor( is_vertical and s_y/s_x or s_x/s_y )
-		for i = 1,count do
-			do_interface( x, y )
-			if( is_vertical ) then
-				y = y + width
-			else
-				x = x + width
-			end
+		if( is_debugging ) then
+			uid = uid + 1
+			GuiIdPush( gui, uid )
+			GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
+			GuiColorSetForNextWidget( gui, 1, 0, 0, 1 )
+			GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
+			GuiImage( gui, uid, pic_x, pic_y, "data/ui_gfx/empty_white.png", 0.75, s_x/2, s_y/2 )
 		end
-		local leftover = ( is_vertical and s_y or s_x ) - count*width
-		if( leftover > 0 ) then
-			local drift = width - leftover
-			if( is_vertical ) then
-				y = y - drift
-			else
-				x = x - drift
-			end
-			do_interface( x, y )
-		end
-	end
 
-	return uid, clicked, r_clicked, hovered
+		uid = uid + 1
+		GuiIdPush( gui, uid )
+		GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
+		GuiImage( gui, uid, m_x - 10, m_y - 10, "data/ui_gfx/empty.png", 1, 10, 10 )
+		clicked, r_clicked, is_hovered = GuiGetPreviousWidgetInfo( gui )
+		if( not( is_new )) then clicked, r_clicked = false, false end
+	end
+	return uid, clicked, r_clicked, is_hovered
 end
 
---make it better
-function pen.new_blinker( gui, colour )
-	colour = rgb2hsv( colour )
-	local fancy_index = math.abs( math.cos( math.rad( GameGetFrameNum())))
-	colour = hsv2rgb( { colour[1], fancy_index*colour[2], math.max( colour[3], ( 1 - fancy_index )), colour[3] } )
-	GuiColorSetForNextWidget( gui, colour[1], colour[2], colour[3], colour[4] )
-end
+function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
+	data = data or {}
 
-function pen.new_anim( gui, uid, auid, pic_x, pic_y, pic_z, path, amount, delay, s_x, s_y, alpha, interactive )
-	anims_state = anims_state or {}
-	anims_state[auid] = anims_state[auid] or { 1, 0 }
-	
-	uid = pen.new_image( gui, uid, pic_x, pic_y, pic_z, path..anims_state[auid][1]..".png", s_x, s_y, alpha, interactive )
-	
-	anims_state[auid][2] = anims_state[auid][2] + 1
-	if( anims_state[auid][2] > delay ) then
-		anims_state[auid][2] = 0
-		anims_state[auid][1] = anims_state[auid][1] + 1
-		if( anims_state[auid][1] > amount ) then
-			anims_state[auid][1] = 1
-		end
+	uid = uid + 1
+	GuiIdPush( gui, uid )
+	GuiZSetForNextWidget( gui, pic_z )
+	GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
+	GuiImage( gui, uid, pic_x, pic_y, pic,
+		data.alpha or 1, data.s_x or 1, data.s_y or 1, data.angle or 0, data.anim_type or 2, data.anim or ""
+	)
+
+	if( data.can_click ) then
+		local w, h = pen.get_pic_dims( pic )
+		uid, data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
+			gui, uid, pic_x, pic_y, w*( data.s_x or 1 ), h*( data.s_y or 1 )
+		)
 	end
-	
-	return uid
+	return uid, data.clicked, data.r_clicked, data.is_hovered
 end
 
 function pen.new_cutout( gui, uid, pic_x, pic_y, size_x, size_y, func, v ) --credit goes to aarvlo
@@ -2759,9 +2709,10 @@ function pen.new_tooltip( gui, uid, text, data, func )
 				size_x, size_y = size_x - inter_size, size_y - inter_size
 				inter_alpha = math.max( 1 - inter_alpha/6, 0.1 )
 				
-				uid = pen.new_image( gui, uid, pic_x, pic_y, pic_z, "data/ui_gfx/empty.png", size_x, size_y )
 				local clicked, r_clicked, is_hovered = false, false, false
-				uid, clicked, r_clicked, is_hovered = pen.new_interface( gui, uid, {pic_x,pic_y,size_x,size_y}, pic_z )
+				uid, clicked, r_clicked, is_hovered = pen.new_image(
+					gui, uid, pic_x, pic_y, pic_z, "data/ui_gfx/empty.png", { s_x = size_x, s_y = size_y, can_click = true }
+				)
 				
 				uid = uid + 1
 				GuiZSetForNextWidget( gui, pic_z + 0.01 )
@@ -2815,6 +2766,9 @@ end
 pen.FLAG_UPDATE_UTF = "PENMAN_UTF_MAP_UPDATE"
 pen.FLAG_USE_FANCY_FONT = "PENMAN_FANCY_FONTING"
 pen.FLAG_RESTART_CHECK = "PENMAN_GAME_HAS_STARTED"
+
+pen.GLOBAL_VIRTUAL_ID = "PENMAN_VIRTUAL_INDEX"
+pen.GLOBAL_INTERFACE_SAFETY = "PENMAN_INTERFACE_FRAME"
 
 pen.MARKER_TAB = "\\_"
 pen.MARKER_FANCY_TEXT = { "{>%S->{", "}<%S-<}", "{%-}%S-{%-}" }
@@ -2911,9 +2865,7 @@ pen.FONT_MODS = {
 			local out = old_val or {0,0,0}
 			local off_x, off_y = unpack( char_data.dims )
 			local clicked, r_clicked, is_hovered = false, false, false
-			uid, clicked, r_clicked, is_hovered = pen.new_interface( gui, uid, {
-				pic_x[1] - off_x*0.25, pic_y[1], off_x*1.5, off_y
-			}, pic_z )
+			uid, clicked, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x[1] - off_x*0.25, pic_y[1], off_x*1.5, off_y )
 			
 			if( clicked ) then out[1] = frame_num end
 			if( r_clicked ) then out[2] = frame_num end
@@ -2951,7 +2903,8 @@ pen.FONT_MODS = {
 		color = ( clicked or 0 ) == 0 and pen.PALETTE.VNL.MANA or pen.PALETTE.VNL.RED
 		if( frame_num < ( is_hovered or 0 )) then
 			pen.colourer( gui, color )
-			uid = pen.new_image( gui, uid, pic_x[2], pic_y[2] + off_y*0.8, pic_z + 0.001, "data/ui_gfx/empty_white.png", off_x*0.5, 0.5 )
+			uid = pen.new_image( gui, uid, pic_x[2], pic_y[2] + off_y*0.8, pic_z + 0.001, "data/ui_gfx/empty_white.png", {
+				s_x = off_x*0.5, s_y = 0.5 })
 		end
 		
 		return pen.FONT_MODS.button( gui, uid, pic_x, pic_y, pic_z, char_data, color, index, link_id )
