@@ -22,8 +22,10 @@ end
 --implant penman into mnee (and test it with most disgusting malformed data possible)
 
 --basic plotter (highres, autoscaling, extremum highlight)
---lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
+--extract hybrid gui from 19a and make it better
+--separate table getting part from clone_comp/clone_entity to get_comp_data/get_entity_data
 --transition all the stuff to child_play
+--lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
 --cleanup, make sure all the funcs reference the right stuff, variable naming consistency
 --make sure that all returned id values are nil
 --actually test all the stuff
@@ -150,7 +152,7 @@ function pen.animate( delta, frame, data ) --https://easings.net/
 	data.params_ease = data.params_ease or {}
 	data.ease_in = pen.get_hybrid_table( data.ease_in or "" )
 	data.ease_out = pen.get_hybrid_table( data.ease_out or "" )
-
+	
 	local easings = {
 		flp = function( t )
 			return 1 - t
@@ -176,7 +178,7 @@ function pen.animate( delta, frame, data ) --https://easings.net/
 			local temp = 10*math.floor( a/10 )
 			return -( math.pow( 2, t*temp )*math.sin(( a - temp )*t*math.pi ))
 		end,
-		bnc = function( t, a )
+		bnc = function( t, a )--paramitrize this
 			local n, d = 7.5625, 2.75
 			if( t < 1/d ) then
 				return n*t*t
@@ -2498,16 +2500,23 @@ function pen.world2gui( x, y, is_raw, no_shake ) --thanks to ImmortalDamned for 
 	return x, y, { massive_balls_x, massive_balls_y }
 end
 
-function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic )
+function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic, can_gamepad )
 	uid = uid + 1
 	GuiIdPush( gui, uid )
 	GuiZSetForNextWidget( gui, pic_z )
-	GuiOptionsAddForNextWidget( gui, 4 ) --ClickCancelsDoubleClick
-	GuiOptionsAddForNextWidget( gui, 6 ) --NoPositionTween
-	GuiOptionsAddForNextWidget( gui, 8 ) --HandleDoubleClickAsClick
-	GuiOptionsAddForNextWidget( gui, 21 ) --DrawNoHoverAnimation
-	GuiOptionsAddForNextWidget( gui, 47 ) --NoSound
-	local clicked, r_clicked = GuiImageButton( gui, uid, pic_x, pic_y, "", pic )
+	
+	local clicked, r_clicked = false, false
+	if( GameGetIsGamepadConnected() and not( can_gamepad )) then
+		GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
+		GuiImage( gui, uid, pic_x, pic_y, pic )
+	else
+		GuiOptionsAddForNextWidget( gui, 4 ) --ClickCancelsDoubleClick
+		GuiOptionsAddForNextWidget( gui, 6 ) --NoPositionTween
+		GuiOptionsAddForNextWidget( gui, 8 ) --HandleDoubleClickAsClick
+		GuiOptionsAddForNextWidget( gui, 21 ) --DrawNoHoverAnimation
+		GuiOptionsAddForNextWidget( gui, 47 ) --NoSound
+		clicked, r_clicked = GuiImageButton( gui, uid, pic_x, pic_y, "", pic )
+	end
 	return uid, clicked, r_clicked
 end
 
@@ -2532,30 +2541,37 @@ function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, is_debugging )
 		GuiIdPush( gui, uid )
 		GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
 		GuiImage( gui, uid, m_x - 10, m_y - 10, "data/ui_gfx/empty.png", 1, 10, 10 )
-		clicked, r_clicked, is_hovered = GuiGetPreviousWidgetInfo( gui )
+		clicked, r_clicked = GuiGetPreviousWidgetInfo( gui ); is_hovered = true
 		if( not( is_new )) then clicked, r_clicked = false, false end
 	end
 	return uid, clicked, r_clicked, is_hovered
 end
 
-function pen.new_dragger( guid, uid, did, pic_x, pic_y, s_x, s_y, is_debugging )
+function pen.new_dragger( gui, uid, did, pic_x, pic_y, s_x, s_y, is_debugging ) --only one dragger can be initiated at the same time
 	pen.cached.dragger_data = pen.cached.dragger_data or {}
-	pen.cached.dragger_data[ did ] = pen.cached.dragger_data[ did ] or { false, 0, 0 }
-	
+	pen.cached.dragger_data[ did ] = pen.cached.dragger_data[ did ] or { false, 0, 0, true }
+
 	local m_x, m_y = pen.get_mouse_pos()
 	local clicked, r_clicked, is_hovered = false, false, false
-	uid, clicked, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, is_debugging )
-	if( clicked ) then pen.cached.dragger_data[ did ] = { true, m_x - pic_x, m_y - pic_y } end
+	uid, _, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, is_debugging )
+	
+	local state = 0
+	local mouse_state = InputIsMouseButtonDown( 1 )
 	if( pen.cached.dragger_data[ did ][1]) then
-		if( InputIsMouseButtonDown( 1 )) then
+		if( mouse_state ) then
 			pic_x = m_x + pen.cached.dragger_data[ did ][2]
 			pic_y = m_y + pen.cached.dragger_data[ did ][3]
+			state = 2
 		else
-			pen.cached.dragger_data[ did ] = { false, 0, 0 }
+			pen.cached.dragger_data[ did ] = { false, 0, 0, true }
+			state = -1
 		end
-	end
+	elseif( is_hovered and ( mouse_state and not( pen.cached.dragger_data[ did ][4]))) then
+		pen.cached.dragger_data[ did ] = { true, pic_x - m_x, pic_y - m_y, true }
+		clicked, state = true, 1
+	else pen.cached.dragger_data[ did ][4] = mouse_state end
 	
-	return pic_x, pic_y, pen.cached.dragger_data[ did ][1], r_clicked, is_hovered
+	return uid, pic_x, pic_y, state, clicked, r_clicked, is_hovered
 end
 
 function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
@@ -2957,6 +2973,7 @@ pen.FONT_MODS = {
 	end,
 	--crossed out text
 	--separate underscore from hyperlink
+	--runic (swap the letter if is within the supported range, else choose based on char_val from A-z range)
 	
 	wave = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
 		pic_y[1] = pic_y[1] + math.sin( 0.5*index.gbl + GameGetFrameNum()/7 )
