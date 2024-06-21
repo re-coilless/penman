@@ -1,4 +1,23 @@
-dofile_once( "mods/penman/_penman.lua" )
+local LOCAL_PATH = "mods/penman/"
+local orig_do_mod_appends = do_mod_appends
+do_mod_appends = function( filename, ... ) --stolen from https://github.com/alex-3141/noita-parallax
+    LOCAL_PATH = filename:match("(.+/)[^/]+")
+    do_mod_appends = orig_do_mod_appends
+    do_mod_appends( filename, ... )
+end
+
+dofile_once( LOCAL_PATH.."_penman.lua" )
+pen.lib = pen.lib or {}
+pen.LOCAL_PATH = LOCAL_PATH
+
+local load_list = { "nxml", "csv", "bitser", "base64", "matrix", "complex", "EZWand" }
+for i,v in ipairs( load_list ) do
+	pen.lib[ v ] = dofile_once( table.concat({ pen.LOCAL_PATH, v, ".lua" })
+end
+--dialog
+--gusgui
+--parallax
+
 if( GameHasFlagRun( pen.FLAG_UPDATE_UTF )) then
 	local the_concept_of_table_itself = dofile_once( "mods/penman/extra/lists/every_character.lua" )
 	for i,the_concept_of_set_itself in ipairs( the_concept_of_table_itself ) do
@@ -26,14 +45,6 @@ if( GameHasFlagRun( pen.FLAG_UPDATE_UTF )) then
 		end
 		print("\n")
 	end
-end
-
-pen.lib = pen.lib or {}
-local orig_do_mod_appends = do_mod_appends
-do_mod_appends = function( filename, ... ) --stolen from https://github.com/alex-3141/noita-parallax
-    pen.LOCAL_PATH = filename:match("(.+/)[^/]+")
-    do_mod_appends = orig_do_mod_appends
-    do_mod_appends( filename, ... )
 end
 
 function pen.lib.magic_write( path, file )
@@ -84,3 +95,6 @@ end
 --[SAFE] ^^^^^^^^^^^^
 if( io == nil ) then return end
 --[UNSAFE] vvvvvvvvvv
+
+--patcher
+--pollnet

@@ -1,8 +1,8 @@
-cvs.lua - https://github.com/geoffleyland/lua-csv
 nxml.lua - https://github.com/zatherz/luanxml
+csv.lua - https://github.com/geoffleyland/lua-csv
 bitser.lua - https://github.com/gvx/bitser
+base64.lua - https://github.com/iskolbin/lbase64
 complex.lua/matrix.lua - https://github.com/davidm/lua-matrix
-stringstore.lua/stringstore_variable.lua - https://github.com/zatherz/StringStore
 EZWand.lua - https://github.com/TheHorscht/EZWand
 
 dialog - https://github.com/TheHorscht/DialogSystem

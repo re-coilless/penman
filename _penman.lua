@@ -62,7 +62,7 @@ function pen.vld( v, is_ecs )
 			out = v > 0
 		end
 	elseif( t == "string" ) then
-		out = v ~= pen.DIV_1 and v ~= "" and v ~= " "
+		out = v ~= pen.DIV_1 and v ~= "" and v ~= " " and v ~= "\0"
 	elseif( t == "table" ) then
 		out = pen.t.count( v, true ) > 0
 	end
@@ -330,6 +330,25 @@ function pen.chrono( f, input, storage_comp, name )
 	return unpack( out )
 end
 
+function pen.v2s( value, is_pretty )
+	return ( is_pretty or false ) and tostring( value ) or (({
+		["nil"] = function( v ) return "" end,
+		["number"] = function( v ) return string.format( "%a", v ) end,
+		["string"] = function( v ) return string.format( "%q", v ) end,
+		["boolean"] = function( v ) return "bool"..pen.b2n( v ) end,
+	})[ type( value )]( value ) or value )
+end
+function pen.s2v( str )
+	if( not( pen.vld( str ))) then
+		return
+	elseif( string.find( str, "bool[01]" )) then
+		return pen.n2b( string.sub( str, -1, -1 ))
+	elseif( tonumber( str )) then
+		return tonumber( str )
+	end
+	return str
+end
+
 function pen.t.init( amount, value )
 	local is_tbl = type( value ) == "table"
 	local tbl, temp = {}, value
@@ -497,60 +516,89 @@ function pen.t.clone( orig, copies )
     return copy
 end
 
-function pen.t.parse( data, is_pretty )
-	if( not( pen.vld( data ))) then return end
-	local function ser( tbl ) --special thanks to ImmortalDamned
-		return ({
-			["nil"] = function( v ) return tostring( v ) end,
-			["number"] = function( v ) return ( is_pretty or false ) and v or string.format( "%a", v ) end,
-			["string"] = function( v ) return ( is_pretty or false ) and v or string.format( "%q", v ) end,
-			["boolean"] = function( v ) return tostring( v ) end,
-			["table"] = function( t )
-				local s, i = "{", 1
-				local l = pen.t.count( t )
-				for k,v in pairs( t ) do
-					s = table.concat({ s, "[", ser( k ), "]=", ser( v ), i < l and "," or "" })
-					i = i + 1
+function pen.t.pack( data, is_pretty )
+	if( not( pen.vld( data ))) then
+		return type( data or "" ) == "string" and {} or ""
+	end
+
+	local function ser( tbl )
+		local out = pen.DIV_1
+		for i,cell in ipairs( tbl ) do
+			if( type( cell ) == "table" ) then
+				out = out..pen.DIV_2
+				for e,v in ipairs( cell ) do
+					out = out..( type( v ) == "table" and "\0" or pen.v2s( v, is_pretty ))..pen.DIV_2
 				end
-				return s.."}"
-			end,
-			--["function"] = function( v )
-			--    return string.dump( v )
-			--end,
-		})[ type( tbl )]( tbl )
+			else
+				out = out..pen.v2s( cell, is_pretty )
+			end
+			out = out..pen.DIV_1
+		end
+		return out
 	end
 	local function dser( str )
+		return pen.cache({ "table_pack", str }, function()
+			local out = {}
+			for cell in string.gmatch( str, pen.ptrn( 1 )) do
+				local file = {}
+				for v in string.gmatch( cell, pen.ptrn( 2 )) do
+					table.insert( file, pen.s2v( v ))
+				end
+				table.insert( out, pen.vld( file ) and file or pen.s2v( cell ))
+			end
+		end)
+	end
+
+	local out = nil
+	if( type( data ) == "table" ) then
+		out = ser( data )
+	else out = dser( data ) end
+	return out
+end
+
+function pen.t.parse( data, is_pretty )
+	if( not( pen.vld( data ))) then
+		return type( data or "" ) == "string" and {} or ""
+	end
+	
+	local function ser( tbl ) --special thanks to ImmortalDamned
+		local out = nil
+		if( type( tbl ) == "table" ) then
+			out = "{"
+			local i, l = 1, pen.t.count( t )
+			for k,v in pairs( t ) do
+				out = table.concat({ out, "[", ser( k ), "]=", ser( v ), i < l and "," or "" })
+				i = i + 1
+			end
+			out = out.."}"
+		else out = pen.v2s( tbl, is_pretty ) end
+		return out
+	end
+	local function dser( str )
+		if( string.sub( str, 1, 1 ) ~= "{" ) then return {} end
 		return pen.cache({ "table_parse", str }, function()
 			local out = {}
-			if( string.sub( str, 1, 1 ) ~= "{" ) then return out end
 			str = ","..string.sub( string.sub( str, 2, -1 ), 1, -2 )..","
 			
+			local name_pattern = "^%[\"?.-\"?%]="
 			local function s2v( s )
-				local is_string = string.sub( s, 1, 1 ) == "\""
-				if( is_string ) then
+				if( string.sub( s, 1, 1 ) == "\"" ) then
 					s = string.sub( s, 2, -2 )
-				else
-					is_string = tonumber( s )
-					if( is_string == nil ) then
-						s = s == "true"
-					else
-						s = is_string
-					end
-				end
+				else s = pen.s2v( s ) end
 				return s
 			end
 			local function s2n( s )
-				local name = string.sub( s, string.find( s, "^%[\"?.-\"?%]=" ))
+				local name = string.sub( s, string.find( s, name_pattern ))
 				return s2v( string.sub( name, 2, -3 ))
 			end
 			
 			for v in string.gmatch( str, "%[[^%]]+]=%b{}" ) do --special thanks to dextercd and nphhpn
 				local a,b = string.find( str, v, 1, true )
 				str = string.sub( str, 1, a - 1 )..string.sub( str, b + 1, -1 )
-				out[ s2n( v )] = dser( string.gsub( v, "^%[\"?.-\"?%]=", "" ) )
+				out[ s2n( v )] = dser( string.gsub( v, name_pattern, "" ))
 			end
 			for i,v in ipairs( pen.ctrn( str, "," )) do
-				out[ s2n( v )] = s2v( string.gsub( v, "^%[\"?.-\"?%]=", "" ))
+				out[ s2n( v )] = s2v( string.gsub( v, name_pattern, "" ))
 			end
 			
 			return out
@@ -560,9 +608,7 @@ function pen.t.parse( data, is_pretty )
 	local out = nil
 	if( type( data ) == "table" ) then
 		out = ser( data )
-	elseif( pen.vld( data )) then
-		out = dser( data )
-	end
+	else out = dser( data ) end
 	return out
 end
 

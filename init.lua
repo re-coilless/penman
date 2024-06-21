@@ -32,17 +32,7 @@ function OnWorldPostUpdate()
 	
 	local request = ComponentGetValue2( storage_request, "value_string" )
 	if( request ~= pen.DIV_1 ) then
-		local stuff = {}
-		for f in string.gmatch( request, pen.ptrn(1)) do
-			local file = {}
-			for v in string.gmatch( f, pen.ptrn(2)) do
-				table.insert( file, v )
-			end
-			if( pen.vld( file )) then
-				table.insert( stuff, file )
-			end
-		end
-		
+		local stuff = pen.t.pack( request )
 		for i,v in ipairs( stuff ) do
 			local storage_file = pen.get_storage( ctrl_body, v[2])
 			penman_w( v[1], string.gsub( ComponentGetValue2( storage_file, "value_string" ), "\\([nt])", { n = "\n", t = "\t", }))
