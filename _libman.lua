@@ -12,7 +12,7 @@ pen.LOCAL_PATH = LOCAL_PATH
 
 local load_list = { "nxml", "csv", "bitser", "base64", "matrix", "complex", "EZWand" }
 for i,v in ipairs( load_list ) do
-	pen.lib[ v ] = dofile_once( table.concat({ pen.LOCAL_PATH, v, ".lua" })
+	pen.lib[ v ] = dofile_once( table.concat({ pen.LOCAL_PATH, v, ".lua" }))
 end
 --dialog
 --gusgui

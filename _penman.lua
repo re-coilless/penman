@@ -1,10 +1,11 @@
 pen = pen or {}
 pen.t = pen.t or {}
 pen.cached = pen.cached or {}
+GlobalsSetValue( "PROSPERO_IS_REAL", "1" )
 
 --[WRITING]
-pen.magic_write = pen.magic_write or ModTextFileSetContent
-if( pen.magic_write ~= nil ) then --dofile_once within OnModInit for this to work
+pen.magic_write = pen.magic_write or ModTextFileSetContent or penman_w
+if( pen.magic_write ~= nil ) then
 	pen.t2f = function( name, text )
 		if( pen[ name ] == nil ) then
 			local num = tonumber( GlobalsGetValue( pen.GLOBAL_VIRTUAL_ID, "0" ))
@@ -19,10 +20,11 @@ end
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---implant penman into mnee (and test it with most disgusting malformed data possible)
+--setting_set/setting_get that works for both NextValue and normal
 
---basic plotter (highres, autoscaling, extremum highlight)
+--basic plotter (customizable step size and line thickness, autoscaling, extremum highlight)
 --extract hybrid gui from 19a and make it better
+--add basicmost full in-gui inter-mod onworldpostupdate unified context with z-level sorting
 --separate table getting part from clone_comp/clone_entity to get_comp_data/get_entity_data
 --transition all the stuff to child_play
 --lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
@@ -125,6 +127,7 @@ function pen.hash_me( str, is_huge )
 	return is_huge and tostring( b*c + a ) or ( b*c + a )
 end
 
+--add autotuning with visualizer
 function pen.pid( pid, delta, k ) --https://www.robotsforroboticists.com/pid-control/
 	k = k or {}
 	pen.cached.pid_memo = pen.cached.pid_memo or {}
@@ -538,6 +541,8 @@ function pen.t.pack( data, is_pretty )
 	end
 	local function dser( str )
 		return pen.cache({ "table_pack", str }, function()
+			if( string.find( str, table.concat({ "^", pen.DIV_1, ".+", pen.DIV_1, "$" })) == nil ) then return {} end
+
 			local out = {}
 			for cell in string.gmatch( str, pen.ptrn( 1 )) do
 				local file = {}
@@ -575,8 +580,9 @@ function pen.t.parse( data, is_pretty )
 		return out
 	end
 	local function dser( str )
-		if( string.sub( str, 1, 1 ) ~= "{" ) then return {} end
 		return pen.cache({ "table_parse", str }, function()
+			if( string.find( str, "^{.+}$" ) == nil ) then return {} end
+
 			local out = {}
 			str = ","..string.sub( string.sub( str, 2, -1 ), 1, -2 )..","
 			
@@ -1705,7 +1711,7 @@ function pen.get_creature_head( entity_id, x, y )
 	return x, y
 end
 
-function pen.get_creature_dimensions( entity_id, is_simple )
+function pen.get_creature_dimensions( entity_id, is_simple ) --this should work with phys bodies
 	local borders = { 0, 0, 0, 0 }
 
 	local char_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterDataComponent" )
