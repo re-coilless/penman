@@ -20,8 +20,7 @@ end
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---setting_set/setting_get that works for both NextValue and normal
-
+--sule-based lua context independent gateway (and steal ModMagicNumbersFileAdd from init.lua via it)
 --basic plotter (customizable step size and line thickness, autoscaling, extremum highlight)
 --extract hybrid gui from 19a and make it better
 --add basicmost full in-gui inter-mod onworldpostupdate unified context with z-level sorting
@@ -55,14 +54,12 @@ function pen.vld( v, is_ecs )
 	if( v == nil ) then
 		return false
 	end
-
+	
 	local out = true
 	local t = type( v )
 	if( t == "number" ) then
 		out = v == v and v ~= math.inf
-		if( out and is_ecs ) then
-			out = v > 0
-		end
+		if( out and is_ecs ) then out = v > 0 end
 	elseif( t == "string" ) then
 		out = v ~= pen.DIV_1 and v ~= "" and v ~= " " and v ~= "\0"
 	elseif( t == "table" ) then
@@ -144,6 +141,13 @@ function pen.pid( pid, delta, k ) --https://www.robotsforroboticists.com/pid-con
 	local der = ( delta - pen.cached.pid_memo[ pid ][1])/time
 	pen.cached.pid_memo[ pid ] = { delta, int }
 	return k.p*delta + k.i*int + k.d*der + k.bias
+end
+
+function pen.atimer( tid, duration, reset_now )
+	local frame_num = GameGetFrameNum()
+	return math.min( pen.cache({ "animation_timer", tid }, function()
+		return frame_num
+	end, { reset_count = 0, reset_now = reset_now }) - frame_num, duration )
 end
 
 function pen.animate( delta, frame, data ) --https://easings.net/
@@ -268,69 +272,22 @@ function pen.animate( delta, frame, data ) --https://easings.net/
 end
 
 --[TECHNICAL]
-function pen.catch( f, input, fallback )
-	local out = { pcall( f, unpack( input or {}))}
-	if( not( out[1])) then
-		if( not( pen.silent_catch )) then print( out[2]) end
-		if( pen.vld( fallback )) then return unpack( fallback ) end
+function pen.get_hybrid_table( table, allow_unarray )
+	if( not( pen.vld( table ))) then return {} end
+	if( type( table ) == "table" and ( allow_unarray or not( pen.t.is_unarray( table )))) then
+		return table
 	else
-		table.remove( out, 1 )
-		return unpack( out )
+		return { table }
 	end
 end
 
-function pen.cache( structure, update_func, data )
-	data = data or {}
-	data.reset_count = data.reset_count or 999
-	data.reset_frame = data.reset_frame or 0 --36000
-
-	local name = structure[1]
-	pen.cached = pen.cached or {}
-	pen.cached[ name ] = pen.cached[ name ] or {}
-	pen.cached[ name ].cache_reset_count = pen.cached[ name ].cache_reset_count or 0
-	pen.cached[ name ].cache_reset_frame = pen.cached[ name ].cache_reset_frame or 0
-
-	local frame_num = GameGetFrameNum()
-	local is_too_many = data.reset_count > 0 and pen.cached[ name ].cache_reset_count > data.reset_count
-	local is_too_long = data.reset_frame > 0 and frame_num > data.reset_frame
-	if( data.reset_now or ( update_func ~= nil and ( is_too_many or is_too_long ))) then
-		pen.cached[ name ] = {}
-		pen.cached[ name ].cache_reset_count = 0
-		pen.cached[ name ].cache_reset_frame = frame_num + data.reset_frame
-	end
-
-	local the_one = pen.cached[ name ]
-	structure = pen.get_hybrid_table( structure )
-	for i = 2,( #structure - 1 ) do
-		the_one[ structure[i]] = the_one[ structure[i]] or {}
-		the_one = the_one[ structure[i]]
-	end
-
-	local val = structure[ #structure ]
-	if( data.always_update ) then
-		local new_val = { update_func( the_one[ val ])}
-		if( pen.vld( new_val )) then the_one[ val ] = new_val end
-	elseif( the_one[ val ] == nil and update_func ~= nil ) then
-		the_one[ val ] = { update_func()}
-		pen.cached[ name ].cache_reset_count = pen.cached[ name ].cache_reset_count + 1
-	end
-	return unpack( the_one[ val ] or {})
-end
-
-function pen.chrono( f, input, storage_comp, name )
-	local check = GameGetRealWorldTimeSinceStarted()*1000
-	local out = { f( unpack( input or {}))}
-	check = GameGetRealWorldTimeSinceStarted()*1000 - check
-
-	if( pen.vld( storage_comp, true )) then
-		pen.magic_comp( storage_comp, { value_string = function( old_val )
-			return table.concat({ old_val, name, pen.DIV_1, check, pen.DIV_1 }) --special thanks to Copi
-		end})
+function pen.get_hybrid_function( func, input )
+	if( not( pen.vld( func ))) then return end
+	if( type( func ) == "function" ) then
+		return pen.catch( func, input )
 	else
-		print( check.."ms" )
+		return func
 	end
-
-	return unpack( out )
 end
 
 function pen.v2s( value, is_pretty )
@@ -639,6 +596,71 @@ end
 
 function pen.t.print( tbl )
 	print( pen.t.parse( tbl, true ))
+end
+
+function pen.catch( f, input, fallback )
+	local out = { pcall( f, unpack( input or {}))}
+	if( not( out[1])) then
+		if( not( pen.silent_catch )) then print( out[2]) end
+		if( pen.vld( fallback )) then return unpack( fallback ) end
+	else
+		table.remove( out, 1 )
+		return unpack( out )
+	end
+end
+
+function pen.cache( structure, update_func, data )
+	data = data or {}
+	data.reset_count = data.reset_count or 999
+	data.reset_frame = data.reset_frame or 0 --36000
+
+	local name = structure[1]
+	pen.cached = pen.cached or {}
+	pen.cached[ name ] = pen.cached[ name ] or {}
+	pen.cached[ name ].cache_reset_count = pen.cached[ name ].cache_reset_count or 0
+	pen.cached[ name ].cache_reset_frame = pen.cached[ name ].cache_reset_frame or 0
+
+	local frame_num = GameGetFrameNum()
+	local is_too_many = data.reset_count > 0 and pen.cached[ name ].cache_reset_count > data.reset_count
+	local is_too_long = data.reset_frame > 0 and frame_num > data.reset_frame
+	if( data.reset_now or ( update_func ~= nil and ( is_too_many or is_too_long ))) then
+		pen.cached[ name ] = {}
+		pen.cached[ name ].cache_reset_count = 0
+		pen.cached[ name ].cache_reset_frame = frame_num + data.reset_frame
+	end
+
+	local the_one = pen.cached[ name ]
+	structure = pen.get_hybrid_table( structure )
+	for i = 2,( #structure - 1 ) do
+		the_one[ structure[i]] = the_one[ structure[i]] or {}
+		the_one = the_one[ structure[i]]
+	end
+
+	local val = structure[ #structure ]
+	if( data.always_update ) then
+		local new_val = { update_func( the_one[ val ])}
+		if( pen.vld( new_val )) then the_one[ val ] = new_val end
+	elseif( the_one[ val ] == nil and update_func ~= nil ) then
+		the_one[ val ] = { update_func()}
+		pen.cached[ name ].cache_reset_count = pen.cached[ name ].cache_reset_count + 1
+	end
+	return unpack( the_one[ val ] or {})
+end
+
+function pen.chrono( f, input, storage_comp, name )
+	local check = GameGetRealWorldTimeSinceStarted()*1000
+	local out = { f( unpack( pen.get_hybrid_table( input )))}
+	check = GameGetRealWorldTimeSinceStarted()*1000 - check
+
+	if( pen.vld( storage_comp, true )) then
+		pen.magic_comp( storage_comp, { value_string = function( old_val )
+			return table.concat({ old_val, name, pen.DIV_1, check, pen.DIV_1 }) --special thanks to Copi
+		end})
+	else
+		print( check.."ms" )
+	end
+
+	return unpack( out )
 end
 
 --[TEXT]
@@ -1524,22 +1546,22 @@ function pen.random_sign( var )
 	return pen.random_bool( var ) and 1 or -1
 end
 
-function pen.get_hybrid_table( table, allow_unarray )
-	if( not( pen.vld( table ))) then return {} end
-	if( type( table ) == "table" and ( allow_unarray or not( pen.t.is_unarray( table )))) then
-		return table
-	else
-		return { table }
-	end
+function pen.setting_set( id, value )
+	ModSettingSet( id, value )
+	ModSettingSetNextValue( id, value )
 end
-
-function pen.get_hybrid_function( func, input )
-	if( not( pen.vld( func ))) then return end
-	if( type( func ) == "function" ) then
-		return pen.catch( func, input )
-	else
-		return func
-	end
+function pen.setting_get( id )
+	-- local settings = pen.cache({ "setting_dump", "stuff" }, function()
+	-- 	local stuff = {}
+	-- 	for i = 0,ModSettingGetCount() do
+	-- 		local name = ModSettingGetAtIndex( i )
+	-- 		if( pen.vld( name )) then stuff[ name ] = i end
+	-- 	end
+	-- 	return stuff
+	-- end)
+	
+	-- local _, value, value_next = ModSettingGetAtIndex( settings[ id ] or -1 )
+	return ModSettingGet( id ), ModSettingGetNextValue( id )
 end
 
 function pen.get_time( secs )
@@ -2405,9 +2427,9 @@ function pen.magic_rgb( c, to_rbg, mode )
 
 	c = pen.get_hybrid_table( c ); c[1] = c[1] or 255; c[2] = c[2] or c[1]; c[3] = c[3] or c[1]
 	local modes = {
-		gamma = {gam2lin,lin2gam},
-		hsv = {rgb2hsv,hsv2rgb},
-		oklab = {rgb2okl,okl2rgb},
+		gamma = { gam2lin, lin2gam },
+		hsv = { rgb2hsv, hsv2rgb },
+		oklab = { rgb2okl, okl2rgb },
 	}
 	local out = { modes[mode][ 1 + pen.b2n( to_rbg )]( unpack( c ))}
 	if( c[4] ~= nil ) then table.insert( out, c[4]) end
@@ -2552,27 +2574,7 @@ function pen.world2gui( x, y, is_raw, no_shake ) --thanks to ImmortalDamned for 
 	return x, y, { massive_balls_x, massive_balls_y }
 end
 
-function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic, can_gamepad )
-	uid = uid + 1
-	GuiIdPush( gui, uid )
-	GuiZSetForNextWidget( gui, pic_z )
-	
-	local clicked, r_clicked = false, false
-	if( GameGetIsGamepadConnected() and not( can_gamepad )) then
-		GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
-		GuiImage( gui, uid, pic_x, pic_y, pic )
-	else
-		GuiOptionsAddForNextWidget( gui, 4 ) --ClickCancelsDoubleClick
-		GuiOptionsAddForNextWidget( gui, 6 ) --NoPositionTween
-		GuiOptionsAddForNextWidget( gui, 8 ) --HandleDoubleClickAsClick
-		GuiOptionsAddForNextWidget( gui, 21 ) --DrawNoHoverAnimation
-		GuiOptionsAddForNextWidget( gui, 47 ) --NoSound
-		clicked, r_clicked = GuiImageButton( gui, uid, pic_x, pic_y, "", pic )
-	end
-	return uid, clicked, r_clicked
-end
-
-function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, is_debugging )
+function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, ignore_multihover, is_debugging )
 	local frame_num = GameGetFrameNum()
 	local m_x, m_y = pen.get_mouse_pos()
 	local clicked, r_clicked, is_hovered = false, false, false
@@ -2593,19 +2595,60 @@ function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, is_debugging )
 		GuiIdPush( gui, uid )
 		GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
 		GuiImage( gui, uid, m_x - 10, m_y - 10, "data/ui_gfx/empty.png", 1, 10, 10 )
-		clicked, r_clicked = GuiGetPreviousWidgetInfo( gui ); is_hovered = true
-		if( not( is_new )) then clicked, r_clicked = false, false end
+		if( is_new ) then clicked, r_clicked = GuiGetPreviousWidgetInfo( gui ) end
+		is_hovered = is_new or not( ignore_multihover )
 	end
 	return uid, clicked, r_clicked, is_hovered
 end
 
-function pen.new_dragger( gui, uid, did, pic_x, pic_y, s_x, s_y, is_debugging ) --only one dragger can be initiated at the same time
+function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
+	data = data or {}
+
+	uid = uid + 1
+	GuiIdPush( gui, uid )
+	GuiZSetForNextWidget( gui, pic_z )
+	GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
+	GuiImage( gui, uid, pic_x, pic_y, pic,
+		data.alpha or 1, data.s_x or 1, data.s_y or 1, data.angle or 0, data.anim_type or 2, data.anim or ""
+	)
+
+	if( data.can_click ) then
+		local w, h = pen.get_pic_dims( pic )
+		uid, data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
+			gui, uid, pic_x, pic_y, w*( data.s_x or 1 ), h*( data.s_y or 1 ), data.ignore_multihover
+		)
+	end
+	return uid, data.clicked, data.r_clicked, data.is_hovered
+end
+
+function pen.new_key( gui, uid, pic_x, pic_y, pic_z, pics, data )
+	data = data or {}
+
+	local w, h = pen.get_pic_dims( pic )
+	uid, data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
+		gui, uid, pic_x, pic_y, w*( data.s_x or 1 ), h*( data.s_y or 1 ), true
+	)
+	
+	if( data.clicked ) then uid, pic_x, pic_y, pic_z, pics, data = data.lmb_event( gui, uid, pic_x, pic_y, pic_z, pics, data ) end
+	if( data.r_clicked ) then uid, pic_x, pic_y, pic_z, pics, data = data.rmb_event( gui, uid, pic_x, pic_y, pic_z, pics, data ) end
+	if( data.is_hovered ) then uid, pic_x, pic_y, pic_z, pics, data = data.hov_event( gui, uid, pic_x, pic_y, pic_z, pics, data )
+	else uid, pic_x, pic_y, pic_z, pics, data = data.idle_event( gui, uid, pic_x, pic_y, pic_z, pics, data ) end
+	
+	for i,pic in ipairs( pen.get_hybrid_table( pics )) do uid = data.func( gui, uid, pic_x, pic_y, pic_z, pic, data ) end
+	return uid, data.clicked, data.r_clicked, data.is_hovered
+end
+
+function pen.new_dragger( gui, uid, did, pic_x, pic_y, s_x, s_y, is_debugging )
 	pen.cached.dragger_data = pen.cached.dragger_data or {}
 	pen.cached.dragger_data[ did ] = pen.cached.dragger_data[ did ] or { false, 0, 0, true }
 
+	local frame_num = GameGetFrameNum()
+	local is_new = tonumber( GlobalsGetValue( pen.GLOBAL_DRAGGER_SAFETY, "0" )) ~= frame_num
+	if( not( is_new )) then return uid, pic_x, pic_y, 0 end
+
 	local m_x, m_y = pen.get_mouse_pos()
 	local clicked, r_clicked, is_hovered = false, false, false
-	uid, _, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, is_debugging )
+	uid, _, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, true, is_debugging )
 	
 	local state = 0
 	local mouse_state = InputIsMouseButtonDown( 1 )
@@ -2623,27 +2666,28 @@ function pen.new_dragger( gui, uid, did, pic_x, pic_y, s_x, s_y, is_debugging ) 
 		clicked, state = true, 1
 	else pen.cached.dragger_data[ did ][4] = mouse_state end
 	
+	if( state > 0 ) then GlobalsSetValue( pen.GLOBAL_DRAGGER_SAFETY, frame_num ) end
 	return uid, pic_x, pic_y, state, clicked, r_clicked, is_hovered
 end
 
-function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
-	data = data or {}
-
+function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic, can_gamepad )
 	uid = uid + 1
 	GuiIdPush( gui, uid )
 	GuiZSetForNextWidget( gui, pic_z )
-	GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
-	GuiImage( gui, uid, pic_x, pic_y, pic,
-		data.alpha or 1, data.s_x or 1, data.s_y or 1, data.angle or 0, data.anim_type or 2, data.anim or ""
-	)
-
-	if( data.can_click ) then
-		local w, h = pen.get_pic_dims( pic )
-		uid, data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
-			gui, uid, pic_x, pic_y, w*( data.s_x or 1 ), h*( data.s_y or 1 )
-		)
+	
+	local clicked, r_clicked = false, false
+	if( GameGetIsGamepadConnected() and not( can_gamepad )) then
+		GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
+		GuiImage( gui, uid, pic_x, pic_y, pic )
+	else
+		GuiOptionsAddForNextWidget( gui, 4 ) --ClickCancelsDoubleClick
+		GuiOptionsAddForNextWidget( gui, 6 ) --NoPositionTween
+		GuiOptionsAddForNextWidget( gui, 8 ) --HandleDoubleClickAsClick
+		GuiOptionsAddForNextWidget( gui, 21 ) --DrawNoHoverAnimation
+		GuiOptionsAddForNextWidget( gui, 47 ) --NoSound
+		clicked, r_clicked = GuiImageButton( gui, uid, pic_x, pic_y, "", pic )
 	end
-	return uid, data.clicked, data.r_clicked, data.is_hovered
+	return uid, clicked, r_clicked
 end
 
 function pen.new_cutout( gui, uid, pic_x, pic_y, size_x, size_y, func, v ) --credit goes to aarvlo
@@ -2974,6 +3018,7 @@ pen.FLAG_RESTART_CHECK = "PENMAN_GAME_HAS_STARTED"
 
 pen.GLOBAL_VIRTUAL_ID = "PENMAN_VIRTUAL_INDEX"
 pen.GLOBAL_INTERFACE_SAFETY = "PENMAN_INTERFACE_FRAME"
+pen.GLOBAL_DRAGGER_SAFETY = "PENMAN_DRAGGER_FRAME"
 
 pen.MARKER_TAB = "\\_"
 pen.MARKER_FANCY_TEXT = { "{>%S->{", "}<%S-<}", "{%-}%S-{%-}" }

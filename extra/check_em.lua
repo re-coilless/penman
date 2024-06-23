@@ -12,13 +12,13 @@ if( pen.testing_done ) then
     if( pen.testing_done == 1 ) then
         return
     else
-        -- pen.testing_done = 1
+        pen.testing_done = 1
         
-        -- misc_tests()
+        misc_tests()
         -- filing()
         -- raters()
         -- input()
-        tipping()
+        -- tipping()
         -- fonting()
         -- cloner()
         -- text2func()
@@ -37,10 +37,29 @@ local test_input = {
 
 function misc_tests()
 
+--[[
+pen.chrono( pen.setting_get, "19_abiding.SCORE_FILTERS" )
+pen.chrono( function()
+    for i = 1,1000 do
+        ModSettingGet( "19_abiding.SCORE_FILTERS" )
+        ModSettingGetNextValue( "19_abiding.SCORE_FILTERS" )
+    end
+end)
+pen.chrono( function()
+    for i = 1,1000 do
+        pen.setting_get( "19_abiding.SCORE_FILTERS" )
+    end
+end)
+pen.chrono( function()
+    for i = 1,1000 do
+        ModSettingGet( "19_abiding.SCORE_FILTERS" )
+        ModSettingGetNextValue( "19_abiding.SCORE_FILTERS" )
+    end
+end)
+
 print( tostring( pen.is_game_restarted()))
 pen.t.print({ GameGetDateAndTimeUTC()})
 
---[[
 local dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
 pen.magic_comp( dmg_comp, "materials_how_much_damage", { "acid", 69 })
 local tbl = pen.magic_comp( dmg_comp, "materials_that_damage" )
