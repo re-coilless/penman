@@ -19,13 +19,13 @@ function OnWorldPostUpdate()
 
 	local world_id = GameGetWorldStateEntity() or 0
 	local ctrl_body = pen.get_child( world_id, "pen_ctrl" )
-	local storage_request = pen.get_storage( ctrl_body, "request" )
+	local storage_request = pen.magic_storage( ctrl_body, "request" )
 	if( not( pen.vld( storage_request, true ))) then return end
 
 	local request = pen.t.pack( ComponentGetValue2( storage_request, "value_string" ))
 	if( pen.vld( request )) then
 		for i,v in ipairs( request ) do
-			local storage_file = pen.get_storage( ctrl_body, v[2])
+			local storage_file = pen.magic_storage( ctrl_body, v[2])
 			penman_w( v[1], string.gsub( ComponentGetValue2( storage_file, "value_string" ), "\\([nt])", { n = "\n", t = "\t", }))
 			ComponentSetValue2( storage_file, "name", "free" )
 			ComponentSetValue2( storage_file, "value_string", "" )

@@ -12,14 +12,14 @@ if( pen.testing_done ) then
     if( pen.testing_done == 1 ) then
         return
     else
-        pen.testing_done = 1
+        -- pen.testing_done = 1
         
-        misc_tests()
+        -- misc_tests()
         -- filing()
         -- raters()
         -- input()
         -- tipping()
-        -- fonting()
+        fonting()
         -- cloner()
         -- text2func()
 
@@ -29,13 +29,19 @@ end
 pen.testing_done = true
 
 local test_input = {
-    "#$%& (45\n|{-}you_should_not_see_this{-}|{>wave>{\n\thmmmmm {-}balls{-}NOPQ {>quake>{{-}ass{-}6LM.,}<wave<}\n/_;;;;; NOPQ}<quake<} 6LM.,efghÃÄÅ{>e1>{ÇÈÉтуzab cфхцgaш”6LM.,}<e1<}{>c2>{{>shadow>{efjjgghghÃÉту}<shadow<}фхцчш”„…∞{>rainbow>{でとどぬballlls}<rainbow<} {>cancer>{;ass}<cancer<} hmmmでとg}<c2<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf",
-    "#$%& (45\n||\n\thmmmmm NOPQ 6LM.,\n/_;;;;; NOPQ 6LM.,efghÃÄÅÇÈÉтуzab cфхцgaш”6LM.,efjjgghghÃÉтуфхцчш”„…∞でとどぬballlls ;ass hmmmでとgg ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf"
+    "#$%& (45\n|{-}you_should_not_see_this{-}|{>wave>{\n\thmmmmm {-}balls{-}NOPQ {>quake>{{-}ass{-}6LM.,}<wave<}\n/_;;;;; NOPQ}<quake<} 6LM.,efghÃÄÅ{>e1>{ÇÈÉтуzab cфхцgaш”6LM.,}<e1<}{>c2>{{>shadow>{efjjg}<shadow<}{>runic>{{>color>{{-}|255|0|0|{-}ghghÃÉту}<color<}}<runic<}ф{>color>{хцчш}<color<}”„…∞{>rainbow>{でとどぬballlls}<rainbow<} {>crossed>{{>cancer>{;ass}<cancer<}}<crossed<} hmmmでとg}<c2<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf",
+    "#$%& (45\n||\n\thmmmmm NOPQ 6LM.,\n/_;;;;; NOPQ 6LM.,efghÃÄÅÇÈÉтуzab cфхцgaш”6LM.,efjjgghghÃÉтуфхцчш”„…∞でとどぬballlls ;ass hmmmでとgg ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf",
+    "{>shadow>{000{>wave>{{-}balls{-}abcde}<shadow<}fg}<wave<}"
 }
 
 -- *************************************************************************
 
 function misc_tests()
+
+print( pen.t.pack( pen.t.unarray({ ass = 1, balls = 2, hmmm = 3, [5] = 5, [18] = 20 })))
+pen.t.print( pen.t.unarray( pen.t.pack( "|:ass:1:|:balls:2:|:hmmm:3:|:5:5:|:18:20:|" )))
+print( pen.t.parse({ ass = 1, balls = 2, hmmm = 3, [5] = 5, [18] = 20 }))
+pen.t.print( pen.t.parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
 
 --[[
 pen.chrono( pen.setting_get, "19_abiding.SCORE_FILTERS" )
@@ -68,8 +74,6 @@ print( tbl.acid )
 local gene_comp = EntityGetFirstComponentIncludingDisabled( hooman, "GenomeDataComponent" )
 pen.magic_comp( gene_comp, "friend_firemage", 0 )
 print( tostring( pen.magic_comp( gene_comp, "friend_firemage" )))
-
-pen.t.print( pen.t.parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
 
 pen.matter_fabricator( 0, -100, {
     matter = "sand",
@@ -186,11 +190,49 @@ uid, _, _, yep = pen.new_image( gui, uid, pic_x, pic_y, 5, "data/ui_gfx/empty_wh
 uid = pen.new_tooltip( gui, uid, test_input[2], { tid = "bs1" })
 -- uid = pen.new_tooltip( gui, uid, test_input[1], { is_active = yep, tid = "bs3", is_left = true })
 -- uid = pen.new_tooltip( gui, uid, test_input[2], { is_active = yep, tid = "bs4", is_over = true, is_left = true })
-uid = pen.new_tooltip( gui, uid, "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", { is_active = yep, pos = {390,200}, allow_hover = true, do_corrections = true, font_mods = {
-    e1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-        return pen.FONT_MODS.tip( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, "balls", "LESSS GOOOOOO" )
+uid = pen.new_tooltip( gui, uid, "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", {
+    is_active = yep, pos = {390,200}, allow_hover = true, do_corrections = true, font_mods = {
+        e1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
+            return pen.FONT_MODS.tip( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, "balls", "LESSS GOOOOOO" )
+        end,
+    }
+})
+
+pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+    func = pen.animate,
+    input = function( x )
+        return 1, 15*x, { ease_in = "sin10", frames = 15 }
     end,
-}})
+    color = pen.PALETTE.PRSP.WHITE,
+})
+pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+    func = pen.animate,
+    input = function( x )
+        return 1, 15*x, { ease_out = "wav", frames = 15 }
+    end,
+    color = pen.PALETTE.PRSP.RED,
+})
+pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+    func = pen.animate,
+    input = function( x )
+        return 1, 15*x, { ease_out = {"exp","wav"}, frames = 15 }
+    end,
+    color = pen.PALETTE.PRSP.BLUE,
+})
+pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+    func = pen.animate,
+    input = function( x )
+        return 1, 15*x, { ease_out = "bnc50", frames = 15 }
+    end,
+    color = pen.PALETTE.PRSP.GREEN,
+})
+pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+    func = pen.animate,
+    input = function( x )
+        return 1, 15*x, { type = "spke", ease_out = "pow", frames = 15 }
+    end,
+    color = pen.PALETTE.PRSP.GREY,
+})
 
 end
 
@@ -205,7 +247,8 @@ function fonting()
 gui = gui or GuiCreate()
 GuiStartFrame( gui )
 
-pen.new_image( gui, 1, 98, 98, 5, "data/ui_gfx/empty_white.png", 52, 52 )
+pen.new_text( gui, 0, 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })
+pen.new_image( gui, 1, 98, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
 pen.new_text( gui, 0, 100, 150, 0, test_input[1], {
     dims = {100, 100},
     -- scale = 2,

@@ -10,10 +10,11 @@ dofile_once( LOCAL_PATH.."_penman.lua" )
 pen.lib = pen.lib or {}
 pen.LOCAL_PATH = LOCAL_PATH
 
-local load_list = { "nxml", "csv", "bitser", "base64", "matrix", "complex", "EZWand" }
+local load_list = { "nxml", "csv", "base64", "matrix", "complex", "EZWand" }
 for i,v in ipairs( load_list ) do
-	pen.lib[ v ] = dofile_once( table.concat({ pen.LOCAL_PATH, v, ".lua" }))
+	pen.lib[ v ] = dofile_once( table.concat({ pen.LOCAL_PATH, "lib/", v, ".lua" }))
 end
+--bitser
 --dialog
 --gusgui
 --parallax
@@ -52,11 +53,11 @@ function pen.lib.magic_write( path, file )
     GlobalsSetValue( "PENMAN_WRITE_INDEX", id + 1 )
 
     local ctrl_body = pen.get_child( GameGetWorldStateEntity(), "pen_ctrl" )
-    local storage_request = pen.get_storage( ctrl_body, "request" )
+    local storage_request = pen.magic_storage( ctrl_body, "request" )
 	local request = ComponentGetValue2( storage_request, "value_string" )
 	ComponentSetValue2( storage_request, "value_string", table.concat({ request, pen.DIV_2, path, pen.DIV_2, "file", id, pen.DIV_2, pen.DIV_1 }))
-
-    local storage_new = pen.get_storage( ctrl_body, "free" )
+	
+    local storage_new = pen.magic_storage( ctrl_body, "free" )
     if( not( pen.vld( storage_new ))) then
         storage_new = EntityAddComponent( ctrl_body, "VariableStorageComponent", 
 		{
