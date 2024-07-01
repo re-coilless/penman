@@ -8,11 +8,11 @@ if( dummy == 0 ) then
 end
 
 hooman = pen.get_hooman()
-if( pen.testing_done ) then
-    if( pen.testing_done == 1 ) then
+if( pen.c.testing_done ) then
+    if( pen.c.testing_done == 1 ) then
         return
     else
-        -- pen.testing_done = 1
+        -- pen.c.testing_done = 1
         
         -- misc_tests()
         -- filing()
@@ -26,12 +26,13 @@ if( pen.testing_done ) then
         return
     end
 end
-pen.testing_done = true
+pen.c.testing_done = true
 
 local test_input = {
-    "#$%& (45\n|{-}you_should_not_see_this{-}|{>wave>{\n\thmmmmm {-}balls{-}NOPQ {>quake>{{-}ass{-}6LM.,}<wave<}\n/_;;;;; NOPQ}<quake<} 6LM.,efghÃÄÅ{>e1>{ÇÈÉтуzab cфхцgaш”6LM.,}<e1<}{>c2>{{>shadow>{efjjg}<shadow<}{>runic>{{>color>{{-}|255|0|0|{-}ghghÃÉту}<color<}}<runic<}ф{>color>{хцчш}<color<}”„…∞{>rainbow>{でとどぬballlls}<rainbow<} {>crossed>{{>cancer>{;ass}<cancer<}}<crossed<} hmmmでとg}<c2<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf",
+    "#$%& (45\n|{-}you_should_not_see_this{-}|{>wave>{\n\thmmmmm {-}balls{-}NOPQ {>quake>{{-}ass{-}6LM.,}<wave<}\n/_;;;;; NOPQ}<quake<} 6LM.,efghÃÄÅ{>e1>{ÇÈÉтуzab cфхцgaш”6LM.,}<e1<}g{>c2>{{>shadow>{efjjg}<shadow<}{>runic>{{>color>{{-}|255|0|0|{-}ghghㅃÃту}<color<}}<runic<}ф{>color>{хцчш}<color<}”„…∞{>rainbow>{でとどぬballlls}<rainbow<} {>crossed>{{>cancer>{;ass}<cancer<}}<crossed<} hmmmでとg}<c2<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf",
     "#$%& (45\n||\n\thmmmmm NOPQ 6LM.,\n/_;;;;; NOPQ 6LM.,efghÃÄÅÇÈÉтуzab cфхцgaш”6LM.,efjjgghghÃÉтуфхцчш”„…∞でとどぬballlls ;ass hmmmでとgg ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf",
-    "{>shadow>{000{>wave>{{-}balls{-}abcde}<shadow<}fg}<wave<}"
+    "{>shadow>{000{>color>{{-}|PRSP|BLUE|{-}abc{-}|PRSP|RED|{-}de}<shadow<}fg}<color<}",
+    "dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf"
 }
 
 -- *************************************************************************

@@ -14,7 +14,6 @@ local load_list = { "nxml", "csv", "base64", "matrix", "complex", "EZWand" }
 for i,v in ipairs( load_list ) do
 	pen.lib[ v ] = dofile_once( table.concat({ pen.LOCAL_PATH, "lib/", v, ".lua" }))
 end
---bitser
 --dialog
 --gusgui
 --parallax
@@ -57,16 +56,10 @@ function pen.lib.magic_write( path, file )
 	local request = ComponentGetValue2( storage_request, "value_string" )
 	ComponentSetValue2( storage_request, "value_string", table.concat({ request, pen.DIV_2, path, pen.DIV_2, "file", id, pen.DIV_2, pen.DIV_1 }))
 	
-    local storage_new = pen.magic_storage( ctrl_body, "free" )
-    if( not( pen.vld( storage_new ))) then
-        storage_new = EntityAddComponent( ctrl_body, "VariableStorageComponent", 
-		{
-			name = "free",
-			value_string = "",
-		})
-    end
-    ComponentSetValue2( storage_new, "name", "file"..id )
-    ComponentSetValue2( storage_new, "value_string", tostring( string.gsub( string.gsub( file, "\n", "\\n" ), "\t", "\\t" )))
+    pen.magic_storage( ctrl_body, "free", {
+        name = "file"..id,
+        value_string = string.gsub( string.gsub( file, "\n", "\\n" ), "\t", "\\t" ),
+    }, true )
 end
 
 function pen.lib.t2f( name, text )
@@ -97,5 +90,6 @@ end
 if( io == nil ) then return end
 --[UNSAFE] vvvvvvvvvv
 
+--bitser
 --patcher
 --pollnet
