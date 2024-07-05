@@ -12,14 +12,15 @@ if( pen.c.testing_done ) then
     if( pen.c.testing_done == 1 ) then
         return
     else
-        -- pen.c.testing_done = 1
+        pen.c.testing_done = 1
         
         -- misc_tests()
         -- filing()
         -- raters()
         -- input()
         -- tipping()
-        fonting()
+        -- texting()
+        -- fonting()
         -- cloner()
         -- text2func()
 
@@ -39,12 +40,14 @@ local test_input = {
 
 function misc_tests()
 
+--[[
+pen.t.print( pen.t.parse( "{[\"main\"]={[\",\"]=0x1.000000p+0,[\"right_alt\"]=0x1.000000p+0}}" ))
+
 print( pen.t.pack( pen.t.unarray({ ass = 1, balls = 2, hmmm = 3, [5] = 5, [18] = 20 })))
 pen.t.print( pen.t.unarray( pen.t.pack( "|:ass:1:|:balls:2:|:hmmm:3:|:5:5:|:18:20:|" )))
 print( pen.t.parse({ ass = 1, balls = 2, hmmm = 3, [5] = 5, [18] = 20 }))
 pen.t.print( pen.t.parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
 
---[[
 pen.chrono( pen.setting_get, "19_abiding.SCORE_FILTERS" )
 pen.chrono( function()
     for i = 1,1000 do
@@ -185,7 +188,7 @@ function tipping()
 gui = gui or GuiCreate()
 GuiStartFrame( gui )
 
-local uid, pic_x, pic_y, _, clicked, _, yep = pen.new_dragger( gui, 1, "balls", 300, 200, 100, 100 )
+local uid, pic_x, pic_y, _, clicked, _, yep = pen.new_dragger( gui, 1, "balls", 400, 100, 100, 100 )
 uid, _, _, yep = pen.new_image( gui, uid, pic_x, pic_y, 5, "data/ui_gfx/empty_white.png", { s_x = 50, s_y = 50, can_click = true })
 -- uid = pen.new_tooltip( gui, uid, test_input[1], { is_active = yep, tid = "bs2", is_over = true })
 uid = pen.new_tooltip( gui, uid, test_input[2], { tid = "bs1" })
@@ -199,41 +202,86 @@ uid = pen.new_tooltip( gui, uid, "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}
     }
 })
 
+-- pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+--     func = pen.animate,
+--     input = function( x )
+--         return 1, 15*x, { ease_int = "jump", ease_in = "sin", ease_out = "flr0", frames = 15 }
+--     end,
+--     color = pen.PALETTE.PRSP.WHITE,
+-- })
 pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
     func = pen.animate,
     input = function( x )
-        return 1, 15*x, { ease_in = "sin10", frames = 15 }
-    end,
-    color = pen.PALETTE.PRSP.WHITE,
-})
-pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
-    func = pen.animate,
-    input = function( x )
-        return 1, 15*x, { ease_out = "wav", frames = 15 }
+        return 1, 15*x, { ease_in = "log1.1", ease_out = "bck2", frames = 15 }
     end,
     color = pen.PALETTE.PRSP.RED,
 })
 pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
     func = pen.animate,
     input = function( x )
-        return 1, 15*x, { ease_out = {"exp","wav"}, frames = 15 }
+        return 1, 15*x, { ease_in = "sin3", ease_out = "wav1", frames = 15 }
     end,
-    color = pen.PALETTE.PRSP.BLUE,
+    color = pen.PALETTE.PRSP.RED,
 })
-pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
-    func = pen.animate,
-    input = function( x )
-        return 1, 15*x, { ease_out = "bnc50", frames = 15 }
-    end,
-    color = pen.PALETTE.PRSP.GREEN,
-})
-pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
-    func = pen.animate,
-    input = function( x )
-        return 1, 15*x, { type = "spke", ease_out = "pow", frames = 15 }
-    end,
-    color = pen.PALETTE.PRSP.GREY,
-})
+-- pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+--     func = pen.animate,
+--     input = function( x )
+--         return 1, 15*x, { ease_out = {"exp","wav"}, frames = 15 }
+--     end,
+--     color = pen.PALETTE.PRSP.BLUE,
+-- })
+-- pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+--     func = pen.animate,
+--     input = function( x )
+--         return 1, 15*x, { ease_out = "bnc50", frames = 15 }
+--     end,
+--     color = pen.PALETTE.PRSP.GREEN,
+-- })
+-- pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+--     func = pen.animate,
+--     input = function( x )
+--         return 1, 15*x, { type = "spke", ease_out = "pow", frames = 15 }
+--     end,
+--     color = pen.PALETTE.PRSP.GREY,
+-- })
+
+end
+
+-- *************************************************************************
+
+function texting()
+
+gui = gui or GuiCreate()
+GuiStartFrame( gui )
+
+-- pen.new_text:
+-- LUA: 0.014300000002549ms
+-- LUA: 0.020199999999022ms
+-- LUA: 0.0097000000023399ms
+-- LUA: 0.010699999998906ms
+
+local uid = 1
+-- print( "pen.new_text: " ) --0.046200000000645ms
+-- pen.chrono( pen.new_text, {
+--     gui, uid, 0, 0, 0, "123456789123456789123456789", { fast_render = true, dims = {10,0}}
+-- })
+-- print( "GuiText: " ) --0.0020000000004075ms
+-- pen.chrono( GuiText, {
+--     gui, 0, 0, "123"
+-- })
+
+local n = 0
+local screen_w, screen_h = pen.get_screen_data()
+local step_x = screen_w/40
+local step_y = 9
+for i = 1,screen_w/step_x do
+    for e = 1,screen_h/step_y do
+        n = n + 1
+        uid = pen.new_text( gui, uid, step_x*( i - 1 ), step_y*( e - 1 ), 0, "123456789123456789123456789", { fast_render = true, dims = {step_x,step_y}})
+        -- GuiText( gui, step_x*( i - 1 ), step_y*( e - 1 ), "123" )   
+    end
+end
+print( n )
 
 end
 
