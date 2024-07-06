@@ -263,7 +263,7 @@ GuiStartFrame( gui )
 local uid = 1
 -- print( "pen.new_text: " ) --0.046200000000645ms
 -- pen.chrono( pen.new_text, {
---     gui, uid, 0, 0, 0, "123456789123456789123456789", { fast_render = true, dims = {10,0}}
+--     gui, uid, 0, 0, 0, "123456789123456789123456789", { fully_featured = false, dims = {10,0}}
 -- })
 -- print( "GuiText: " ) --0.0020000000004075ms
 -- pen.chrono( GuiText, {
@@ -277,7 +277,7 @@ local step_y = 9
 for i = 1,screen_w/step_x do
     for e = 1,screen_h/step_y do
         n = n + 1
-        uid = pen.new_text( gui, uid, step_x*( i - 1 ), step_y*( e - 1 ), 0, "123456789123456789123456789", { fast_render = true, dims = {step_x,step_y}})
+        uid = pen.new_text( gui, uid, step_x*( i - 1 ), step_y*( e - 1 ), 0, "123456789123456789123456789", { fully_featured = false, dims = {step_x,step_y}})
         -- GuiText( gui, step_x*( i - 1 ), step_y*( e - 1 ), "123" )   
     end
 end
@@ -299,6 +299,8 @@ GuiStartFrame( gui )
 pen.new_text( gui, 0, 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })
 pen.new_image( gui, 1, 98, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
 pen.new_text( gui, 0, 100, 150, 0, test_input[1], {
+    is_huge = false,
+    fully_featured = true,
     dims = {100, 100},
     -- scale = 2,
     -- font
@@ -306,6 +308,7 @@ pen.new_text( gui, 0, 100, 150, 0, test_input[1], {
     color = {255,0,0,1},
     -- is_shadow = true,
     -- is_centered_x = true,
+    is_right_x = true,
     is_centered_y = true,
     funcs = {
         c1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )

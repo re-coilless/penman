@@ -35,6 +35,7 @@ end
 -- pen.rate_wand
 -- pen.rate_creature
 
+--notification system (gameprintimportant-like but unified and with more capabilities)
 --add pen.animate debugging that plots/demos motion/scaling in self-aligning grid
 --coroutine-based sequencer that accepts a table of events (use varstorage to preserve the state between restarts)
 --custom scroller (static tip as background, cutout, custom graphics for all elements, sine smoothing of scrolling, mouse wheel support)
@@ -862,10 +863,12 @@ function pen.magic_byte( char ) --https://github.com/meepen/Lua-5.1-UTF-8/blob/m
 	end, { reset_count = 0 })
 end
 
-function pen.font_cancer( font, is_shadow )
+function pen.font_cancer( font, is_shadow, is_huge )
 	if( not( pen.vld( font ))) then
-		local default = GameHasFlagRun( pen.FLAG_USE_FANCY_FONT ) and "data/fonts/generated/notosans_ko_24.bin" or "data/fonts/font_pixel"..(( is_shadow or false ) and "" or "_noshadow" )..".xml"
-		font = pen.FONT_MAP[ GameTextGetTranslatedOrNot( "$current_language" )] or default
+		local default = ( is_huge or false ) and "data/fonts/font_pixel_huge.xml"
+			or ( GameHasFlagRun( pen.FLAG_USE_FANCY_FONT ) and "data/fonts/generated/notosans_ko_24.bin"
+				or "data/fonts/font_pixel"..(( is_shadow or false ) and "" or "_noshadow" )..".xml" )
+		font = ( pen.FONT_MAP[ GameTextGetTranslatedOrNot( "$current_language" )] or {})[ pen.b2n( is_huge ) + 1 ] or default
 	end
 	return font, string.find( font, "%.bin$", 1 ) == nil, pen.FONT_SPACING[ font ] or 0
 end
@@ -890,8 +893,40 @@ end
 
 function pen.get_char_count( str )
 	local total = 0
-	pen.w2c( str, function( char_id, letter_id ) total = letter_id end)
+	pen.w2c( str, function( char_id, letter_id ) total = letter_id end )
 	return total
+end
+
+function pen.text_defancifier( str )
+	local markers = pen.MARKER_FANCY_TEXT
+	local new_str, gotcha, is_fancy = str, 0, false
+	for i = 1,#markers do
+		new_str, gotcha = string.gsub( new_str, markers[i], "" )
+		is_fancy = is_fancy or ( gotcha or 0 ) > 0 end
+	if( not( is_fancy )) then return new_str, {} end
+	
+	local fancy_list = {}
+	local l_pos, r_pos, drift = 0, 0, 0
+	local pos, is_going = { 1, 1, 1 }, true
+	while( is_going ) do
+		is_going = false
+		for i = 1,#markers do
+			l_pos, r_pos = string.find( str, markers[i], pos[i])
+			if( l_pos ) then
+				pos[i], is_going = r_pos, true
+				local marker = string.sub( str, l_pos, r_pos )
+				table.insert( fancy_list, { l_pos, marker, r_pos - l_pos + 1 })
+			end
+		end
+	end
+	
+	table.sort( fancy_list, function( a, b )
+		return a[1] < b[1] end)
+	for i,marker in ipairs( fancy_list ) do
+		fancy_list[i][1] = marker[1] - drift
+		drift = drift + marker[3]
+	end
+	return new_str, fancy_list
 end
 
 function pen.liner( text, length, height, font, data )
@@ -905,43 +940,11 @@ function pen.liner( text, length, height, font, data )
 	local space_l, font_height = pen.get_char_dims( " ", nil, font )
 	length, height = (( length or -1 ) > 0 and length or 99999 ) + space_l, height or -1
 	if( height >= 0 ) then height = math.max( height, 1.5*font_height ) end
-
-	local function defancifier( str )
-		local markers = pen.MARKER_FANCY_TEXT
-		local new_str, gotcha, is_fancy = str, 0, false
-		for i = 1,#markers do
-			new_str, gotcha = string.gsub( new_str, markers[i], "" )
-			is_fancy = is_fancy or ( gotcha or 0 ) > 0 end
-		if( not( is_fancy )) then return new_str, {} end
-		
-		local fancy_list = {}
-		local l_pos, r_pos, drift = 0, 0, 0
-		local pos, is_going = { 1, 1, 1 }, true
-		while( is_going ) do
-			is_going = false
-			for i = 1,#markers do
-				l_pos, r_pos = string.find( str, markers[i], pos[i])
-				if( l_pos ) then
-					pos[i], is_going = r_pos, true
-					local marker = string.sub( str, l_pos, r_pos )
-					table.insert( fancy_list, { l_pos, marker, r_pos - l_pos + 1 })
-				end
-			end
-		end
-
-		table.sort( fancy_list, function( a, b )
-			return a[1] < b[1] end)
-		for i,marker in ipairs( fancy_list ) do
-			fancy_list[i][1] = marker[1] - drift
-			drift = drift + marker[3]
-		end
-		return new_str, fancy_list
-	end
 	
 	local function do_a_word( formatted, ln, l, h, raw_word )
 		local range, w = { 1, 1 }, ""
 		local this_l, overlines = space_l, {}
-		local word, fancy_list = defancifier( raw_word )
+		local word, fancy_list = pen.text_defancifier( raw_word )
 		pen.w2c( word, function( id )
 			w = w..string.sub( word, range[1], range[2])
 
@@ -2421,30 +2424,61 @@ function pen.world2gui( x, y, is_raw, no_shake ) --thanks to ImmortalDamned for 
 	return massive_balls_x*x, massive_balls_y*y, { massive_balls_x, massive_balls_y }
 end
 
-function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, ignore_multihover, is_debugging )
+function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, pic_z, ignore_multihover, is_debugging )
 	local frame_num = GameGetFrameNum()
+	local clicked, r_clicked = false, false
+
+	local top_z = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_Z, "nope" ))
+	local is_figuring = top_z ~= nil
+
+	pen.c.interface_memo = pen.c.interface_memo or {}
 	local m_x, m_y = pen.get_mouse_pos()
-	local clicked, r_clicked, is_hovered = false, false, false
-	local is_new = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_SAFETY, "0" )) ~= frame_num
-	if( pen.check_bounds({ m_x, m_y }, { pic_x, pic_y }, { s_x, s_y })) then
-		GlobalsSetValue( pen.GLOBAL_INTERFACE_SAFETY, frame_num )
-
-		if( is_debugging ) then
-			uid = uid + 1
-			GuiIdPush( gui, uid )
-			GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
-			GuiColorSetForNextWidget( gui, 1, 0, 0, 1 )
-			GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
-			GuiImage( gui, uid, pic_x, pic_y, pen.FILE_PIC_NUL, 0.75, s_x/2, s_y/2 )
-		end
-
+	local m_pos = pen.c.interface_memo[3] or { m_x, m_y }
+	local is_hovered = pen.check_bounds( m_pos, { pic_x, pic_y }, { s_x, s_y })
+	if( is_hovered and is_debugging ) then
+		uid = uid + 1
+		GuiIdPush( gui, uid )
+		GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
+		GuiColorSetForNextWidget( gui, 1, 0, 0, 1 )
+		GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
+		GuiImage( gui, uid, pic_x, pic_y, pen.FILE_PIC_NUL, 0.75, s_x/2, s_y/2 )
+	end
+	
+	if( is_hovered ) then
 		uid = uid + 1
 		GuiIdPush( gui, uid )
 		GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
 		GuiImage( gui, uid, m_x - 10, m_y - 10, pen.FILE_PIC_NIL, 1, 10, 10 )
-		if( is_new ) then clicked, r_clicked = GuiGetPreviousWidgetInfo( gui ) end
+
+		local is_new = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_FRAME, "0" )) ~= frame_num
+		if( not( is_figuring ) and pic_z == nil ) then
+			if( is_new ) then clicked, r_clicked = GuiGetPreviousWidgetInfo( gui ) end
+		elseif( pic_z ~= nil ) then
+			clicked, r_clicked = InputIsMouseButtonDown( 1 ), InputIsMouseButtonDown( 2 )
+			if( not( clicked or r_clicked )) then pen.c.interface_memo[4] = true end
+
+			local down_toggle = pen.c.interface_memo[4]
+			if( not( down_toggle ) or is_figuring or not( is_new )) then clicked, r_clicked = false, false end
+
+			local update_frame = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_FRAME_Z, "0" ))
+			if( is_figuring and frame_num - update_frame > 1 and pen.compare_float( pic_z, top_z, 0.001 )) then
+				clicked, r_clicked, pen.c.interface_memo[3] = pen.c.interface_memo[1], pen.c.interface_memo[2], nil
+				GlobalsSetValue( pen.GLOBAL_INTERFACE_Z, "nope" )
+				return uid, clicked, r_clicked, true
+			end
+			
+			if(( not( is_figuring ) and ( clicked or r_clicked )) or ( is_figuring and pic_z < top_z )) then
+				if( not( is_figuring )) then pen.c.interface_memo = { clicked, r_clicked, m_pos, false } end
+				GlobalsSetValue( pen.GLOBAL_INTERFACE_FRAME_Z, frame_num )
+				GlobalsSetValue( pen.GLOBAL_INTERFACE_Z, pic_z )
+				clicked, r_clicked = false, false
+			end
+		end
+
+		GlobalsSetValue( pen.GLOBAL_INTERFACE_FRAME, frame_num )
 		is_hovered = is_new or not( ignore_multihover )
 	end
+
 	return uid, clicked, r_clicked, is_hovered
 end
 
@@ -2462,8 +2496,9 @@ function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
 
 	if( data.can_click ) then
 		local w, h = pen.get_pic_dims( pic )
+		if( not( data.z_adjusted )) then pic_z = nil end
 		uid, data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
-			gui, uid, pic_x, pic_y, w*( data.s_x or 1 ), h*( data.s_y or 1 ), data.ignore_multihover
+			gui, uid, pic_x, pic_y, w*( data.s_x or 1 ), h*( data.s_y or 1 ), pic_z, data.ignore_multihover
 		)
 	end
 	return uid, data.clicked, data.r_clicked, data.is_hovered
@@ -2475,9 +2510,11 @@ function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic, data )
 		return pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
 	end
 
-	data.pic_w, data.pic_h = pen.get_pic_dims(( pen.get_hybrid_table( pic ))[1])
+	local pic_iz = pic_z
+	if( data.skip_z_check ) then pic_iz = nil end
+	data.pic_w, data.pic_h = pen.get_pic_dims( pen.get_hybrid_table( pic )[1])
 	uid, data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
-		gui, uid, pic_x, pic_y, data.pic_w*( data.s_x or 1 ), data.pic_h*( data.s_y or 1 ), true
+		gui, uid, pic_x, pic_y, data.pic_w*( data.s_x or 1 ), data.pic_h*( data.s_y or 1 ), pic_iz, true
 	)
 
 	if( data.lmb_event ~= nil and data.clicked ) then
@@ -2492,7 +2529,7 @@ function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic, data )
 	return uid, data.clicked, data.r_clicked, data.is_hovered
 end
 
-function pen.new_dragger( gui, uid, did, pic_x, pic_y, s_x, s_y, is_debugging )
+function pen.new_dragger( gui, uid, did, pic_x, pic_y, s_x, s_y, pic_z, is_debugging )
 	pen.c.dragger_data = pen.c.dragger_data or {}
 	pen.c.dragger_data[ did ] = pen.c.dragger_data[ did ] or { false, 0, 0, true }
 
@@ -2502,7 +2539,7 @@ function pen.new_dragger( gui, uid, did, pic_x, pic_y, s_x, s_y, is_debugging )
 
 	local m_x, m_y = pen.get_mouse_pos()
 	local clicked, r_clicked, is_hovered = false, false, false
-	uid, _, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, true, is_debugging )
+	uid, _, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, pic_z, true, is_debugging )
 	
 	local state = 0
 	local mouse_state = InputIsMouseButtonDown( 1 )
@@ -2542,7 +2579,7 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	data = data or {}
 	data.scale, data.funcs = 1, data.funcs or {}
 	local dims, is_pixel_font, new_line = {}, false, 9
-	data.font, is_pixel_font = pen.font_cancer( data.font, data.is_shadow )
+	data.font, is_pixel_font = pen.font_cancer( data.font, data.is_shadow, data.is_huge )
 	
 	if( pen.vld( data.dims )) then
 		data.dims = pen.get_hybrid_table( data.dims )
@@ -2558,14 +2595,14 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 		data.dims = dims
 	end
 	
-	if( data.fast_render ) then
-		if( data.is_centered_x or data.is_right_x ) then
-			pic_x = pic_x - dims[1]/( data.is_right_x and 1 or 2 )
-		end
+	local off_x = 0 --( data.is_centered_x or false ) and -math.abs( data.dims[1])/2 or 0
+	local off_y = ( data.is_centered_y or false ) and -math.max( data.dims[2] or 0, dims[2])/2 or 0
+	if( not( data.fully_featured )) then
+		if( data.is_centered_x or data.is_right_x ) then pic_x = pic_x - dims[1]/( data.is_right_x and 1 or 2 ) end
 		for i,t in ipairs( text ) do
 			pen.colourer( gui, data.color )
 			GuiZSetForNextWidget( gui, pic_z )
-			GuiText( gui, pic_x, pic_y + ( i - 1 )*new_line, t, data.scale, data.font, is_pixel_font )
+			GuiText( gui, pic_x + off_x, pic_y + ( i - 1 )*new_line + off_y, t, data.scale, data.font, is_pixel_font )
 		end
 		return uid, dims
 	end
@@ -2581,9 +2618,9 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 			local temp = line
 			local l_pos, r_pos = {0,0,0}, {0,0,0}
 			local new_element = { x = 0, y = height_counter }
-			if( data.is_centered_x ) then
+			if( data.is_centered_x or data.is_right_x ) then
 				local _,off = pen.liner( line, nil, nil, data.font )
-				new_element.x = ( data.is_right_x or false ) and -off[1] or ( math.abs( data.dims[1]) - off[1])/2
+				new_element.x = -off[1]/( data.is_right_x and 1 or 2 )
 			end
 			
 			while( pen.vld( temp )) do
@@ -2644,8 +2681,6 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	pen.c.font_ram = pen.c.font_ram or {}
 	
 	local c_gbl, c_lcl = 1, {}
-	local off_x = ( data.is_centered_x or false ) and -math.abs( data.dims[1])/2 or 0
-	local off_y = ( data.is_centered_y or false ) and -math.max( data.dims[2] or 0, dims[2])/2 or 0
 	pen.t.loop( structure, function( i, element )
 		if( not( pen.vld( element.text ))) then return end
 
@@ -2732,7 +2767,7 @@ function pen.new_tooltip( gui, uid, text, data, func )
 		local tip_anim = pen.c.ttips[ data.tid ].anim
 		if(( frame_num - tip_anim[2]) > ( data.frames + 5 )) then tip_anim[1] = frame_num -1 end
 		tip_anim[2], tip_anim[3] = frame_num, math.min( frame_num - tip_anim[1], data.frames )
-		
+
 		local w, h = GuiGetScreenDimensions( gui )
 		if( not( pen.vld( data.dims ))) then
 			_,data.dims = pen.liner( text )
@@ -2769,10 +2804,8 @@ function pen.new_tooltip( gui, uid, text, data, func )
 			local inter_alpha = pen.animate( 1, d.t, {
 				ease_out = "exp", frames = d.frames })
 			uid = pen.new_text( gui, uid, pic_x + d.edging, pic_y + d.edging - 2, pic_z, text, {
-				dims = { size_x - d.edging, size_y },
-				line_offset = d.line_offset or -2,
-				funcs = d.font_mods,
-				color = { 255, 255, 255, inter_alpha },
+				dims = { size_x - d.edging, size_y }, line_offset = d.line_offset or -2,
+				fully_featured = true, funcs = d.font_mods, color = { 255, 255, 255, inter_alpha },
 			})
 			
 			local inter_size = 15*( 1 - pen.animate( 1, d.t, {
@@ -2907,7 +2940,9 @@ pen.FLAG_USE_FANCY_FONT = "PENMAN_FANCY_FONTING"
 pen.FLAG_RESTART_CHECK = "PENMAN_GAME_HAS_STARTED"
 
 pen.GLOBAL_VIRTUAL_ID = "PENMAN_VIRTUAL_INDEX"
-pen.GLOBAL_INTERFACE_SAFETY = "PENMAN_INTERFACE_FRAME"
+pen.GLOBAL_INTERFACE_FRAME_Z = "PENMAN_INTERFACE_FRAME_Z"
+pen.GLOBAL_INTERFACE_FRAME = "PENMAN_INTERFACE_FRAME"
+pen.GLOBAL_INTERFACE_Z = "PENMAN_INTERFACE_Z"
 pen.GLOBAL_DRAGGER_SAFETY = "PENMAN_DRAGGER_FRAME"
 
 pen.MARKER_TAB = "\\_"
@@ -2936,14 +2971,17 @@ pen.AI_COMPS = {
 }
 
 pen.FONT_MAP = {
-	["简体中文"] = "data/fonts/generated/notosans_zhcn_24.bin",
-	["日本語"] = "data/fonts/generated/notosans_jp_24.bin",
-	["한국어"] = "data/fonts/generated/notosans_ko_24.bin",
+	["简体中文"] = { "data/fonts/generated/notosans_zhcn_24.bin", "data/fonts/generated/notosans_zhcn_36.bin" },
+	["日本語"] = { "data/fonts/generated/notosans_jp_24.bin", "data/fonts/generated/notosans_jp_36.bin" },
+	["한국어"] = { "data/fonts/generated/notosans_ko_24.bin", "data/fonts/generated/notosans_ko_36.bin" },
 }
 pen.FONT_SPACING = {
 	["data/fonts/generated/notosans_zhcn_24.bin"] = 1.5,
 	["data/fonts/generated/notosans_jp_24.bin"] = 1.5,
 	["data/fonts/generated/notosans_ko_24.bin"] = 1.5,
+	["data/fonts/generated/notosans_zhcn_36.bin"] = 2.5,
+	["data/fonts/generated/notosans_jp_36.bin"] = 2.5,
+	["data/fonts/generated/notosans_ko_36.bin"] = 2.5,
 }
 pen.FONT_MODS = {
 	_bold = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
