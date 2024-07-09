@@ -38,7 +38,7 @@ end
 --notification system (gameprintimportant-like but unified and with more capabilities)
 --add pen.animate debugging that plots/demos motion/scaling in self-aligning grid
 --coroutine-based sequencer that accepts a table of events (use varstorage to preserve the state between restarts)
---custom scroller (static tip as background, cutout, custom graphics for all elements, sine smoothing of scrolling, mouse wheel support)
+--custom scroller (static tip as background, cutout, custom graphics for all elements, wav interpolation of scrolling, global mouse wheel support)
 --raytrace_entities
 --sule-based lua context independent gateway (and steal ModMagicNumbersFileAdd from init.lua via it)
 --in-gui particle system
@@ -2424,17 +2424,41 @@ function pen.world2gui( x, y, is_raw, no_shake ) --thanks to ImmortalDamned for 
 	return massive_balls_x*x, massive_balls_y*y, { massive_balls_x, massive_balls_y }
 end
 
+--make non z-level adjusted stuff work with z-level adjusted, the latter must always be prioritized
 function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, pic_z, ignore_multihover, is_debugging )
 	local frame_num = GameGetFrameNum()
 	local clicked, r_clicked = false, false
+	local lmb_state, rmb_state = InputIsMouseButtonDown( 1 ), InputIsMouseButtonDown( 2 )
 
+	local function safety_update()
+		local safety = {
+			{ pen.GLOBAL_INTERFACE_SAFETY_TL, pen.GLOBAL_INTERFACE_SAFETY_LL, lmb_state },
+			{ pen.GLOBAL_INTERFACE_SAFETY_TR, pen.GLOBAL_INTERFACE_SAFETY_LR, rmb_state },
+		}
+		for i,v in ipairs( safety ) do
+			local safety_frame = tonumber( GlobalsGetValue( v[1], "0" ))
+			if( math.abs( safety_frame ) ~= frame_num ) then
+				GlobalsSetValue( v[2], safety_frame )
+				GlobalsSetValue( v[1], ( v[3] and -1 or 1 )*frame_num )
+			end
+		end
+	end
+
+	local update_frame = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_FRAME_Z, "0" ))
 	local top_z = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_Z, "nope" ))
 	local is_figuring = top_z ~= nil
-
+	if( is_figuring and frame_num - update_frame > 2 ) then pen.c.interface_memo = nil end
 	pen.c.interface_memo = pen.c.interface_memo or {}
+
+	if( pic_z ~= nil and not( is_figuring )) then safety_update() end
+
 	local m_x, m_y = pen.get_mouse_pos()
 	local m_pos = pen.c.interface_memo[3] or { m_x, m_y }
-	local is_hovered = pen.check_bounds( m_pos, { pic_x, pic_y }, { s_x, s_y })
+	local is_hovered = false
+	if( tonumber( GlobalsGetValue( pen.GLOBAL_DRAGGER_SAFETY, "1" )) > 0 or not( ignore_multihover )) then
+		is_hovered = pen.check_bounds( m_pos, { pic_x, pic_y }, { s_x, s_y })
+	end
+	
 	if( is_hovered and is_debugging ) then
 		uid = uid + 1
 		GuiIdPush( gui, uid )
@@ -2451,22 +2475,22 @@ function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, pic_z, ignore_mult
 		GuiImage( gui, uid, m_x - 10, m_y - 10, pen.FILE_PIC_NIL, 1, 10, 10 )
 
 		local is_new = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_FRAME, "0" )) ~= frame_num
-		if( not( is_figuring ) and pic_z == nil ) then
+		local no_left = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_SAFETY_LL, "0" )) > 0
+		local no_right = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_SAFETY_LR, "0" )) > 0
+		if( not( is_figuring ) and pic_z == nil ) then --safety won't work since vanilla ui is clicked on_up
 			if( is_new ) then clicked, r_clicked = GuiGetPreviousWidgetInfo( gui ) end
-		elseif( pic_z ~= nil ) then
-			clicked, r_clicked = InputIsMouseButtonDown( 1 ), InputIsMouseButtonDown( 2 )
+		elseif( pic_z ~= nil and no_left and no_right ) then
+			clicked, r_clicked = lmb_state, rmb_state
 			if( not( clicked or r_clicked )) then pen.c.interface_memo[4] = true end
 
 			local down_toggle = pen.c.interface_memo[4]
 			if( not( down_toggle ) or is_figuring or not( is_new )) then clicked, r_clicked = false, false end
-
-			local update_frame = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_FRAME_Z, "0" ))
 			if( is_figuring and frame_num - update_frame > 1 and pen.compare_float( pic_z, top_z, 0.001 )) then
 				clicked, r_clicked, pen.c.interface_memo[3] = pen.c.interface_memo[1], pen.c.interface_memo[2], nil
 				GlobalsSetValue( pen.GLOBAL_INTERFACE_Z, "nope" )
 				return uid, clicked, r_clicked, true
 			end
-			
+
 			if(( not( is_figuring ) and ( clicked or r_clicked )) or ( is_figuring and pic_z < top_z )) then
 				if( not( is_figuring )) then pen.c.interface_memo = { clicked, r_clicked, m_pos, false } end
 				GlobalsSetValue( pen.GLOBAL_INTERFACE_FRAME_Z, frame_num )
@@ -2496,7 +2520,7 @@ function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
 
 	if( data.can_click ) then
 		local w, h = pen.get_pic_dims( pic )
-		if( not( data.z_adjusted )) then pic_z = nil end
+		if( data.skip_z_check ) then pic_z = nil end
 		uid, data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
 			gui, uid, pic_x, pic_y, w*( data.s_x or 1 ), h*( data.s_y or 1 ), pic_z, data.ignore_multihover
 		)
@@ -2504,17 +2528,26 @@ function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
 	return uid, data.clicked, data.r_clicked, data.is_hovered
 end
 
+---Button framework.
+---@param gui gui
+---@param uid number
+---@param pic_x number
+---@param pic_y number
+---@param pic_z number
+---@param pic path
+---@param data? PenmanButtonData
+---@return number uid, boolean clicked, boolean r_clicked, boolean is_hovered
 function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic, data )
 	data = data or {}
-	data.pic_func = data.pic_func or function( gui, uid, pic_x, pic_y, pic_z, pic, data )
-		return pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
-	end
-
+	data.auid = data.auid or table.concat({ pic, pic_z })
+	data.no_anim = data.no_anim or false
+	data.pic_func = data.pic_func or pen.new_image
+	
 	local pic_iz = pic_z
 	if( data.skip_z_check ) then pic_iz = nil end
-	data.pic_w, data.pic_h = pen.get_pic_dims( pen.get_hybrid_table( pic )[1])
+	data.dims = { pen.get_pic_dims( pen.get_hybrid_table( pic )[1])}
 	uid, data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
-		gui, uid, pic_x, pic_y, data.pic_w*( data.s_x or 1 ), data.pic_h*( data.s_y or 1 ), pic_iz, true
+		gui, uid, pic_x, pic_y, data.dims[1]*( data.s_x or 1 ), data.dims[2]*( data.s_y or 1 ), pic_iz, true
 	)
 
 	if( data.lmb_event ~= nil and data.clicked ) then
@@ -2529,32 +2562,38 @@ function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic, data )
 	return uid, data.clicked, data.r_clicked, data.is_hovered
 end
 
-function pen.new_dragger( gui, uid, did, pic_x, pic_y, s_x, s_y, pic_z, is_debugging )
+function pen.new_dragger( gui, uid, did, pic_x, pic_y, s_x, s_y, pic_z, allow_multihovers, is_debugging )
 	pen.c.dragger_data = pen.c.dragger_data or {}
-	pen.c.dragger_data[ did ] = pen.c.dragger_data[ did ] or { false, 0, 0, true }
+	pen.c.dragger_data[ did ] = pen.c.dragger_data[ did ] or { is_going = false, old_state = true, off = {0,0}}
 
 	local frame_num = GameGetFrameNum()
-	local is_new = tonumber( GlobalsGetValue( pen.GLOBAL_DRAGGER_SAFETY, "0" )) ~= frame_num
+	local is_new = math.abs( tonumber( GlobalsGetValue( pen.GLOBAL_DRAGGER_SAFETY, "0" ))) ~= frame_num
 	if( not( is_new )) then return uid, pic_x, pic_y, 0 end
 
 	local m_x, m_y = pen.get_mouse_pos()
+	-- pen.c.dragger_data[ did ].old_pos = pen.c.dragger_data[ did ].old_pos or { m_x, m_y }
+	-- local d_x, d_y = m_x - pen.c.dragger_data[ did ].old_pos[1], m_y - pen.c.dragger_data[ did ].old_pos[2]
+	-- pen.c.dragger_data[ did ].old_pos = { m_x, m_y }
+	
 	local clicked, r_clicked, is_hovered = false, false, false
-	uid, _, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, pic_z, true, is_debugging )
+	uid, _, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, pic_z, false, is_debugging )
 	
 	local state = 0
 	local mouse_state = InputIsMouseButtonDown( 1 )
-	if( pen.c.dragger_data[ did ][1]) then
+	if( pen.c.dragger_data[ did ].is_going ) then
 		if( mouse_state ) then
-			pic_x = m_x + pen.c.dragger_data[ did ][2]
-			pic_y = m_y + pen.c.dragger_data[ did ][3]
+			pic_x = m_x + pen.c.dragger_data[ did ].off[1]
+			pic_y = m_y + pen.c.dragger_data[ did ].off[2]
 			state = 2
-		else pen.c.dragger_data[ did ] = { false, 0, 0, true }; state = -1 end
-	elseif( is_hovered and ( mouse_state and not( pen.c.dragger_data[ did ][4]))) then
-		pen.c.dragger_data[ did ] = { true, pic_x - m_x, pic_y - m_y, true }
+		else pen.c.dragger_data[ did ] = nil; state = -1; GlobalsSetValue( pen.GLOBAL_DRAGGER_SAFETY, 1 ) end
+	elseif( is_hovered and ( mouse_state and not( pen.c.dragger_data[ did ].old_state ))) then
+		pen.c.dragger_data[ did ].off = { pic_x - m_x, pic_y - m_y }
+		pen.c.dragger_data[ did ].old_state = true
+		pen.c.dragger_data[ did ].is_going = true
 		clicked, state = true, 1
-	else pen.c.dragger_data[ did ][4] = mouse_state end
+	else pen.c.dragger_data[ did ].old_state = mouse_state end
 	
-	if( state > 0 ) then GlobalsSetValue( pen.GLOBAL_DRAGGER_SAFETY, frame_num ) end
+	if( state > 0 ) then GlobalsSetValue( pen.GLOBAL_DRAGGER_SAFETY, (( allow_multihovers or false ) and 1 or -1 )*frame_num ) end
 	return uid, pic_x, pic_y, state, clicked, r_clicked, is_hovered
 end
 
@@ -2741,9 +2780,15 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	return uid, dims
 end
 
+---Tooltip framework.
+---@param gui gui
+---@param uid number
+---@param text? string
+---@param data? PenmanTooltipData
+---@param func? fun( gui:gui, uid:number, text?:string, d?:PenmanTooltipData ): uid:number, { clicked:boolean, r_clicked:boolean, is_hovered:boolean } The definition of the custom visuals. Draws the default tip if left empty.
+---@return number uid, boolean is_active
 function pen.new_tooltip( gui, uid, text, data, func )
 	data = data or {}
-	data.pos = data.pos or {}
 	data.tid = data.tid or "dft"
 	data.edging = data.edging or 3
 	data.frames = data.frames or 15
@@ -2801,15 +2846,15 @@ function pen.new_tooltip( gui, uid, text, data, func )
 			local size_x, size_y = unpack( d.dims )
 			local pic_x, pic_y, pic_z = unpack( d.pos )
 
-			local inter_alpha = pen.animate( 1, d.t, {
-				ease_out = "exp", frames = d.frames })
-			uid = pen.new_text( gui, uid, pic_x + d.edging, pic_y + d.edging - 2, pic_z, text, {
-				dims = { size_x - d.edging, size_y }, line_offset = d.line_offset or -2,
-				fully_featured = true, funcs = d.font_mods, color = { 255, 255, 255, inter_alpha },
-			})
+			local inter_alpha = pen.animate( 1, d.t, { ease_out = "exp", frames = d.frames })
+			if( pen.vld( text )) then
+				uid = pen.new_text( gui, uid, pic_x + d.edging, pic_y + d.edging - 2, pic_z, text, {
+					dims = { size_x - d.edging, size_y }, line_offset = d.line_offset or -2,
+					fully_featured = true, funcs = d.font_mods, color = { 255, 255, 255, inter_alpha },
+				})
+			end
 			
-			local inter_size = 15*( 1 - pen.animate( 1, d.t, {
-				ease_out = "wav1.5", frames = d.frames }))
+			local inter_size = 15*( 1 - pen.animate( 1, d.t, { ease_out = "wav1.5", frames = d.frames }))
 			pic_x, pic_y = pic_x + 0.5*inter_size, pic_y + 0.5*inter_size
 			size_x, size_y = size_x - inter_size, size_y - inter_size
 			
@@ -2858,22 +2903,32 @@ function pen.new_input( gui, uid, iid, pic_x, pic_y, pic_z, data )
 	return uid
 end
 
+---Paging framework.
+---@param gui gui
+---@param uid number
+---@param pic_x number
+---@param pic_y number
+---@param pic_z number
+---@param data PenmanPagerData
+---@return number uid, number page, number sfx_type
 function pen.new_pager( gui, uid, pic_x, pic_y, pic_z, data )
-	local counter, skip = 0, false
+	data.items_per_page = data.items_per_page or 1
+
+	local counter, will_skip = 0, false
 	if( type( data.list ) == "table" ) then
 		local starter, ender = data.items_per_page*( data.page - 1 ), data.items_per_page*data.page + 1
 		for k,v in ( data.order_func or pen.t.order )( data.list ) do
 			counter = counter + 1
 			if( data.func ~= nil ) then
 				local is_hidden = not( counter > starter and counter < ender )
-				uid, skip = data.func( gui, uid, pic_x, pic_y, pic_z, k, v, counter - starter, is_hidden )
-				if( skip ) then counter = counter - 1 end
+				uid, will_skip = data.func( gui, uid, pic_x, pic_y, pic_z, k, v, counter - starter, is_hidden )
+				if( will_skip ) then counter = counter - 1 end
 			end
 		end
 	else counter = data.list + 1 end
 
 	local sfx_type = 0
-	local max_page = math.ceil(( counter - 1 )/( data.items_per_page or 1 ))
+	local max_page = math.ceil(( counter - 1 )/data.items_per_page )
 	for i = 1,2 do
 		local sign = i == 1 and -1 or 1
 		if( data.click[i] == 1 and max_page > 1 ) then
@@ -2940,9 +2995,13 @@ pen.FLAG_USE_FANCY_FONT = "PENMAN_FANCY_FONTING"
 pen.FLAG_RESTART_CHECK = "PENMAN_GAME_HAS_STARTED"
 
 pen.GLOBAL_VIRTUAL_ID = "PENMAN_VIRTUAL_INDEX"
-pen.GLOBAL_INTERFACE_FRAME_Z = "PENMAN_INTERFACE_FRAME_Z"
-pen.GLOBAL_INTERFACE_FRAME = "PENMAN_INTERFACE_FRAME"
 pen.GLOBAL_INTERFACE_Z = "PENMAN_INTERFACE_Z"
+pen.GLOBAL_INTERFACE_FRAME = "PENMAN_INTERFACE_FRAME"
+pen.GLOBAL_INTERFACE_FRAME_Z = "PENMAN_INTERFACE_FRAME_Z"
+pen.GLOBAL_INTERFACE_SAFETY_LL = "PENMAN_INTERFACE_SAFETY_LL"
+pen.GLOBAL_INTERFACE_SAFETY_TL = "PENMAN_INTERFACE_SAFETY_TL"
+pen.GLOBAL_INTERFACE_SAFETY_LR = "PENMAN_INTERFACE_SAFETY_LR"
+pen.GLOBAL_INTERFACE_SAFETY_TR = "PENMAN_INTERFACE_SAFETY_TR"
 pen.GLOBAL_DRAGGER_SAFETY = "PENMAN_DRAGGER_FRAME"
 
 pen.MARKER_TAB = "\\_"
@@ -5009,3 +5068,36 @@ pen.FILE_XML_MATTER = [[
 	</DamageModelComponent>
 </Entity>
 ]]
+
+---@class PenmanButtonData
+---@field auid string [DFT: pic..pic_z ]<br> Unique animation ID.
+---@field no_anim boolean [DFT: false ]<br> Will not do animations if set to true.
+---@field highlight any Highlight kind modifier.
+---@field skip_z_check boolean [DFT: false ]<br> Set to true to skip the z-level adjustment (it makes only the topmost button to activate on click, yet introduces a 2-frame long delay between the click and the event triggering).
+---@field s_x number [DFT: 1 ]<br> Scale X
+---@field s_y number [DFT: 1 ]<br> Scale Y
+---@field lmb_event fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Gets called on click.
+---@field rmb_event fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Gets called on r_click.
+---@field hov_event fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Gets called on is_hovered.
+---@field idle_event fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Get called on not( is_hovered )
+---@field pic_func fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): uid:number Always gets called and get replaced with pen.new_image if is nil.
+
+---@class PenmanTooltipData
+---@field tid string [DFT: "dft" ]<br> The ID of the tooltip. Only one tip can be opened per unique ID.
+---@field is_active boolean [DFT: is_hovered ]<br> Set to true to force the tooltip open. If is nil, then will check the state of the last gui element.
+---@field allow_hover boolean [DFT: false ]<br> Set to true to keep tooltip opened as long as the mouse is hovering over it.
+---@field dims table [DFT: { text_width, text_height } ]<br> The size of the tooltip. If is nil, will fit itself to the text provided.
+---@field pos table [DFT: mouse_pos ]<br> The position of the tooltip on the screen.
+---@field pic_z number [DFT: pen.Z_LAYERS.tips ]<br> The depth to draw the tooltip at.
+---@field is_left boolean [DFT: false ]<br> Will draw the tooltip to the left if set to true.
+---@field is_over boolean [DFT: false ]<br> Will draw the tooltip up above if set to true.
+---@field frames number [DFT: 15 ]<br> The duration of the opening animation.
+---@field edging number [DFT: 3 ]<br> The spacing between the text and the inner edge of the tooltip background.
+
+---@class PenmanPagerData
+---@field list table|number [OBLIGATORY]<br> Can be set to either a table to iterate through or to a maximum number of "pages" to scroll one-by-one.
+---@field page number [OBLIGATORY]<br> The current page.
+---@field items_per_page number [DFT: 1 ]<br> How many elements one page should contain.
+---@field func fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, absolute_i:number, element:any, relative_k:number, is_hidden:boolean ): uid:number, will_skip:boolean Draws the elements of the current page.
+---@field order_func function [DFT: pen.t.order ]<br> Sorts the list for later processing.
+---@field click table [INTERNAL]<br> This is used to interface between visual and logical segments. The value of 1 means that the button was clicked and the value of -1 means that it was r_clicked.
