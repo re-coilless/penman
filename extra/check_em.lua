@@ -297,18 +297,18 @@ gui = gui or GuiCreate()
 GuiStartFrame( gui )
 
 pen.new_text( gui, 0, 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })
-pen.new_image( gui, 1, 98, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
+-- pen.new_image( gui, 1, 98, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
 pen.new_text( gui, 0, 100, 150, 0, test_input[1], {
-    is_huge = false,
+    -- is_huge = false,
     fully_featured = true,
     dims = {100, 100},
     -- scale = 2,
     -- font
     nil_val = "balls",
     color = {255,0,0,1},
-    -- is_shadow = true,
+    has_shadow = true,
     -- is_centered_x = true,
-    is_right_x = true,
+    -- is_right_x = true,
     is_centered_y = true,
     funcs = {
         c1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
@@ -326,6 +326,15 @@ pen.new_text( gui, 0, 100, 150, 0, test_input[1], {
 if(( pen.cache({ "hyperlink_state", "balls" }) or -1 ) == GameGetFrameNum()) then
     EntityLoad( "data/entities/animals/scavenger_smg.xml", 0, -200 )
 end
+
+pen.new_image( gui, 1, 298, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
+pen.new_text( gui, 0, 300, 150, 0, test_input[1], {
+    is_huge = false,
+    fully_featured = true,
+    dims = {100, 100},
+    color = {255,0,0,1},
+    is_centered_y = true,
+})
 
 end
 
