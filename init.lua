@@ -36,6 +36,10 @@ function OnWorldPostUpdate()
 		pen.c.matter_test_file = true
 		pen.lib.magic_write( pen.FILE_MATTER, pen.get_xy_matter_file())
 	end
+	if( not( pen.c.matter_color_file )) then
+		pen.c.matter_color_file = true
+		pen.lib.magic_write( pen.FILE_MATTER_COLOR, pen.FILE_XML_MATTER_COLOR )
+	end
 
 	dofile( "mods/penman/extra/check_em.lua" )
 end

@@ -12,13 +12,13 @@ if( pen.c.testing_done ) then
     if( pen.c.testing_done == 1 ) then
         return
     else
-        pen.c.testing_done = 1
+        -- pen.c.testing_done = 1
         
         -- misc_tests()
         -- filing()
         -- raters()
         -- input()
-        -- tipping()
+        tipping()
         -- texting()
         -- fonting()
         -- cloner()
@@ -195,7 +195,7 @@ uid = pen.new_tooltip( gui, uid, test_input[2], { tid = "bs1" })
 -- uid = pen.new_tooltip( gui, uid, test_input[1], { is_active = yep, tid = "bs3", is_left = true })
 -- uid = pen.new_tooltip( gui, uid, test_input[2], { is_active = yep, tid = "bs4", is_over = true, is_left = true })
 uid = pen.new_tooltip( gui, uid, "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", {
-    is_active = yep, pos = {390,200}, allow_hover = true, do_corrections = true, font_mods = {
+    is_active = yep, pos = {390,199}, allow_hover = true, do_corrections = true, font_mods = {
         e1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
             return pen.FONT_MODS.tip( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, "balls", "LESSS GOOOOOO" )
         end,
@@ -210,9 +210,18 @@ uid = pen.new_tooltip( gui, uid, "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}
 --     color = pen.PALETTE.PRSP.WHITE,
 -- })
 pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+    range = { 0, 2.5 },
     func = pen.animate,
     input = function( x )
-        return 1, 15*x, { ease_in = "log1.1", ease_out = "bck2", frames = 15 }
+        return 1, 15*x, { type = "emap", frames = 15 }
+    end,
+    color = pen.PALETTE.PRSP.BLUE,
+})
+pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+    range = { 0, 2.5 },
+    func = pen.animate,
+    input = function( x )
+        return 1, true, { ease_in = "log1.1", ease_out = "bck2", frames = 15 }
     end,
     color = pen.PALETTE.PRSP.RED,
 })

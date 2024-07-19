@@ -5,6 +5,30 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "PROSPERO_IS_REAL", "1" )
 end
 
+--[COMPLEX]
+pen.i = { 
+	__mt= { --just steal the whole complex.lua
+		__add = function( a, b )
+			return pen.i.new( a.r + b.r, a.i + b.i )
+		end,
+		__sub = function( a, b )
+			return pen.i.new( a.r - b.r, a.i - b.i )
+		end,
+		__mul = function( a, b )
+			return pen.i.new( a.r*b.r - a.i*b.i, a.r*b.i + a.i*b.r )
+		end,
+		__tostring = function( a )
+			return table.concat({ "[", a.r, ";", a.i, "]" })
+		end,
+	},
+	new = function( r, i )
+		return setmetatable({ r = r, i = i or 0 }, pen.i.__mt )
+	end,
+	expi = function( i )
+		return pen.i.new( math.cos( i ), math.sin( i ))
+	end,
+}
+
 --[WRITING]
 pen.magic_write = pen.magic_write or ModTextFileSetContent or penman_w
 if( pen.magic_write ~= nil ) then
@@ -174,147 +198,36 @@ function pen.atimer( tid, duration, reset_now, stillborn )
 	end; return math.min( frame_num - pen.c.animation_timer[ tid ], duration or 0 )
 end
 
---add looping capabilities + discrete fourier (https://www.youtube.com/watch?v=xV4aQvPLYEY)
 function pen.animate( delta, frame, data ) --https://www.febucci.com/2018/08/easing-functions/
 	data = data or {}
-	data.type = data.type or "lerp"
-	data.params = data.params or {}
 	data.frames = data.frames or 20
 	data.ease_int = data.ease_int or "lerp"
-	data.params_ease = data.params_ease or {}
 	data.ease_in = pen.get_hybrid_table( data.ease_in )
 	data.ease_out = pen.get_hybrid_table( data.ease_out )
 	
-	local easings = { --https://easings.net/
-		nul = function( t )
-			return t
-		end,
-		flp = function( t )
-			return 1 - t
-		end,
-		flr = function( t, a )
-			return math.min( t, ( a or 0 )/10 )
-		end,
-		cel = function( t, a )
-			return math.max( t, ( a or 0 )/10 )
-		end,
-		pow = function( t, a )
-			return t^( a or 2 )
-		end,
-		sin = function( t, a )
-			return math.sin( t*math.pi/2 )^( 1/( a or 1 ))
-		end,
-		exp = function( t, a )
-			return ( a or 2 )^( 10*( t - 1 ))
-		end,
-		crc = function( t, a )
-			return math.sqrt( 1 - t^( a or 2 ))
-		end,
-		bck = function( t, a )
-			a = a or 1
-			return t*t*(( a + 1 )*t - a )
-		end,
-		log = function( t, a )
-			a = a or math.exp( 1 )
-			return math.log(( a - 1 )*t + 1 )/math.log( a )
-		end,
-		wav = function( t, a )
-			t = 2*math.pi*math.floor( a or 2 )*( t - 1 )
-			return math.sin( t )/t
-		end,
-		rbr = function( t, a )
-			t, a = 10*( t - 1 ), a or 2
-			return -( math.pow( 2, t )*math.sin( a*( t - 1.5/a )*math.pi/3 ))
-		end,
-		bnc = function( t, a ) --https://gist.github.com/mbostock/5743979
-			t, a = 1 - t, ( a or 25 )/100
-
-			local b0 = 1 - a
-			local b1 = b0*( 1 - b0 ) + b0
-			local b2 = b0*( 1 - b1 ) + b1
-
-			local x0 = 2*math.sqrt( a )
-			local x1 = x0*math.sqrt( a )
-			local x2 = x1*math.sqrt( a )
-
-			local t0 = 1/( 1 + x0 + x1 + x2 )
-			local t1 = t0 + t0*x0
-			local t2 = t1 + t0*x1
-
-			local m0 = t0 + t0*x0/2
-			local m1 = t1 + t0*x1/2
-			local m2 = t2 + t0*x2/2
-
-			local v = 1/( t0*t0 )
-			if( t >= 1 ) then
-				v = 1
-			elseif( t < t0 ) then
-				v = v*t*t
-			elseif( t < t1 ) then
-				t = t - m0
-				v = v*t*t + b0
-			elseif( t < t2 ) then
-				t = t - m1
-				v = v*t*t + b1
-			else
-				t = t - m2
-				v = v*t*t + b2
-			end
-			return 1 - v
-		end,
-	}
-	local inters = {
-		lerp = function( t, delta )
-			return delta[2] + ( delta[1] - delta[2])*t
-		end,
-		spke = function( t, delta )
-			return delta[2] + ( delta[1] - delta[2])*(( t < 0.5 ) and 2*t or -2*( t - 1 ))
-		end,
-		jump = function( t, delta, params )
-			return t > ( params[1] or 0.5 ) and delta[2] or delta[1]
-		end,
-		hill = function( t, delta, params )
-			return delta[2] + ( delta[1] - delta[2])*( math.sin( t*math.pi )^( params[1] or 1 ))
-		end,
-		sine = function( t, delta, params )
-			return delta[2] + ( delta[1] - delta[2])*( 1 + math.sin( math.pi*( t - 0.5 ))^( 2*( params[1] or 0 ) + 1 ))/2
-		end,
-		bzir = function( t, delta, params )
-			return delta[2]*( 1 - t )^3
-				+ ( params[1] or 1 )*3*t*( 1 - t )^2
-				+ ( params[2] or 0 )*3*( 1 - t )*t^2
-				+ ( delta[1] - delta[2])*t^3
-		end,
-		lgrn = function( t, delta, params ) --https://www.geeksforgeeks.org/lagranges-interpolation/
-			local out = 0
-			for i,v1 in ipairs( params ) do
-				local temp = v1[2]
-				for e,v2 in ipairs( params ) do
-					if( e ~= i ) then
-						temp = temp*( t - v2[1])/( v1[1] - v2[1])
-					end
-				end
-				out = out + temp
-			end
-			return delta[2] + ( delta[1] - delta[2])*out
-		end,
-	}
-	
 	delta = pen.get_hybrid_table( delta )
-	if( delta[2] ~= nil ) then
-		local temp = delta[1]
-		delta[1] = delta[2]
-		delta[2] = temp
-	else delta[2] = 0 end
-
+	if( delta[2] == nil ) then delta[2] = delta[1]; delta[1] = 0 end
+	
+	local is_looped = frame == true
+	local frame_num = GameGetFrameNum()
 	if( type( frame ) == "string" ) then
 		frame = pen.atimer( frame, data.frames, data.reset_now, data.stillborn )
-	end
-
-	local time = frame/data.frames
-	if( time == 0 ) then return delta[2] end
-	if( time == 1 ) then return delta[1] end
+	elseif( is_looped ) then frame = frame_num%data.frames end
 	
+	local time = frame/data.frames
+	if( not( is_looped )) then
+		if( time == 0 ) then return delta[1] end
+		if( time == 1 ) then return delta[2] end
+	elseif( data.type == "frir" ) then
+		local total = 0
+		for i,k in ipairs( pen.ANIM_INTERS[ data.type ]( time, delta, data.params )) do
+			total = total + data.params[i]*( math.cos( 2*math.pi*i*k.r ) - math.sin( 2*math.pi*i*k.i ))
+		end
+		return total
+	end
+	
+	if( is_looped and math.floor( frame_num/data.frames )%2 == 1 ) then time = 1 - time end
+
 	local orig_time = time
 	for i = 1,math.max( #data.ease_in, #data.ease_out ) do
 		local eases = {}
@@ -323,22 +236,23 @@ function pen.animate( delta, frame, data ) --https://www.febucci.com/2018/08/eas
 			if( pen.vld( ease )) then
 				local func = {}
 				if( type( ease ) == "function" ) then func = { ease, data } else
-					func = { easings[ string.sub( ease, 1, 3 )], tonumber( string.sub( ease, 4, -1 ))}
+					func = { pen.ANIM_EASINGS[ string.sub( ease, 1, 3 )], tonumber( string.sub( ease, 4, -1 ))}
 				end
 				if( k == 1 ) then
-					eases[k] = func[1]( time, func[2])
-				else eases[k] = easings.flp( func[1]( easings.flp( time ), func[2])) end
+					eases[2] = func[1]( time, func[2])
+				else eases[1] = 1 - func[1]( 1 - time, func[2]) end
 			end
 		end
 		
 		if( eases[1] ~= nil and eases[2] ~= nil ) then
-			time = inters[ data.ease_int ]( orig_time, eases, data.params_ease )
+			time = pen.ANIM_INTERS[ data.ease_int ]( orig_time, eases, data.params_ease )
 		else time = eases[1] or eases[2] or orig_time end
 	end
 	
+	data.type = data.type or "lerp"
 	if( data.type == "function" ) then
 		return data.type( time, delta, data.params )
-	else return inters[ data.type ]( time, delta, data.params ) end
+	else return pen.ANIM_INTERS[ data.type ]( time, delta, data.params ) end
 end
 
 --[TECHNICAL]
@@ -983,23 +897,6 @@ function pen.text_defancifier( str )
 		drift = drift + marker[3]
 	end
 	return new_str, fancy_list
-end
-
-function pen.get_text_dims( text, font, is_pixel_font )
-	if( font == true ) then
-		local _,dims = pen.liner( text, nil, nil, is_pixel_font )
-		return unpack( dims )
-	end
-
-	local gui = GuiCreate()
-	GuiStartFrame( gui )
-
-	local symbol = "_"
-	local reference = GuiGetTextDimensions( gui, symbol, 1, 0, font, is_pixel_font )
-	local w, h = pen.catch( GuiGetTextDimensions, { gui, table.concat({ symbol, text, symbol }), 1, 0, font, is_pixel_font }, {0,0})
-
-	GuiDestroy( gui )
-	return w - 2*reference, h
 end
 
 function pen.liner( text, length, height, font, data )
@@ -1914,6 +1811,21 @@ function pen.get_xy_matter( x, y, duration )
 	end
 end
 
+function pen.get_color_matter( matter )
+	if( not( ModDoesFileExist( pen.FILE_MATTER_COLOR ))) then
+		if( pen.magic_write and not( pen.c.matter_color_file )) then
+			pen.c.matter_color_file = true
+			pen.magic_write( pen.FILE_MATTER_COLOR, pen.FILE_XML_MATTER_COLOR )
+		else return pen.PALETTE.W end
+	end
+
+	local color_probe = EntityLoad( pen.FILE_MATTER_COLOR )
+	AddMaterialInventoryMaterial( color_probe, matter, 1000 )
+	local color = pen.magic_uint( GameGetPotionColorUint( color_probe ))
+	EntityKill( color_probe )
+	return color
+end
+
 function pen.debug_dot( x, y, frames )
 	GameCreateSpriteForXFrames( "data/ui_gfx/debug_marker.png", x, y, true, 0, 0, frames or 1, true )
 end
@@ -2401,6 +2313,23 @@ function pen.play_entity_sound( entity_id, x, y, event_mutator, no_bullshit )
 	pen.play_sound( sound_table, x, y, no_bullshit )
 end
 
+function pen.get_text_dims( text, font, is_pixel_font )
+	if( font == true ) then
+		local _,dims = pen.liner( text, nil, nil, is_pixel_font )
+		return unpack( dims )
+	end
+
+	local gui = GuiCreate()
+	GuiStartFrame( gui )
+
+	local symbol = "_"
+	local reference = GuiGetTextDimensions( gui, symbol, 1, 0, font, is_pixel_font )
+	local w, h = pen.catch( GuiGetTextDimensions, { gui, table.concat({ symbol, text, symbol }), 1, 0, font, is_pixel_font }, {0,0})
+
+	GuiDestroy( gui )
+	return w - 2*reference, h
+end
+
 function pen.get_pic_dims( path )
 	return pen.cache({ "pic_dimensions", path }, function()
 		local gui = GuiCreate()
@@ -2414,9 +2343,9 @@ end
 function pen.get_tip_dims( text, width, height, line_offset )
 	width = width or {}; width[1], width[2] = width[1] or 121, width[2] or 525
 
-	local _,dims = pen.liner( text )
-	if( string.find( text, "[\n@]" ) ~= nil ) then dims[1] = 2*dims[1] end
-	local line = math.max(( dims[1] > 300 and math.max( math.pow( 250/dims[1], 1.25 ), 0.1 ) or 1 )*dims[1], width[1])
+	local _,dims = pen.liner( text ); local s_x, s_y = unpack( dims )
+	if( string.find( text, "[\n@]" ) ~= nil ) then s_x = 2*s_x end
+	local line = math.max(( s_x > 300 and math.max( math.pow( 250/s_x, 1.25 ), 0.1 ) or 1 )*s_x, width[1])
 	_,dims = pen.liner( text, math.min( line, width[2]), height or 300, nil, { line_offset = line_offset or -2 })
 
 	return dims
@@ -2912,7 +2841,7 @@ function pen.new_tooltip( gui, uid, text, data, func )
 		local tip_anim = pen.c.ttips[ data.tid ].anim
 		if(( frame_num - tip_anim[2]) > ( data.frames + 5 )) then tip_anim[1] = frame_num -1 end
 		tip_anim[2], tip_anim[3] = frame_num, math.min( frame_num - tip_anim[1], data.frames )
-		
+
 		local w, h = GuiGetScreenDimensions( gui )
 		if( not( pen.vld( data.dims ))) then
 			data.dims = pen.get_tip_dims( text, { data.min_width or 121, data.max_width or 0.9*w }, h, data.line_offset or -2 )
@@ -2956,9 +2885,7 @@ function pen.new_tooltip( gui, uid, text, data, func )
 			size_x, size_y = size_x - inter_size, size_y - inter_size
 			
 			local clicked, r_clicked, is_hovered = false, false, false
-			uid, clicked, r_clicked, is_hovered = pen.new_image(
-				gui, uid, pic_x, pic_y, pic_z, pen.FILE_PIC_NIL, { s_x = size_x, s_y = size_y, can_click = true }
-			)
+			uid, clicked, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, size_x, size_y )
 			
 			uid = uid + 1
 			GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
@@ -3108,6 +3035,7 @@ pen.MARKER_MAGIC_APPEND = "%-%-<{> MAGICAL APPEND MARKER <}>%-%-"
 pen.FILE_PIC_NIL = "data/ui_gfx/empty.png"
 pen.FILE_PIC_NUL = "data/ui_gfx/empty_white.png"
 pen.FILE_MATTER = "data/debug/matter_test.xml"
+pen.FILE_MATTER_COLOR = "data/debug/matter_color.xml"
 pen.FILE_T2F = "data/debug/vpn"
 
 pen.DIV_0 = "@"
@@ -3281,6 +3209,160 @@ pen.FONT_MODS = {
 		--char_data.extra for modifications (compare the index num with index.chr)
 		--letters appear through alpha sin interpolating top down 
 		return uid, pic_x[1], pic_y[1]
+	end,
+}
+
+pen.ANIM_EASINGS = { --https://easings.net/
+	nul = function( t )
+		return t
+	end,
+	flp = function( t )
+		return 1 - t
+	end,
+	flr = function( t, a )
+		return math.min( t, ( a or 0 )/10 )
+	end,
+	cel = function( t, a )
+		return math.max( t, ( a or 0 )/10 )
+	end,
+	pow = function( t, a )
+		return t^( a or 2 )
+	end,
+	sin = function( t, a )
+		return math.sin( t*math.pi/2 )^( 1/( a or 1 ))
+	end,
+	exp = function( t, a )
+		return ( a or 2 )^( 10*( t - 1 ))
+	end,
+	crc = function( t, a )
+		return math.sqrt( 1 - t^( a or 2 ))
+	end,
+	bck = function( t, a )
+		a = a or 1
+		return t*t*(( a + 1 )*t - a )
+	end,
+	log = function( t, a )
+		a = a or math.exp( 1 )
+		return math.log(( a - 1 )*t + 1 )/math.log( a )
+	end,
+	wav = function( t, a )
+		t = 2*math.pi*math.floor( a or 2 )*( t - 1 )
+		return math.sin( t )/t
+	end,
+	rbr = function( t, a )
+		t, a = 10*( t - 1 ), a or 2
+		return -( math.pow( 2, t )*math.sin( a*( t - 1.5/a )*math.pi/3 ))
+	end,
+	bnc = function( t, a ) --https://gist.github.com/mbostock/5743979
+		t, a = 1 - t, ( a or 25 )/100
+
+		local b0 = 1 - a
+		local b1 = b0*( 1 - b0 ) + b0
+		local b2 = b0*( 1 - b1 ) + b1
+
+		local x0 = 2*math.sqrt( a )
+		local x1 = x0*math.sqrt( a )
+		local x2 = x1*math.sqrt( a )
+
+		local t0 = 1/( 1 + x0 + x1 + x2 )
+		local t1 = t0 + t0*x0
+		local t2 = t1 + t0*x1
+
+		local m0 = t0 + t0*x0/2
+		local m1 = t1 + t0*x1/2
+		local m2 = t2 + t0*x2/2
+
+		local v = 1/( t0*t0 )
+		if( t >= 1 ) then
+			v = 1
+		elseif( t < t0 ) then
+			v = v*t*t
+		elseif( t < t1 ) then
+			t = t - m0
+			v = v*t*t + b0
+		elseif( t < t2 ) then
+			t = t - m1
+			v = v*t*t + b1
+		else
+			t = t - m2
+			v = v*t*t + b2
+		end
+		return 1 - v
+	end,
+}
+pen.ANIM_INTERS = {
+	lerp = function( t, delta )
+		return delta[1] + ( delta[2] - delta[1])*t
+	end,
+	jump = function( t, delta, p )
+		return t > ( p or 0.5 ) and delta[1] or delta[2]
+	end,
+	sine = function( t, delta, p )
+		return delta[1] + ( delta[2] - delta[1])*( 1 + math.sin( math.pi*( t - 0.5 ))^( 2*( p or 0 ) + 1 ))/2
+	end,
+	bzir = function( t, delta, p )
+		p = p or {}
+		return delta[1]*( 1 - t )^3
+			+ ( p[1] or 1 )*3*t*( 1 - t )^2
+			+ ( p[2] or 0 )*3*( 1 - t )*t^2
+			+ ( delta[2] - delta[1])*t^3
+	end,
+	lgrn = function( t, delta, p ) --https://www.geeksforgeeks.org/lagranges-interpolation/
+		local out = 0
+		for i,v1 in ipairs( p or {}) do
+			local temp = v1[2]
+			for e,v2 in ipairs( p ) do
+				if( e ~= i ) then
+					temp = temp*( t - v2[1])/( v1[1] - v2[1])
+				end
+			end
+			out = out + temp
+		end
+		return delta[1] + ( delta[2] - delta[1])*out
+	end,
+
+	ilrp = function( t, delta )
+		return ( t - delta[1])/( delta[2] - delta[1])
+	end,
+	spke = function( t, delta )
+		return delta[1] + ( delta[2] - delta[1])*(( t < 0.5 ) and 2*t or -2*( t - 1 ))
+	end,
+	hill = function( t, delta, p )
+		return delta[1] + ( delta[2] - delta[1])*( math.sin( t*math.pi )^( p or 1 ))
+	end,
+	emap = function( t, delta, p ) --thanks Nathan
+		--maybe try doing actual remapping to always be within [0;1]
+		--https://uploads.gamedev.net/monthly_2019_10/code.png.2b57c8e848a842330559286e38cecd03.png
+		p = p or {}; local a, k = p[1] or -10, p[2] or -1.9
+		return delta[1] + ( delta[2] - delta[1])*math.log(( a + 1 )/( math.exp( k*math.sin( 1.5*math.pi*t )) + a ))
+	end,
+	frir = function( t, delta, p ) --https://rosettacode.org/wiki/Fast_Fourier_transform#Lua
+		local function fft( tbl ) --literal shit, write custom implementation
+			local n = #tbl
+			if( n <= 1 ) then return end
+
+			local odd, even = {}, {}
+			for i = 1,n,2 do
+				table.insert( odd, tbl[i])
+				table.insert( even, tbl[ i + 1 ])
+			end
+			fft( even ); fft( odd )
+
+			for k = 1,n/2 do
+				local t = even[k]*pen.i.expi( -2*math.pi*( k - 1 )/n )
+				pen.c.fft_data[k], pen.c.fft_data[ k + n/2 ] = odd[k] + t, odd[k] - t
+			end
+			return pen.c.fft_data
+		end
+		
+		--come up with a good default param set
+		--check if it's looped properly and add buffer points (45 degree straight) if is not
+		return pen.cache({ "fft_memo", pen.t.pack( p )}, function()
+			pen.c.fft_data = {}
+			for i,v in ipairs( p or {}) do pen.c.fft_data[i] = pen.i.new( v ) end
+			local out = fft( pen.c.fft_data ); pen.c.fft_data = nil
+			return pen.t.clone( out )
+		end)
 	end,
 }
 
@@ -5183,6 +5265,22 @@ pen.FILE_XML_MATTER = [[
 			holy="0"
 		></damage_multipliers>
 	</DamageModelComponent>
+</Entity>
+]]
+
+pen.FILE_XML_MATTER_COLOR = [[
+<Entity serialize="0" >
+    <MaterialInventoryComponent
+        drop_as_item="0" 
+        on_death_spill="0"
+        leak_pressure_min="0"
+        leak_on_damage_percent="0"
+        min_damage_to_leak="0"
+        death_throw_particle_velocity_coeff="0"
+        do_reactions="0"
+        ><count_per_material_type>
+        </count_per_material_type>
+    </MaterialInventoryComponent>
 </Entity>
 ]]
 
