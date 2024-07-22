@@ -1,10 +1,16 @@
 ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 
-function OnPlayerSpawned( hooman )
-	local world_id = GameGetWorldStateEntity()
-	EntityAddChild( world_id, EntityLoad( "mods/penman/extra/ctrl_body.xml" ))
-	
-	--logo is prospero themed book
+function OnModInit()
+	dofile_once( "mods/penman/_libman.lua" )
+	pen.lib.font_builder( "data/fonts/font_pixel_runes.xml", {
+		[79] = {
+			forced = true,
+			pos = { 298, 0, 6 },
+			rect_h = 22, rect_w = 3,
+		},
+	}, "data/fonts/font_pixel.png" )
+
+	pen.pic_builder( "data/debug/circle_16.png", 10, 10 )
 end
 
 function OnWorldPreUpdate()
@@ -13,32 +19,22 @@ function OnWorldPreUpdate()
 	end
 end
 
+--logo is prospero themed book
+
+penman_d = penman_d or ModImageMakeEditable
+penman_r = penman_r or ModTextFileGetContent
 penman_w = penman_w or ModTextFileSetContent
 function OnWorldPostUpdate()
 	dofile_once( "mods/penman/_libman.lua" )
 	
-	local ctrl_body = pen.get_child( GameGetWorldStateEntity(), "pen_ctrl" )
-	local storage_request = pen.magic_storage( ctrl_body, "request" )
-	if( not( pen.vld( storage_request, true ))) then return end
-	
-	local request = pen.t.pack( ComponentGetValue2( storage_request, "value_string" ))
-	if( pen.vld( request )) then
-		for i,v in ipairs( request ) do
-			local storage_file = pen.magic_storage( ctrl_body, v[2])
-			penman_w( v[1], string.gsub( ComponentGetValue2( storage_file, "value_string" ), "\\([nt])", { n = "\n", t = "\t", }))
-			ComponentSetValue2( storage_file, "name", "free" )
-			ComponentSetValue2( storage_file, "value_string", "" )
-		end
-		ComponentSetValue2( storage_request, "value_string", pen.DIV_1 )
-	end
-	
+	pen.init_pipeline()
 	if( not( pen.c.matter_test_file )) then
 		pen.c.matter_test_file = true
-		pen.lib.magic_write( pen.FILE_MATTER, pen.get_xy_matter_file())
+		pen.magic_write( pen.FILE_MATTER, pen.get_xy_matter_file())
 	end
 	if( not( pen.c.matter_color_file )) then
 		pen.c.matter_color_file = true
-		pen.lib.magic_write( pen.FILE_MATTER_COLOR, pen.FILE_XML_MATTER_COLOR )
+		pen.magic_write( pen.FILE_MATTER_COLOR, pen.FILE_XML_MATTER_COLOR )
 	end
 
 	dofile( "mods/penman/extra/check_em.lua" )

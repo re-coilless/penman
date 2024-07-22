@@ -7,7 +7,7 @@ end
 
 --[COMPLEX]
 pen.i = { 
-	__mt= { --just steal the whole complex.lua
+	__mt = { --just steal the whole complex.lua
 		__add = function( a, b )
 			return pen.i.new( a.r + b.r, a.i + b.i )
 		end,
@@ -29,7 +29,9 @@ pen.i = {
 	end,
 }
 
---[WRITING]
+--[IO]
+pen.magic_draw = pen.magic_draw or ModImageMakeEditable or penman_d
+pen.magic_read = pen.magic_read or ModTextFileGetContent or penman_r
 pen.magic_write = pen.magic_write or ModTextFileSetContent or penman_w
 if( pen.magic_write ~= nil ) then
 	pen.t2f = function( name, text )
@@ -46,7 +48,8 @@ end
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---custom font creator pen.register_font (with ability to modify existing ones)
+--probably move [COMPLEX] to libman and append FFT to ANIM_INTERS separately
+--pen.new_image interfacing must have xml offset support + integrate offsets with rotation
 --transition mrshll to penman
 
 -- pen.animate
@@ -78,6 +81,7 @@ end
 --actually test all the stuff
 
 --[TODO]
+--try Horscht's idea of getting pic res from setting.lua context to pass to ImageMakeEditable
 --tinker with GamePlaySound and GameEntityPlaySound (thanks to lamia)
 --tinker with copi's spriteemitter image concept
 --add sfxes (separate banks for prospero, hermes, trigger) + pics
@@ -536,7 +540,7 @@ function pen.t.parse( data, is_pretty, full_precision )
 			end
 			
 			local out = {}
-			for v in string.gmatch( str, "%[[^%]]+]=%b{}" ) do --special thanks to dextercd and nphhpn
+			for v in string.gmatch( str, "%[[^%]]+]=%b{}" ) do --huge thanks to dextercd and nphhpn
 				local a,b = string.find( str, v, 1, true )
 				str = string.sub( str, 1, a - 1 )..string.sub( str, b + 1, -1 )
 				out[ s2n( v )] = dser( string.gsub( v, name_pattern, "" ))
@@ -643,15 +647,48 @@ function pen.chrono( f, input, storage_comp, name )
 
 	if( pen.vld( storage_comp, true )) then
 		pen.magic_comp( storage_comp, { value_string = function( old_val )
-			return table.concat({ old_val, name, pen.DIV_1, check, pen.DIV_1 }) --special thanks to Copi
+			return table.concat({ old_val, name, pen.DIV_1, check, pen.DIV_1 })
 		end})
 	else print( check.."ms" ) end
 	return unpack( out )
 end
 
+function pen.init_pipeline( data, value )
+	local ctrl_body = pen.get_ctrl()
+
+	if( pen.vld( data )) then
+		value = pen.get_hybrid_table( value )
+
+		local id = tonumber( GlobalsGetValue( data.index, "0" ))
+		GlobalsSetValue( data.index, id + 1 )
+
+		local storage_request = pen.magic_storage( ctrl_body, "request_"..data.name )
+		local request = ComponentGetValue2( storage_request, "value_string" )
+		ComponentSetValue2( storage_request, "value_string",
+			table.concat({ request, pen.DIV_2, data.name, id, pen.DIV_2, value[1], pen.DIV_2, pen.DIV_1 }))
+		return pen.magic_storage( ctrl_body, "free", {
+			name = data.name..id, value_string = value[2] or "",
+		}, true )
+	end
+
+	for name,data in pairs( pen.INIT_THREADS ) do
+		local storage_request = pen.magic_storage( ctrl_body, "request_"..data.name )
+		local request = pen.t.pack( ComponentGetValue2( storage_request, "value_string" ))
+		if( pen.vld( request )) then
+			for i,v in ipairs( request ) do
+				local storage_file = pen.magic_storage( ctrl_body, v[1])
+				data.func( v[2], ComponentGetValue2( storage_file, "value_string" ))
+				ComponentSetValue2( storage_file, "name", "free" )
+				ComponentSetValue2( storage_file, "value_string", "" )
+			end
+			ComponentSetValue2( storage_request, "value_string", pen.DIV_1 )
+		end
+	end
+end
+
 --[TEXT]
 function pen.ptrn( id )
-	return table.concat({ "([^", type( id ) == "number" and pen[ "DIV_"..( id or 1 )] or tostring( id ), "]+)" })
+	return table.concat({ "([^", type( id ) == "number" and pen[ "DIV_"..( id or 1 )] or tostring( id ), "]+)" }) --special thanks to Copi
 end
 function pen.ctrn( str, marker, is_unarrayed )
 	local t = {}
@@ -746,20 +783,12 @@ function pen.w2c( word, on_char, do_pre, on_iter )
 end
 
 function pen.t2t( str, is_post )
-	if( is_post ) then
-		str = string.gsub( str, "^ +", "" )
-		str = string.gsub( str, " +$", "" )
-	else
-		str = string.gsub( str, "\t", "" )
-		str = string.gsub( str, "\r\n", "\n" )
-	end
-	return str
+	if( is_post ) then str = string.gsub( string.gsub( str, "^ +", "" ), " +$", "" ); return str end
+	str = string.gsub( string.gsub( str, "\t", "" ), "\r\n", "\n" ); return str
 end
-
 function pen.t2l( str, string_indexed )
 	return pen.ctrn( pen.t2t( str ), "\n", string_indexed )
 end
-
 function pen.t2w( str )
 	return pen.ctrn( str )
 end
@@ -1009,15 +1038,15 @@ end
 
 function pen.magic_append( to_file, from_file )
 	local marker = pen.MARKER_MAGIC_APPEND
-	local a, b = ModTextFileGetContent( to_file ), ModTextFileGetContent( from_file )
-	ModTextFileSetContent( to_file, string.gsub( a, marker, table.concat({ b, "\n\n\n", marker })))
+	local a, b = pen.magic_read( to_file ), pen.magic_read( from_file )
+	if( pen.magic_write ) then pen.magic_write( to_file, string.gsub( a, marker, table.concat({ b, "\n\n\n", marker }))) end
 end
 
 function pen.add_herds( new_file, default, overrides )
 	overrides = pen.t.unarray( overrides or {})
 	local herd, old_file = {}, "data/genome_relations.csv"
 
-	local raw_herd = pen.t2l( ModTextFileGetContent( old_file ))
+	local raw_herd = pen.t2l( pen.magic_read( old_file ))
 	local header = pen.ctrn( raw_herd[1], "," )
 	for i = 2,#raw_herd do
 		local line = pen.ctrn( raw_herd[i], "," )
@@ -1030,7 +1059,7 @@ function pen.add_herds( new_file, default, overrides )
 	end
 	if( new_file == nil ) then return herd end
 
-	raw_herd = pen.t2l( ModTextFileGetContent( new_file ))
+	raw_herd = pen.t2l( pen.magic_read( new_file ))
 	local new_header = pen.ctrn( raw_herd[1], "," )
 	for i = 2,#raw_herd do
 		local line = pen.ctrn( raw_herd[i], "," )
@@ -1083,7 +1112,7 @@ end
 
 function pen.add_shaders( shader_path )
 	local shader_old = "data/shaders/post_final.frag"
-	local file_old = ModTextFileGetContent( shader_old )
+	local file_old = pen.magic_read( shader_old )
 	local markers_old = {
 		--[[ ******[UNIFORMS]****** ]]"// %-*\r\n// utilities",
 		--[[ ******[FUNCTIONS]****** ]]"// trip \"fractals\" effect. this is based on some code from ShaderToy, which I can't find anymore.",
@@ -1091,43 +1120,61 @@ function pen.add_shaders( shader_path )
 		--[[ ******[OVERLAY]****** ]]"// ============================================================================================================\r\n// additive overlay ===========================================================================================",
 	}
 
-	local file_new = ModTextFileGetContent( shader_path ).."\n\n******[EOF]******\n"
+	local file_new = pen.magic_read( shader_path ).."\n\n******[EOF]******\n"
 	for i,segment in ipairs( pen.ctrn( file_new, "******[%S-]******" )) do
 		if( pen.vld( string.gsub( segment, "%s", "" )) and markers_old[i] ~= nil ) then
 			file = string.gsub( file, markers_old[i], table.concat({ markers_old[i], "\n", segment }))
 		end
 	end
-	ModTextFileSetContent( shader_old, file )
+	if( pen.magic_write ) then pen.magic_write( shader_old, file ) end
 end
 
 function pen.add_translations( path )
 	local main = "data/translations/common.csv"
-	local file = string.gsub( string.gsub( ModTextFileGetContent( path ), "\r", "" ), "\n\n+", "\n" )
-	ModTextFileSetContent( main, ModTextFileGetContent( main )..string.gsub( file, "^[^\n]*\n", "" ))
+	local file = string.gsub( string.gsub( pen.magic_read( path ), "\r", "" ), "\n\n+", "\n" )
+	if( pen.magic_write ) then pen.magic_write( main, pen.magic_read( main )..string.gsub( file, "^[^\n]*\n", "" )) end
 end
 
 --[ECS]
-function pen.get_hooman( is_smart ) --stolen from eba 😋
-	if( is_smart ) then
+function pen.get_ctrl()
+	local world_id = GameGetWorldStateEntity()
+	local ctrl_body = pen.get_child( world_id, "pen_ctrl" )
+	if( pen.is_game_restarted()) then
+		EntityKill( ctrl_body )
+	elseif( pen.vld( ctrl_body, true )) then return ctrl_body end
+	
+	ctrl_body = EntityCreateNew( "pen_ctrl" )
+	EntityAddTag( ctrl_body, "pen_ctrl" )
+	EntityAddChild( world_id, ctrl_body )
+	EntityAddComponent2( ctrl_body, "InheritTransformComponent" )
+	for name,data in pairs( pen.INIT_THREADS ) do
+		pen.magic_storage( ctrl_body, "request_"..data.name, {
+			name = "request_"..data.name, value_string = pen.DIV_1, }, true )
+	end
+	return ctrl_body
+end
+
+function pen.get_hooman( is_dynamic ) --stolen from eba 😋
+	if( is_dynamic ) then
 		local cam_x, cam_y = GameGetCameraPos()
 		return EntityGetClosestWithTag( cam_x, cam_y, "player_unit" )
 			or EntityGetClosestWithTag( cam_x, cam_y, "polymorphed_player" )
 	else return ( EntityGetWithTag( "player_unit" ) or EntityGetWithTag( "polymorphed_player" ) or {})[1] end
 end
 
-function pen.child_play( entity_id, action )
+function pen.child_play( entity_id, func )
 	if( not( pen.vld( entity_id, true ))) then return end
 	return pen.t.loop( EntityGetAllChildren( entity_id ), function( i, child )
-		return action( entity_id, child, i )
+		return func( entity_id, child, i )
 	end)
 end
 
-function pen.child_play_full( dude_id, func, params )
-	local ignore = func( dude_id, params )
+function pen.child_play_full( dude_id, func, args )
+	local ignore = func( dude_id, args )
 	return pen.child_play( dude_id, function( parent, child )
 		if( not( ignore )) then
-			return pen.child_play_full( child, func, params )
-		else return func( child, params ) end
+			return pen.child_play_full( child, func, args )
+		else return func( child, args ) end
 	end)
 end
 
@@ -1530,12 +1577,12 @@ function pen.generic_random( a, b, macro_drift, bidirectional )
 	return ( bidirectional or false ) and ( Random( a, b*2 ) - b ) or Random( a, b )
 end
 
-function pen.migrate( mod_id, actions )
+function pen.migrate( mod_id, funcs )
 	local latest_version = 0
 	local current_version = pen.setting_get( mod_id.."._version" ) or 1
-	for version,action in pen.t.order( actions ) do
+	for version,func in pen.t.order( funcs ) do
 		if( current_version < version ) then
-			action( mod_id..".", current_version )
+			func( mod_id..".", current_version )
 			latest_version = version
 		end
 	end
@@ -2386,8 +2433,7 @@ function pen.get_camera_shake( w, h, real_w, real_h, k )
 	local screen_x, screen_y = InputGetMousePosOnScreen()
 	screen_x, screen_y = purify( w*screen_x/real_w, w ), purify( h*screen_y/real_h, h )
 	if( screen_x < 1 ) then
-		screen_x = 0
-		world_x = 0
+		screen_x, world_x = 0, 0
 	elseif( screen_x <= 214 ) then
 		screen_x = screen_x - 1
 	elseif( screen_x < 427 ) then
@@ -2436,6 +2482,59 @@ function pen.world2gui( x, y, is_raw, no_shake ) --thanks to ImmortalDamned for 
 	end
 
 	return massive_balls_x*x, massive_balls_y*y, { massive_balls_x, massive_balls_y }
+end
+
+function pen.pic_wiper( pic_id, wh )
+	for i = 0,( wh[1] - 1 ) do for e = 0,( wh[2] - 1 ) do
+		ModImageSetPixel( pic_id, i, e, 0x0 )	
+	end end
+end
+function pen.pic_paster( new_id, old_id, wh, new_xy, old_xy )
+	new_xy, old_xy = new_xy or { 0, 0 }, old_xy or { 0, 0 }
+	for i = 0,( wh[1] - 1 ) do for e = 0,( wh[2] - 1 ) do
+		local pixel = ModImageGetPixel( old_id, old_xy[1] + i, old_xy[2] + e )
+		ModImageSetPixel( new_id, new_xy[1] + i, new_xy[2] + e, pixel )
+	end end
+	return new_id
+end
+function pen.pic_cloner( old_pic, new_pic, dims )
+	local old_id, old_w, old_h = pen.magic_draw( old_pic, 0, 0 )
+	local new_id, new_w, new_h = pen.magic_draw( new_pic, dims[1] or old_w, dims[2] or old_h )
+	return pen.pic_paster( new_id, old_id, { math.min( old_w, new_w ), math.min( old_h, new_h )}), new_pic
+end
+function pen.pic_builder( pic, w, h ) --apocalyptic thanks to Lamia and Dexter
+	if( not( pen.vld( pen.magic_draw ))) then return end
+	
+	local do_it = w ~= nil
+	if( ModDoesFileExist( pic )) then
+		local _, pic_w, pic_h = pen.magic_draw( pic, w or 0, h or 0 )
+		w, h = w or pic_w, h or pic_h
+		if( pic_w == w and pic_h == h ) then
+			if( ModMagicNumbersFileAdd ~= nil ) then do_it = true else do_it = 1 end
+		else do_it = 1 end
+	elseif( not( do_it )) then return end
+
+	local pic_builder_memo = pen.t.parse( pen.setting_get( pen.SETTING_PPB )) or {}
+	local raw_id = string.gsub( string.gsub( pic, ".png$", "" ), "_PPB%d-$", "" )
+	pic_builder_memo[ raw_id ] = pic_builder_memo[ raw_id ] or { count = 0 }
+	
+	local pic_id = table.concat({ w, "|", h })
+	local count = pic_builder_memo[ raw_id ].count
+	if( do_it == 1 and pic_builder_memo[ raw_id ][ pic_id ] ~= nil ) then
+		pic_id = table.concat({ "c"..count, "|", "c"..count })
+	end
+	if( pic_builder_memo[ raw_id ][ pic_id ] == nil ) then
+		pic_builder_memo[ raw_id ].count = count + 1
+		pic_builder_memo[ raw_id ][ pic_id ] = table.concat({
+			raw_id, "_PPB", pic_builder_memo[ raw_id ].count, ".png" })
+		pen.setting_set( pen.SETTING_PPB, pen.t.parse( pic_builder_memo ))
+	end
+
+	if( do_it == 1 ) then
+		pic_id, pic = pen.pic_cloner( pic, pic_builder_memo[ raw_id ][ pic_id ], { w, h })
+		print( pic )
+	else pic_id = ModImageIdFromFilename( pic ) end
+	return pic_id, pic
 end
 
 --make non z-level adjusted stuff work with z-level adjusted, the latter must always be prioritized
@@ -2809,6 +2908,13 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	return uid, dims
 end
 
+function pen.new_shadowed_text( gui, uid, pic_x, pic_y, pic_z, text, data )
+	local _,is_pixel = pen.font_cancer()
+	data = data or {}; data.has_shadow = not( is_pixel )
+	if( is_pixel ) then data.font = "data/fonts/font_pixel.xml" end
+	return pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
+end
+
 ---Tooltip framework.
 ---@param gui gui
 ---@param uid number
@@ -3037,6 +3143,12 @@ pen.FILE_PIC_NUL = "data/ui_gfx/empty_white.png"
 pen.FILE_MATTER = "data/debug/matter_test.xml"
 pen.FILE_MATTER_COLOR = "data/debug/matter_color.xml"
 pen.FILE_T2F = "data/debug/vpn"
+
+pen.SETTING_PPB = "PENMAN.SETTING_PPB"
+
+pen.INDEX_WRITER = "PENMAN_WRITE_INDEX"
+pen.INDEX_T2F = "PENMAN_VIRTUAL_INDEX"
+pen.INDEX_DRAWER = "PENMAN_PIC_INDEX"
 
 pen.DIV_0 = "@"
 pen.DIV_1 = "|"
@@ -3381,6 +3493,7 @@ pen.PALETTE = {
 		MANA = {66,168,226},
 		CAST = {252,138,67},
 		RUNIC = {121,201,153},
+		BROWN = {121,71,56},
 	},
 	HRMS = {
 		GOLD_1 = {205,104,61},
@@ -3500,6 +3613,23 @@ pen.Z_LAYERS = {
 	tips_back = -10100,
 	tips = -10101, --tooltips duh
 	tips_front = -10102,
+}
+
+pen.INIT_THREADS = {
+	WRITER = {
+		name = "writer",
+		index = pen.INDEX_WRITER,
+		func = function( request, value )
+			penman_w( request, string.gsub( value, "\\([nt])", { n = "\n", t = "\t", }))
+		end,
+	},
+	-- DRAWER = {
+	-- 	name = "drawer",
+	-- 	index = pen.INDEX_DRAWER,
+	-- 	func = function( request, value )
+	-- 		penman_d( request, tonumber( string.sub( value, 1, 4 )), tonumber( string.sub( value, 5, -1 )))
+	-- 	end,
+	-- },
 }
 
 pen.CANCER_COMPS = {
@@ -5282,6 +5412,15 @@ pen.FILE_XML_MATTER_COLOR = [[
         </count_per_material_type>
     </MaterialInventoryComponent>
 </Entity>
+]]
+
+pen.FILE_XML_FONT = [[
+<FontData>
+	<Texture>data/fonts/font_pixel_noshadow.png</Texture>
+	<LineHeight>7</LineHeight>
+	<CharSpace>0</CharSpace>
+	<WordSpace>6</WordSpace>
+</FontData>
 ]]
 
 ---@class PenmanButtonData

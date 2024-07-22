@@ -18,9 +18,9 @@ if( pen.c.testing_done ) then
         -- filing()
         -- raters()
         -- input()
-        tipping()
+        -- tipping()
         -- texting()
-        -- fonting()
+        fonting()
         -- cloner()
         -- text2func()
 
@@ -41,6 +41,14 @@ local test_input = {
 function misc_tests()
 
 --[[
+pen.lib.font_builder( "data/fonts/font_pixel_noshadow.xml", {
+    [55] = {
+        forced = true,
+        pos = { 140, 0, 6 },
+        rect_h = 22, rect_w = 3,
+    },
+}, { "data/fonts/font_pixel.png", 1483, 11 })
+
 pen.t.print( pen.t.parse( "{[\"main\"]={[\",\"]=0x1.000000p+0,[\"right_alt\"]=0x1.000000p+0}}" ))
 
 print( pen.t.pack( pen.t.unarray({ ass = 1, balls = 2, hmmm = 3, [5] = 5, [18] = 20 })))
@@ -305,8 +313,15 @@ function fonting()
 gui = gui or GuiCreate()
 GuiStartFrame( gui )
 
-pen.new_text( gui, 0, 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })
+print( pen.pic_builder( "data/debug/circle_16.png", 10, 10 )) --this should return either the path or nil (and reset setting memo if frame is less then should be)
+
+pen.new_image( gui, 1, 0, 100, 5, "data/fonts/font_pixel_runes_PPB1.png" )
+pen.new_image( gui, 1, 0, 100, 5, "data/debug/circle_16.png" )
+pen.new_image( gui, 1, 0, 120, 5, "data/debug/circle_16_PPB1.png" )
+
+-- pen.new_text( gui, 0, 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })
 -- pen.new_image( gui, 1, 98, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
+--[[
 pen.new_text( gui, 0, 100, 150, 0, test_input[1], {
     -- is_huge = false,
     fully_featured = true,
@@ -344,7 +359,7 @@ pen.new_text( gui, 0, 300, 150, 0, test_input[1], {
     color = {255,0,0,1},
     is_centered_y = true,
 })
-
+]]
 end
 
 -- *************************************************************************
