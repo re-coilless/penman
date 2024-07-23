@@ -1,18 +1,5 @@
 ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 
-function OnModInit()
-	dofile_once( "mods/penman/_libman.lua" )
-	pen.lib.font_builder( "data/fonts/font_pixel_runes.xml", {
-		[79] = {
-			forced = true,
-			pos = { 298, 0, 6 },
-			rect_h = 22, rect_w = 3,
-		},
-	}, "data/fonts/font_pixel.png" )
-
-	pen.pic_builder( "data/debug/circle_16.png", 10, 10 )
-end
-
 function OnWorldPreUpdate()
 	if( HasFlagPersistent( "one_shall_not_spawn" )) then
 		RemoveFlagPersistent( "one_shall_not_spawn" )

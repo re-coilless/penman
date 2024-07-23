@@ -12,7 +12,7 @@ if( pen.c.testing_done ) then
     if( pen.c.testing_done == 1 ) then
         return
     else
-        -- pen.c.testing_done = 1
+        pen.c.testing_done = 1
         
         -- misc_tests()
         -- filing()
@@ -20,7 +20,7 @@ if( pen.c.testing_done ) then
         -- input()
         -- tipping()
         -- texting()
-        fonting()
+        -- fonting()
         -- cloner()
         -- text2func()
 
@@ -39,6 +39,8 @@ local test_input = {
 -- *************************************************************************
 
 function misc_tests()
+
+print( tostring( pen.pic_builder( "data/debug/circle_16.png", 10, 15 ) or "" ))
 
 --[[
 pen.lib.font_builder( "data/fonts/font_pixel_noshadow.xml", {
@@ -313,15 +315,8 @@ function fonting()
 gui = gui or GuiCreate()
 GuiStartFrame( gui )
 
-print( pen.pic_builder( "data/debug/circle_16.png", 10, 10 )) --this should return either the path or nil (and reset setting memo if frame is less then should be)
-
-pen.new_image( gui, 1, 0, 100, 5, "data/fonts/font_pixel_runes_PPB1.png" )
-pen.new_image( gui, 1, 0, 100, 5, "data/debug/circle_16.png" )
-pen.new_image( gui, 1, 0, 120, 5, "data/debug/circle_16_PPB1.png" )
-
--- pen.new_text( gui, 0, 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })
+pen.new_text( gui, 0, 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })
 -- pen.new_image( gui, 1, 98, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
---[[
 pen.new_text( gui, 0, 100, 150, 0, test_input[1], {
     -- is_huge = false,
     fully_featured = true,
@@ -359,7 +354,7 @@ pen.new_text( gui, 0, 300, 150, 0, test_input[1], {
     color = {255,0,0,1},
     is_centered_y = true,
 })
-]]
+
 end
 
 -- *************************************************************************

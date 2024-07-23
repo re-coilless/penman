@@ -65,6 +65,7 @@ end
 -- pen.rate_wand
 -- pen.rate_creature
 
+--some kind of message system (check how MQTT works)
 --notification system (gameprintimportant-like but unified and with more capabilities)
 --add pen.animate debugging that plots/demos motion/scaling in self-aligning grid
 --coroutine-based sequencer that accepts a table of events (use varstorage to preserve the state between restarts)
@@ -867,7 +868,7 @@ end
 function pen.font_cancer( font, is_huge )
 	if( not( pen.vld( font ))) then
 		local default = "data/fonts/font_pixel_noshadow.xml"
-		if( GameHasFlagRun( pen.FLAG_USE_FANCY_FONT )) then
+		if( GameHasFlagRun( pen.FLAG_FANCY_FONT )) then
 			default = "data/fonts/generated/notosans_ko_24.bin" end 
 		if( is_huge == true ) then
 			default, is_huge = "data/fonts/font_pixel_huge.xml", 3
@@ -1591,14 +1592,15 @@ function pen.migrate( mod_id, funcs )
 	pen.setting_set( mod_id.."._version", latest_version )
 end
 
-function pen.is_game_restarted()
-	local is_nil = pen.c.restart_check == nil
-	local has_flag = GameHasFlagRun( pen.FLAG_RESTART_CHECK )
-
-	pen.c.restart_check = 1
-	GameAddFlagRun( pen.FLAG_RESTART_CHECK )
-	
-	return is_nil and has_flag
+function pen.is_game_restarted( is_local )
+	local is_reset = not( pen.c.restart_check or false ); pen.c.restart_check = true
+	if( is_reset and is_local ) then GameRemoveFlagRun( pen.FLAG_RESTART_CHECK ) end
+	local is_start = GameGetRealWorldTimeSinceStarted() < 6
+	if( is_start and is_reset ) then GameRemoveFlagRun( pen.FLAG_RESTART_CHECK ) end
+	local is_init = SessionNumbersGetValue( "is_biome_map_initialized" ) == "0"
+	local is_new = is_reset and is_init and not( GameHasFlagRun( pen.FLAG_RESTART_CHECK ))
+	if( is_new ) then GameAddFlagRun( pen.FLAG_RESTART_CHECK ) end
+	return is_new
 end
 
 function pen.is_inv_active( hooman )
@@ -2503,36 +2505,40 @@ function pen.pic_cloner( old_pic, new_pic, dims )
 	return pen.pic_paster( new_id, old_id, { math.min( old_w, new_w ), math.min( old_h, new_h )}), new_pic
 end
 function pen.pic_builder( pic, w, h ) --apocalyptic thanks to Lamia and Dexter
-	if( not( pen.vld( pen.magic_draw ))) then return end
-	
+	if( pen.is_game_restarted()) then pen.setting_set( pen.SETTING_PPB, "" ) end
+
+	local pic_builder_memo = pen.t.parse( pen.setting_get( pen.SETTING_PPB )) or {}
+	local raw_id = string.gsub( string.gsub( pic, ".png$", "" ), "_ppb%d-$", "" )
+	if( ModImageMakeEditable == nil ) then
+		if( pic_builder_memo[ raw_id ] == nil or w == nil ) then return end
+		return pic_builder_memo[ raw_id ][ table.concat({( w or -1 ), "|", ( h or -1 )})]
+	else pic_builder_memo[ raw_id ] = pic_builder_memo[ raw_id ] or { count = 0 } end
+
 	local do_it = w ~= nil
 	if( ModDoesFileExist( pic )) then
 		local _, pic_w, pic_h = pen.magic_draw( pic, w or 0, h or 0 )
 		w, h = w or pic_w, h or pic_h
 		if( pic_w == w and pic_h == h ) then
-			if( ModMagicNumbersFileAdd ~= nil ) then do_it = true else do_it = 1 end
-		else do_it = 1 end
+			do_it = 1
+		else do_it = true end
 	elseif( not( do_it )) then return end
 
-	local pic_builder_memo = pen.t.parse( pen.setting_get( pen.SETTING_PPB )) or {}
-	local raw_id = string.gsub( string.gsub( pic, ".png$", "" ), "_PPB%d-$", "" )
-	pic_builder_memo[ raw_id ] = pic_builder_memo[ raw_id ] or { count = 0 }
-	
 	local pic_id = table.concat({ w, "|", h })
 	local count = pic_builder_memo[ raw_id ].count
-	if( do_it == 1 and pic_builder_memo[ raw_id ][ pic_id ] ~= nil ) then
+	if( do_it == true and pic_builder_memo[ raw_id ][ pic_id ] ~= nil ) then
 		pic_id = table.concat({ "c"..count, "|", "c"..count })
 	end
-	if( pic_builder_memo[ raw_id ][ pic_id ] == nil ) then
-		pic_builder_memo[ raw_id ].count = count + 1
-		pic_builder_memo[ raw_id ][ pic_id ] = table.concat({
-			raw_id, "_PPB", pic_builder_memo[ raw_id ].count, ".png" })
-		pen.setting_set( pen.SETTING_PPB, pen.t.parse( pic_builder_memo ))
-	end
-
-	if( do_it == 1 ) then
+	
+	if( do_it == true ) then
+		local pic_memo = pic_builder_memo[ raw_id ][ pic_id ]
+		if( pic_memo == nil ) then
+			pic_builder_memo[ raw_id ].count = count + 1
+			pic_builder_memo[ raw_id ][ pic_id ] = string.lower( table.concat({
+				raw_id, "_ppb", pic_builder_memo[ raw_id ].count, ".png" }))
+			pen.setting_set( pen.SETTING_PPB, pen.t.parse( pic_builder_memo ))
+		else return ModImageIdFromFilename( pic_memo ), pic_memo end
+		
 		pic_id, pic = pen.pic_cloner( pic, pic_builder_memo[ raw_id ][ pic_id ], { w, h })
-		print( pic )
 	else pic_id = ModImageIdFromFilename( pic ) end
 	return pic_id, pic
 end
@@ -3121,7 +3127,7 @@ end
 
 --[GLOBALS]
 pen.FLAG_UPDATE_UTF = "PENMAN_UTF_MAP_UPDATE"
-pen.FLAG_USE_FANCY_FONT = "PENMAN_FANCY_FONTING"
+pen.FLAG_FANCY_FONT = "PENMAN_FANCY_FONTING"
 pen.FLAG_RESTART_CHECK = "PENMAN_GAME_HAS_STARTED"
 
 pen.GLOBAL_VIRTUAL_ID = "PENMAN_VIRTUAL_INDEX"
