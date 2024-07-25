@@ -12,13 +12,13 @@ if( pen.c.testing_done ) then
     if( pen.c.testing_done == 1 ) then
         return
     else
-        pen.c.testing_done = 1
+        -- pen.c.testing_done = 1
         
         -- misc_tests()
         -- filing()
         -- raters()
         -- input()
-        -- tipping()
+        tipping()
         -- texting()
         -- fonting()
         -- cloner()
@@ -40,16 +40,25 @@ local test_input = {
 
 function misc_tests()
 
-print( tostring( pen.pic_builder( "data/debug/circle_16.png", 10, 15 ) or "" ))
+local gui = GuiCreate()
+local balls = {}; balls[ gui ] = 1
+print( balls[ gui ], tostring( gui ))
 
 --[[
+local m_x, m_y = DEBUG_GetMouseWorld()
+if( InputIsKeyDown( 20 )) then --q
+local result = pen.get_xy_matter( m_x, m_y, -10 )
+if( pen.vld( result )) then print( tostring( CellFactory_GetName( result ))) end
+end
+
+print( tostring( pen.pic_builder( "data/debug/circle_16.png", 10, 15 ) or "" ))
 pen.lib.font_builder( "data/fonts/font_pixel_noshadow.xml", {
     [55] = {
         forced = true,
         pos = { 140, 0, 6 },
-        rect_h = 22, rect_w = 3,
+        rect_w = 3, rect_h = 22,
     },
-}, { "data/fonts/font_pixel.png", 1483, 11 })
+}, "data/fonts/font_pixel.png" )
 
 pen.t.print( pen.t.parse( "{[\"main\"]={[\",\"]=0x1.000000p+0,[\"right_alt\"]=0x1.000000p+0}}" ))
 
@@ -182,10 +191,7 @@ end
 
 function input()
 
-gui = gui or GuiCreate()
-GuiStartFrame( gui )
-
-uid = pen.new_input( gui, 1, "balls", 100, 100, 5, {
+pen.new_input( "balls", 100, 100, 5, {
 
 })
 
@@ -195,19 +201,16 @@ end
 
 function tipping()
 
-gui = gui or GuiCreate()
-GuiStartFrame( gui )
-
-local uid, pic_x, pic_y, _, clicked, _, yep = pen.new_dragger( gui, 1, "balls", 400, 100, 100, 100 )
-uid, _, _, yep = pen.new_image( gui, uid, pic_x, pic_y, 5, "data/ui_gfx/empty_white.png", { s_x = 50, s_y = 50, can_click = true })
--- uid = pen.new_tooltip( gui, uid, test_input[1], { is_active = yep, tid = "bs2", is_over = true })
-uid = pen.new_tooltip( gui, uid, test_input[2], { tid = "bs1" })
--- uid = pen.new_tooltip( gui, uid, test_input[1], { is_active = yep, tid = "bs3", is_left = true })
--- uid = pen.new_tooltip( gui, uid, test_input[2], { is_active = yep, tid = "bs4", is_over = true, is_left = true })
-uid = pen.new_tooltip( gui, uid, "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", {
+local pic_x, pic_y, _, clicked, _, yep = pen.new_dragger( "balls", 400, 100, 100, 100 )
+_, _, yep = pen.new_image( pic_x, pic_y, 5, "data/ui_gfx/empty_white.png", { s_x = 50, s_y = 50, can_click = true })
+-- pen.new_tooltip( test_input[1], { is_active = yep, tid = "bs2", is_over = true })
+pen.new_tooltip( test_input[2], { tid = "bs1" })
+-- pen.new_tooltip( test_input[1], { is_active = yep, tid = "bs3", is_left = true })
+-- pen.new_tooltip( test_input[2], { is_active = yep, tid = "bs4", is_over = true, is_left = true })
+pen.new_tooltip( "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", {
     is_active = yep, pos = {390,199}, allow_hover = true, do_corrections = true, font_mods = {
-        e1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-            return pen.FONT_MODS.tip( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, "balls", "LESSS GOOOOOO" )
+        e1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
+            return pen.FONT_MODS.tip( pic_x, pic_y, pic_z, char_data, color, indexes, "balls", "LESSS GOOOOOO" )
         end,
     }
 })
@@ -270,20 +273,18 @@ end
 
 function texting()
 
-gui = gui or GuiCreate()
-GuiStartFrame( gui )
-
 -- pen.new_text:
 -- LUA: 0.014300000002549ms
 -- LUA: 0.020199999999022ms
 -- LUA: 0.0097000000023399ms
 -- LUA: 0.010699999998906ms
 
-local uid = 1
 -- print( "pen.new_text: " ) --0.046200000000645ms
 -- pen.chrono( pen.new_text, {
---     gui, uid, 0, 0, 0, "123456789123456789123456789", { fully_featured = false, dims = {10,0}}
+--     0, 0, 0, "123456789123456789123456789", { fully_featured = false, dims = {10,0}}
 -- })
+-- local gui = GuiCreate()
+-- GuiStartFrame( gui )
 -- print( "GuiText: " ) --0.0020000000004075ms
 -- pen.chrono( GuiText, {
 --     gui, 0, 0, "123"
@@ -296,7 +297,7 @@ local step_y = 9
 for i = 1,screen_w/step_x do
     for e = 1,screen_h/step_y do
         n = n + 1
-        uid = pen.new_text( gui, uid, step_x*( i - 1 ), step_y*( e - 1 ), 0, "123456789123456789123456789", { fully_featured = false, dims = {step_x,step_y}})
+        pen.new_text( step_x*( i - 1 ), step_y*( e - 1 ), 0, "123456789123456789123456789", { fully_featured = false, dims = {step_x,step_y}})
         -- GuiText( gui, step_x*( i - 1 ), step_y*( e - 1 ), "123" )   
     end
 end
@@ -312,12 +313,9 @@ function fonting()
 -- GamePrint( pen.magic_byte( pen.BYTE_TO_ID[ 237117598 ]))
 -- GamePrint( pen.magic_byte( pen.magic_byte( "∞" )))
 
-gui = gui or GuiCreate()
-GuiStartFrame( gui )
-
-pen.new_text( gui, 0, 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })
--- pen.new_image( gui, 1, 98, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
-pen.new_text( gui, 0, 100, 150, 0, test_input[1], {
+pen.new_text( 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })
+-- pen.new_image( 98, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
+pen.new_text( 100, 150, 0, test_input[1], {
     -- is_huge = false,
     fully_featured = true,
     dims = {100, 100},
@@ -330,15 +328,15 @@ pen.new_text( gui, 0, 100, 150, 0, test_input[1], {
     -- is_right_x = true,
     is_centered_y = true,
     funcs = {
-        c1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-            return uid, pic_x[1], pic_y[1], {0,255,0,0.5}
+        c1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
+            return pic_x[1], pic_y[1], {0,255,0,0.5}
         end,
-        c2 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-            return uid, pic_x[1], pic_y[1], pen.PALETTE.PRSP.RED
+        c2 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
+            return pic_x[1], pic_y[1], pen.PALETTE.PRSP.RED
         end,
         
-        e1 = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes )
-            return pen.FONT_MODS.hyperlink( gui, uid, pic_x, pic_y, pic_z, char_data, color, indexes, "balls" )
+        e1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
+            return pen.FONT_MODS.hyperlink( pic_x, pic_y, pic_z, char_data, color, indexes, "balls" )
         end,
     },
 })
@@ -346,8 +344,8 @@ if(( pen.cache({ "hyperlink_state", "balls" }) or -1 ) == GameGetFrameNum()) the
     EntityLoad( "data/entities/animals/scavenger_smg.xml", 0, -200 )
 end
 
-pen.new_image( gui, 1, 298, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
-pen.new_text( gui, 0, 300, 150, 0, test_input[1], {
+pen.new_image( 298, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
+pen.new_text( 300, 150, 0, test_input[1], {
     is_huge = false,
     fully_featured = true,
     dims = {100, 100},

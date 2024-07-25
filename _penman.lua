@@ -48,10 +48,13 @@ end
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
+--transition mnee and kappa to new gui
+--scrolling text via new_cutout
 --probably move [COMPLEX] to libman and append FFT to ANIM_INTERS separately
 --pen.new_image interfacing must have xml offset support + integrate offsets with rotation
 --transition mrshll to penman
 
+-- pen.estimate
 -- pen.animate
 -- pen.setting_set
 -- pen.setting_get
@@ -65,6 +68,7 @@ end
 -- pen.rate_wand
 -- pen.rate_creature
 
+--a system that converts images into a pixel table to be drawn in settings.lua
 --some kind of message system (check how MQTT works)
 --notification system (gameprintimportant-like but unified and with more capabilities)
 --add pen.animate debugging that plots/demos motion/scaling in self-aligning grid
@@ -203,6 +207,15 @@ function pen.atimer( tid, duration, reset_now, stillborn )
 	end; return math.min( frame_num - pen.c.animation_timer[ tid ], duration or 0 )
 end
 
+function pen.estimate( eid, target, speed, min_delta ) --make it more advanced by stealiing animate funcs
+	pen.c.estimator_memo = pen.c.estimator_memo or {}
+	pen.c.estimator_memo[ eid ] = pen.c.estimator_memo[ eid ] or 0
+	local delta = target - pen.c.estimator_memo[ eid ]
+	pen.c.estimator_memo[ eid ] = pen.c.estimator_memo[ eid ]
+		+ pen.limiter( pen.limiter(( speed or 0.1 )*delta, min_delta or 1, true ), delta )
+	return pen.c.estimator_memo[ eid ]
+end
+
 function pen.animate( delta, frame, data ) --https://www.febucci.com/2018/08/easing-functions/
 	data = data or {}
 	data.frames = data.frames or 20
@@ -282,6 +295,7 @@ function pen.v2s( value, is_pretty, full_precision )
 		["string"] = function( v ) return string.format( "%q", v ) end,
 		["boolean"] = function( v ) return "bool"..pen.b2n( v ) end,
 		["function"] = function( v ) return string.format( "%q", tostring( v )) end,
+		["userdata"] = function( v ) return string.format( "%q", tostring( v )) end,
 	})[ type( value )]( value ) or value )
 end
 function pen.s2v( str )
@@ -415,7 +429,7 @@ function pen.t.get_max( tbl )
 	for k,v in pairs( tbl ) do
 		if( best[2] < v ) then best = { k, v } end
 	end
-	return tbl[ best[1]], best[1]
+	return unpack( best )
 end
 
 function pen.t.get_most( tbl )
@@ -1837,24 +1851,41 @@ function pen.get_xy_matter( x, y, duration )
 		else return 0 end
 	end
 
+	duration = duration or 5
 	pen.c.get_xy_matter_memo = pen.c.get_xy_matter_memo or {
-		probe = EntityLoad( pen.FILE_MATTER, x, y ),
-		frames = GameGetFrameNum() + ( duration or 5 ),
-		mtr_list = {},
+		probe = pen.delayed_kill( EntityLoad( pen.FILE_MATTER, x, y ), math.abs( duration )),
+		frames = duration < 0 and math.abs( duration ) or ( GameGetFrameNum() + duration ),
+		mtr_list = {}, mtr_buff = {}, mtr_memo = {},
 	}
+	if( not( EntityGetIsAlive( pen.c.get_xy_matter_memo.probe or 0 ))) then
+		pen.c.get_xy_matter_memo.probe = pen.delayed_kill( EntityLoad( pen.FILE_MATTER, x, y ), math.abs( duration ))
+	end
 	
     local data = pen.c.get_xy_matter_memo
-	if( data.frames > GameGetFrameNum()) then
+	if( duration < 0 or data.frames > GameGetFrameNum()) then
         EntityApplyTransform( data.probe, x + 0.5*pen.get_sign( math.random( -1, 0 )), y + 0.5*pen.get_sign( math.random( -1, 0 )))
 		
         local dmg_comp = EntityGetFirstComponentIncludingDisabled( data.probe, "DamageModelComponent" )
         local matter = ComponentGetValue2( dmg_comp, "mCollisionMessageMaterials" )
-        for i,v in ipairs( ComponentGetValue2( dmg_comp, "mCollisionMessageMaterialCountsThisFrame" )) do
-            if( v > 0 ) then pen.c.get_xy_matter_memo.mtr_list[ matter[i]] = ( data.mtr_list[ matter[i]] or 0 ) + v end
-        end
+		pen.t.loop( ComponentGetValue2( dmg_comp, "mCollisionMessageMaterialCountsThisFrame" ), function( i, v )
+			if( v > 0 ) then data.mtr_list[ matter[i]], data.mtr_buff[ matter[i]] = ( data.mtr_list[ matter[i]] or 0 ) + v, v end
+		end)
+		
+		if( duration < 0 ) then
+			pen.magic_comp( data.probe, "LifetimeComponent", function( comp_id, v, is_enabled )
+				v.kill_frame = GameGetFrameNum() + data.frames; return true
+			end)
+
+			table.insert( data.mtr_memo, data.mtr_buff ); data.mtr_buff = {}
+			if( data.frames < #data.mtr_memo ) then
+				for m,v in pairs( data.mtr_memo[1]) do
+					data.mtr_list[m] = data.mtr_list[m] - v
+				end; table.remove( data.mtr_memo, 1 )
+				return pen.t.get_max( data.mtr_list )
+			end
+		end
 	else
-		local _,mtr = pen.t.get_max( data.mtr_list )
-		EntityKill( data.probe )
+		local mtr = pen.t.get_max( data.mtr_list ); EntityKill( data.probe )
 		pen.c.get_xy_matter_memo = nil
 		return mtr
 	end
@@ -1920,8 +1951,9 @@ function pen.magic_shooter( who_shot, path, x, y, v_x, v_y, do_it, proj_mods, cu
 end
 
 function pen.delayed_kill( entity_id, delay, comp_id )
-	EntityAddComponent( entity_id, "LifetimeComponent", { lifetime = delay + 1 })
+	EntityAddComponent( entity_id, "LifetimeComponent", { lifetime = ( delay or 5 ) + 1 })
 	if( pen.vld( comp_id, true )) then EntityRemoveComponent( entity_id, comp_id ) end
+	return entity_id
 end
 
 function pen.check_bounds( dot, pos, box )
@@ -2239,6 +2271,28 @@ function pen.rate_creature( entity_id, hooman, data )--hamis at 20m is 1
 end
 
 --[INTERFACE]
+function pen.new_gui( gui )
+	if( gui == false or ( gui == true and (( pen.c.gui_data or {})[2] or 2 ) < 2 )) then
+		if(( pen.c.gui_data or {})[1]) then GuiDestroy( pen.c.gui_data[1]) end
+		pen.c.gui_data = nil
+		return
+	elseif( type( gui ) == "userdata" ) then
+		if( pen.vld( pen.c.gui_data )) then
+			pen.c.gui_dump[ pen.c.gui_data[1]] = pen.t.clone( pen.c.gui_data )
+		end
+		if( pen.c.gui_dump[ gui ] ~= nil ) then
+			pen.c.gui_data = pen.t.clone( pen.c.gui_dump[ gui ])
+		else pen.c.gui_data = nil end
+	end
+
+	local frame_num = GameGetFrameNum()
+	pen.c.gui_data = pen.c.gui_data or { gui or GuiCreate(), 1, frame_num }
+	if( pen.c.gui_data[3] ~= frame_num ) then
+		pen.c.gui_data[2], pen.c.gui_data[3] = 1, frame_num; GuiStartFrame( pen.c.gui_data[1])
+	else pen.c.gui_data[2] = pen.c.gui_data[2] + 1; GuiIdPush( unpack( pen.c.gui_data )) end
+	return unpack( pen.c.gui_data )
+end
+
 function pen.magic_rgb( c, to_rbg, mode )
 	--HSV: https://github.com/iskolbin/lhsx/blob/master/hsx.lua
 	--OKLAB: https://bottosson.github.io/posts/oklab/#converting-from-linear-srgb-to-oklab
@@ -2324,7 +2378,7 @@ function pen.magic_rgb( c, to_rbg, mode )
 	end))
 end
 
-function pen.colourer( gui, c, alpha )
+function pen.colourer( c, alpha )
 	if( not( pen.vld( c ) or pen.vld( alpha ))) then return end
 	c = pen.get_hybrid_table( c, true )
 
@@ -2334,6 +2388,7 @@ function pen.colourer( gui, c, alpha )
 		b = c[3] or c[1] or 255,
 		a = c[4] or alpha or 1,
 	}
+	local gui = pen.new_gui(); pen.c.gui_data[2] = pen.c.gui_data[2] - 1
 	GuiColorSetForNextWidget( gui, color.r/255, color.g/255, color.b/255, color.a )
 end
 
@@ -2544,7 +2599,7 @@ function pen.pic_builder( pic, w, h ) --apocalyptic thanks to Lamia and Dexter
 end
 
 --make non z-level adjusted stuff work with z-level adjusted, the latter must always be prioritized
-function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, pic_z, ignore_multihover, is_debugging )
+function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, ignore_multihover, is_debugging )
 	local frame_num = GameGetFrameNum()
 	local clicked, r_clicked = false, false
 	local lmb_state, rmb_state = InputIsMouseButtonDown( 1 ), InputIsMouseButtonDown( 2 )
@@ -2578,18 +2633,13 @@ function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, pic_z, ignore_mult
 		is_hovered = pen.check_bounds( m_pos, { pic_x, pic_y }, { s_x, s_y })
 	end
 	
-	if( is_hovered and is_debugging ) then
-		uid = uid + 1
-		GuiIdPush( gui, uid )
-		GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
-		GuiColorSetForNextWidget( gui, 1, 0, 0, 1 )
-		GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
-		GuiImage( gui, uid, pic_x, pic_y, pen.FILE_PIC_NUL, 0.75, s_x/2, s_y/2 )
-	end
-	
 	if( is_hovered ) then
-		uid = uid + 1
-		GuiIdPush( gui, uid )
+		if( is_debugging ) then
+			pen.new_image( pic_x, pic_y, 10*pen.Z_LAYERS.tips,
+				pen.FILE_PIC_NUL, { s_x = s_x/2, s_y = s_y/2, color = {255,0,0}, alpha = 0.75 })
+		end
+		
+		local gui, uid = pen.new_gui()
 		GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
 		GuiImage( gui, uid, m_x - 10, m_y - 10, pen.FILE_PIC_NIL, 1, 10, 10 )
 
@@ -2607,7 +2657,7 @@ function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, pic_z, ignore_mult
 			if( is_figuring and frame_num - update_frame > 1 and pen.compare_float( pic_z, top_z, 0.001 )) then
 				clicked, r_clicked, pen.c.interface_memo[3] = pen.c.interface_memo[1], pen.c.interface_memo[2], nil
 				GlobalsSetValue( pen.GLOBAL_INTERFACE_Z, "nope" )
-				return uid, clicked, r_clicked, true
+				return clicked, r_clicked, true
 			end
 
 			if(( not( is_figuring ) and ( clicked or r_clicked )) or ( is_figuring and pic_z < top_z )) then
@@ -2622,15 +2672,14 @@ function pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, pic_z, ignore_mult
 		is_hovered = is_new or not( ignore_multihover )
 	end
 
-	return uid, clicked, r_clicked, is_hovered
+	return clicked, r_clicked, is_hovered
 end
 
-function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
+function pen.new_image( pic_x, pic_y, pic_z, pic, data )
 	data = data or {}
 
-	uid = uid + 1
-	GuiIdPush( gui, uid )
-	pen.colourer( gui, data.color )
+	local gui, uid = pen.new_gui()
+	pen.colourer( data.color )
 	GuiZSetForNextWidget( gui, pic_z )
 	GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
 	GuiImage( gui, uid, pic_x, pic_y, pic,
@@ -2640,7 +2689,7 @@ function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
 	local w, h = pen.get_pic_dims( pic )
 	if( data.has_shadow ) then
 		GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
-		pen.colourer( gui, pen.PALETTE.SHADOW )
+		pen.colourer( pen.PALETTE.SHADOW )
 		GuiZSetForNextWidget( gui, pic_z + 0.0001 )
 		local s_x, s_y = 1/(( data.s_x or 1 )*w ) + 1, 1/(( data.s_y or 1 )*h ) + 1
 		GuiImage( gui, uid, pic_x - 0.5, pic_y - 0.5,
@@ -2648,23 +2697,18 @@ function pen.new_image( gui, uid, pic_x, pic_y, pic_z, pic, data )
 	end
 	if( data.can_click ) then
 		if( data.skip_z_check ) then pic_z = nil end
-		uid, data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
-			gui, uid, pic_x, pic_y, w*( data.s_x or 1 ), h*( data.s_y or 1 ), pic_z, data.ignore_multihover
-		)
+		return pen.new_interface( pic_x, pic_y, w*( data.s_x or 1 ), h*( data.s_y or 1 ), pic_z, data.ignore_multihover )
 	end
-	return uid, data.clicked, data.r_clicked, data.is_hovered
 end
 
 ---Button framework.
----@param gui gui
----@param uid number
 ---@param pic_x number
 ---@param pic_y number
 ---@param pic_z number
 ---@param pic path
 ---@param data? PenmanButtonData
----@return number uid, boolean clicked, boolean r_clicked, boolean is_hovered
-function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic, data )
+---@return boolean clicked, boolean r_clicked, boolean is_hovered
+function pen.new_button( pic_x, pic_y, pic_z, pic, data )
 	data = data or {}
 	data.auid = data.auid or table.concat({ pic, pic_z })
 	data.no_anim = data.no_anim or false
@@ -2673,37 +2717,36 @@ function pen.new_button( gui, uid, pic_x, pic_y, pic_z, pic, data )
 	local pic_iz = pic_z
 	if( data.skip_z_check ) then pic_iz = nil end
 	data.dims = { pen.get_pic_dims( pen.get_hybrid_table( pic )[1])}
-	uid, data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
-		gui, uid, pic_x, pic_y, data.dims[1]*( data.s_x or 1 ), data.dims[2]*( data.s_y or 1 ), pic_iz, true
-	)
+	data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
+		pic_x, pic_y, data.dims[1]*( data.s_x or 1 ), data.dims[2]*( data.s_y or 1 ), pic_iz, true )
 
 	if( data.lmb_event ~= nil and data.clicked ) then
-		uid, pic_x, pic_y, pic_z, pic, data = data.lmb_event( gui, uid, pic_x, pic_y, pic_z, pic, data ) end
+		pic_x, pic_y, pic_z, pic, data = data.lmb_event( pic_x, pic_y, pic_z, pic, data ) end
 	if( data.rmb_event ~= nil and data.r_clicked ) then
-		uid, pic_x, pic_y, pic_z, pic, data = data.rmb_event( gui, uid, pic_x, pic_y, pic_z, pic, data ) end
+		pic_x, pic_y, pic_z, pic, data = data.rmb_event( pic_x, pic_y, pic_z, pic, data ) end
 	if( data.hov_event ~= nil and data.is_hovered ) then
-		uid, pic_x, pic_y, pic_z, pic, data = data.hov_event( gui, uid, pic_x, pic_y, pic_z, pic, data )
+		pic_x, pic_y, pic_z, pic, data = data.hov_event( pic_x, pic_y, pic_z, pic, data )
 	elseif( data.idle_event ~= nil ) then
-		uid, pic_x, pic_y, pic_z, pic, data = data.idle_event( gui, uid, pic_x, pic_y, pic_z, pic, data ) end
-	uid = data.pic_func( gui, uid, pic_x, pic_y, pic_z, pic, data )
-	return uid, data.clicked, data.r_clicked, data.is_hovered
+		pic_x, pic_y, pic_z, pic, data = data.idle_event( pic_x, pic_y, pic_z, pic, data ) end
+	data.pic_func( pic_x, pic_y, pic_z, pic, data )
+	return data.clicked, data.r_clicked, data.is_hovered
 end
 
-function pen.new_dragger( gui, uid, did, pic_x, pic_y, s_x, s_y, pic_z, allow_multihovers, is_debugging )
+function pen.new_dragger( did, pic_x, pic_y, s_x, s_y, pic_z, allow_multihovers, is_debugging )
 	pen.c.dragger_data = pen.c.dragger_data or {}
 	pen.c.dragger_data[ did ] = pen.c.dragger_data[ did ] or { is_going = false, old_state = true, off = {0,0}}
 
 	local frame_num = GameGetFrameNum()
 	local is_new = math.abs( tonumber( GlobalsGetValue( pen.GLOBAL_DRAGGER_SAFETY, "0" ))) ~= frame_num
-	if( not( is_new )) then return uid, pic_x, pic_y, 0 end
+	if( not( is_new )) then return pic_x, pic_y, 0 end
 
 	local m_x, m_y = pen.get_mouse_pos()
 	-- pen.c.dragger_data[ did ].old_pos = pen.c.dragger_data[ did ].old_pos or { m_x, m_y }
 	-- local d_x, d_y = m_x - pen.c.dragger_data[ did ].old_pos[1], m_y - pen.c.dragger_data[ did ].old_pos[2]
 	-- pen.c.dragger_data[ did ].old_pos = { m_x, m_y }
 	
-	local clicked, r_clicked, is_hovered = false, false, false
-	uid, _, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, s_x, s_y, pic_z, false, is_debugging )
+	local clicked = false
+	local _, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, false, is_debugging )
 	
 	local state = 0
 	local mouse_state = InputIsMouseButtonDown( 1 )
@@ -2721,27 +2764,23 @@ function pen.new_dragger( gui, uid, did, pic_x, pic_y, s_x, s_y, pic_z, allow_mu
 	else pen.c.dragger_data[ did ].old_state = mouse_state end
 	
 	if( state > 0 ) then GlobalsSetValue( pen.GLOBAL_DRAGGER_SAFETY, (( allow_multihovers or false ) and 1 or -1 )*frame_num ) end
-	return uid, pic_x, pic_y, state, clicked, r_clicked, is_hovered
+	return pic_x, pic_y, state, clicked, r_clicked, is_hovered
 end
 
-function pen.new_cutout( gui, uid, pic_x, pic_y, size_x, size_y, func, v ) --credit goes to aarvlo
-	uid = uid + 1
-	GuiIdPush( gui, uid )
-
+function pen.new_cutout( pic_x, pic_y, size_x, size_y, func, args ) --credit goes to aarvlo
 	local margin = 0
+	local gui, uid = pen.new_gui()
 	GuiAnimateBegin( gui )
 	GuiAnimateAlphaFadeIn( gui, uid, 0, 0, true )
 	GuiBeginAutoBox( gui )
 	GuiBeginScrollContainer( gui, uid, pic_x - margin, pic_y - margin, size_x, size_y, false, margin, margin )
 	GuiEndAutoBoxNinePiece( gui )
 	GuiAnimateEnd( gui )
-	uid = func( gui, uid, v )
+	func( args )
 	GuiEndScrollContainer( gui )
-
-	return uid
 end
 
-function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
+function pen.new_text( pic_x, pic_y, pic_z, text, data )
 	data = data or {}
 	data.alpha = data.alpha or 1
 	data.scale, data.funcs = 1, data.funcs or {}
@@ -2762,13 +2801,15 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 		data.dims = dims
 	end
 	
-	local function shadowed_text( gui, pic_x, pic_y, pic_z, txt, scale, font, is_pixel, color, alpha, has_shadow )
+	local gui = pen.new_gui()
+	local function shadowed_text( pic_x, pic_y, pic_z, txt, scale, font, is_pixel, color, alpha, has_shadow )
+		local gui = pen.c.gui_data[1]
 		GuiZSetForNextWidget( gui, pic_z )
-		pen.colourer( gui, color, alpha )
+		pen.colourer( color, alpha )
 		GuiText( gui, pic_x, pic_y, txt, scale, font, is_pixel )
 		if( not( has_shadow )) then return end
 		GuiZSetForNextWidget( gui, pic_z + 0.0001 )
-		pen.colourer( gui, pen.PALETTE.SHADOW, 0.6*alpha )
+		pen.colourer( pen.PALETTE.SHADOW, 0.6*alpha )
 		GuiText( gui, pic_x + scale/2, pic_y + scale/2, txt, scale, font, is_pixel )
 	end
 
@@ -2777,10 +2818,10 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	if( not( data.fully_featured )) then
 		if( data.is_centered_x or data.is_right_x ) then pic_x = pic_x - dims[1]/( data.is_right_x and 1 or 2 ) end
 		for i,t in ipairs( text ) do
-			shadowed_text( gui, pic_x + off_x, pic_y + ( i - 1 )*new_line + off_y, pic_z,
+			shadowed_text( pic_x + off_x, pic_y + ( i - 1 )*new_line + off_y, pic_z,
 				t, data.scale, data.font, is_pixel_font, data.color, data.alpha, data.has_shadow )
 		end
-		return uid, dims
+		return dims
 	end
 	
 	local structure = pen.cache({ "metafont",
@@ -2863,7 +2904,7 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 		local pos_y = pic_y + data.scale*( off_y + element.y )
 		if( not( pen.vld( element.f ))) then
 			c_lcl = {}
-			shadowed_text( gui, pos_x, pos_y, pic_z,
+			shadowed_text( pos_x, pos_y, pic_z,
 				element.text, data.scale, data.font, is_pixel_font, data.color, data.alpha, data.has_shadow )
 			return
 		end
@@ -2889,8 +2930,8 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 				if( font_mod ~= nil ) then
 					clr[4] = clr[4] or data.alpha
 					c_lcl[ func ] = ( c_lcl[ func ] or 0 ) + 1
-					uid, pos_x, pos_y, new_clr, new_font, new_char = font_mod(
-						gui, uid, { pos_x, orig_x }, { pos_y, orig_y }, pic_z,
+					pos_x, pos_y, new_clr, new_font, new_char = font_mod(
+						{ pos_x, orig_x }, { pos_y, orig_y }, pic_z,
 						{ char = char, dims = off, font = font, extra = extra_list, ram = pen.c.font_ram },
 						clr, { gbl = c_gbl, lcl = c_lcl[ func ], chr = letter_id }
 					)
@@ -2901,7 +2942,7 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 			end
 			
 			if( pen.vld( char )) then
-				shadowed_text( gui, pos_x, pos_y, pic_z, char, data.scale, font[1], font[2], clr, data.alpha, data.has_shadow )
+				shadowed_text( pos_x, pos_y, pic_z, char, data.scale, font[1], font[2], clr, data.alpha, data.has_shadow )
 			end
 
 			orig_x = orig_x + off[1]
@@ -2910,25 +2951,23 @@ function pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
 	end)
 	
 	pen.c.font_ram = nil
-	
-	return uid, dims
+
+	return dims
 end
 
-function pen.new_shadowed_text( gui, uid, pic_x, pic_y, pic_z, text, data )
+function pen.new_shadowed_text( pic_x, pic_y, pic_z, text, data )
 	local _,is_pixel = pen.font_cancer()
 	data = data or {}; data.has_shadow = not( is_pixel )
 	if( is_pixel ) then data.font = "data/fonts/font_pixel.xml" end
-	return pen.new_text( gui, uid, pic_x, pic_y, pic_z, text, data )
+	return pen.new_text( pic_x, pic_y, pic_z, text, data )
 end
 
 ---Tooltip framework.
----@param gui gui
----@param uid number
 ---@param text? string
 ---@param data? PenmanTooltipData
----@param func? fun( gui:gui, uid:number, text?:string, d?:PenmanTooltipData ): uid:number, { clicked:boolean, r_clicked:boolean, is_hovered:boolean } The definition of the custom visuals. Draws the default tip if left empty.
----@return number uid, boolean is_active
-function pen.new_tooltip( gui, uid, text, data, func )
+---@param func? fun( text?:string, d?:PenmanTooltipData ): { clicked:boolean, r_clicked:boolean, is_hovered:boolean } The definition of the custom visuals. Draws the default tip if left empty.
+---@return boolean is_active
+function pen.new_tooltip( text, data, func )
 	data = data or {}
 	data.tid = data.tid or "dft"
 	data.edging = data.edging or 3
@@ -2937,6 +2976,7 @@ function pen.new_tooltip( gui, uid, text, data, func )
 	data.allow_hover = data.allow_hover or false
 	data.do_corrections = data.do_corrections or not( pen.vld( data.pos ))
 	
+	local gui = pen.new_gui()
 	local frame_num = GameGetFrameNum()
 	pen.c.ttips = pen.c.ttips or {}
 	pen.c.ttips[ data.tid ] = pen.c.ttips[ data.tid ] or {
@@ -2945,7 +2985,7 @@ function pen.new_tooltip( gui, uid, text, data, func )
 	if( data.allow_hover and pen.vld( pen.c.ttips[ data.tid ].inter_state )) then
 		data.is_active = data.is_active or pen.c.ttips[ data.tid ].inter_state[3]
 	end
-	if( not( data.is_active )) then return uid end
+	if( not( data.is_active )) then return end
 	
 	if( pen.c.ttips[ data.tid ].going ~= frame_num ) then
 		pen.c.ttips[ data.tid ].going = frame_num
@@ -2980,13 +3020,13 @@ function pen.new_tooltip( gui, uid, text, data, func )
 		end
 		data.pos[3] = data.pic_z
 
-		func = func or function( gui, uid, text, d )
+		func = func or function( text, d )
 			local size_x, size_y = unpack( d.dims )
 			local pic_x, pic_y, pic_z = unpack( d.pos )
 
 			local inter_alpha = pen.animate( 1, d.t, { ease_out = "exp", frames = d.frames })
 			if( pen.vld( text )) then
-				uid = pen.new_text( gui, uid, pic_x + d.edging, pic_y + d.edging - 2, pic_z, text, {
+				pen.new_text( pic_x + d.edging, pic_y + d.edging - 2, pic_z, text, {
 					dims = { size_x - d.edging, size_y }, line_offset = d.line_offset or -2,
 					fully_featured = true, funcs = d.font_mods, alpha = inter_alpha,
 				})
@@ -2995,25 +3035,23 @@ function pen.new_tooltip( gui, uid, text, data, func )
 			local inter_size = 15*( 1 - pen.animate( 1, d.t, { ease_out = "wav1.5", frames = d.frames }))
 			pic_x, pic_y = pic_x + 0.5*inter_size, pic_y + 0.5*inter_size
 			size_x, size_y = size_x - inter_size, size_y - inter_size
+			local clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, size_x, size_y )
 			
-			local clicked, r_clicked, is_hovered = false, false, false
-			uid, clicked, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x, pic_y, size_x, size_y )
-			
-			uid = uid + 1
+			pen.c.gui_data[2] = pen.c.gui_data[2] + 1
 			GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
 			GuiZSetForNextWidget( gui, pic_z + 0.01 )
-			GuiImageNinePiece( gui, uid, pic_x, pic_y, size_x, size_y, 1.15*math.max( 1 - inter_alpha/6, 0.1 ))
-			return uid, { clicked, r_clicked, is_hovered }
+			GuiImageNinePiece( gui, pen.c.gui_data[2], pic_x, pic_y, size_x, size_y, 1.15*math.max( 1 - inter_alpha/6, 0.1 ))
+			return { clicked, r_clicked, is_hovered }
 		end
 		
 		data.t = pen.c.ttips[ data.tid ].anim[3]
-		uid, pen.c.ttips[ data.tid ].inter_state = func( gui, uid, text, data )
+		pen.c.ttips[ data.tid ].inter_state = func( text, data )
 	else pen.c.ttips[ data.tid ].inter_state = {} end
 	
-	return uid, data.is_active
+	return data.is_active
 end
 
-function pen.new_input( gui, uid, iid, pic_x, pic_y, pic_z, data )
+function pen.new_input( iid, pic_x, pic_y, pic_z, data )
 	data = data or {}
 	local _,default_dims = pen.liner( "T__________T", nil, nil, nil, { line_offset = data.line_offset or -2, })
 	data.dims = data.dims or default_dims
@@ -3027,7 +3065,7 @@ function pen.new_input( gui, uid, iid, pic_x, pic_y, pic_z, data )
 	--copypaste support (through global var)
 	--multiline cursor with arrow control
 	
-	uid = pen.new_tooltip( gui, uid, text, {
+	pen.new_tooltip( text, {
 		is_active = true,
 		tid = iid, pic_z = pic_z, pos = {pic_x,pic_y},
 		dims = data.dims or default_dims,
@@ -3036,29 +3074,26 @@ function pen.new_input( gui, uid, iid, pic_x, pic_y, pic_z, data )
 
 	print( tostring( pen.c.ttips[iid].inter_state[1]))
 	
-	return uid
+	return
 end
 
 ---Paging framework.
----@param gui gui
----@param uid number
 ---@param pic_x number
 ---@param pic_y number
 ---@param pic_z number
 ---@param data PenmanPagerData
----@return number uid, number page, number sfx_type
-function pen.new_pager( gui, uid, pic_x, pic_y, pic_z, data )
+---@return number page, number sfx_type
+function pen.new_pager( pic_x, pic_y, pic_z, data )
 	data.items_per_page = data.items_per_page or 1
 
-	local counter, will_skip = 0, false
+	local counter = 0
 	if( type( data.list ) == "table" ) then
 		local starter, ender = data.items_per_page*( data.page - 1 ), data.items_per_page*data.page + 1
 		for k,v in ( data.order_func or pen.t.order )( data.list ) do
 			counter = counter + 1
 			if( data.func ~= nil ) then
 				local is_hidden = not( counter > starter and counter < ender )
-				uid, will_skip = data.func( gui, uid, pic_x, pic_y, pic_z, k, v, counter - starter, is_hidden )
-				if( will_skip ) then counter = counter - 1 end
+				if( data.func( pic_x, pic_y, pic_z, k, v, counter - starter, is_hidden )) then counter = counter - 1 end
 			end
 		end
 	else counter = data.list + 1 end
@@ -3079,7 +3114,7 @@ function pen.new_pager( gui, uid, pic_x, pic_y, pic_z, data )
 		end
 	end
 
-	return uid, data.page, sfx_type
+	return data.page, sfx_type
 end
 
 function pen.new_plot( pic_x, pic_y, pic_z, data )
@@ -3095,11 +3130,10 @@ function pen.new_plot( pic_x, pic_y, pic_z, data )
 	--cache it
 	--autoscaling
 	--should be capable of plotting a table
-	local gui = GuiCreate()
-	GuiStartFrame( gui )
 	
 	local memo = {}
-	local uid, last_dot = 1, {}
+	local last_dot = {}
+	local _,_,_,orig_gui = pen.new_gui( GuiCreate())
 	for x = data.range[1],(data.range[2]+data.step/2),data.step do
 		local y = data.func( data.input( x ))
 		if( pen.vld( last_dot )) then
@@ -3107,7 +3141,7 @@ function pen.new_plot( pic_x, pic_y, pic_z, data )
 			local width, rotation = data.thickness/2, math.atan2( delta_y, delta_x )
 			local x_shift, y_shift = pen.rotate_offset( 0, -width/2, rotation )
 			local pos_x, pos_y = pic_x + x_shift, pic_y - data.scale[2]*last_dot[2] + y_shift
-			uid = pen.new_image( gui, uid, pos_x, pos_y, pic_z, pen.FILE_PIC_NUL, {
+			pen.new_image( pos_x, pos_y, pic_z, pen.FILE_PIC_NUL, {
 				s_x = math.sqrt(( data.scale[1]*delta_x )^2 + ( data.scale[2]*delta_y )^2 )/2,
 				s_y = width, angle = rotation, color = data.color,
 			})
@@ -3117,12 +3151,9 @@ function pen.new_plot( pic_x, pic_y, pic_z, data )
 		table.insert( memo, last_dot )
 	end
 	
-	GuiDestroy( gui )
+	pen.new_gui( false )
+	if( orig_gui ) then pen.new_gui( orig_gui ) end
 	return memo
-end
-
-function pen.gui_killer( gui )
-	if( gui ~= nil ) then GuiDestroy( gui ) end
 end
 
 --[GLOBALS]
@@ -3202,43 +3233,42 @@ pen.FONT_SPACING = {
 	["data/fonts/generated/notosans_ko_36.bin"] = 2.5,
 }
 pen.FONT_MODS = {
-	_bold = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
-		pen.colourer( gui, color )
-		GuiZSetForNextWidget( gui, pic_z )
+	_bold = function( pic_x, pic_y, pic_z, char_data, color, index )
+		pen.colourer( color )
+		GuiZSetForNextWidget( pen.c.gui_data[1], pic_z )
 		local off_x, off_y = unpack( char_data.dims )
-		GuiText( gui, pic_x[1] - 0.25*off_x, pic_y[1] - 0.25*off_y, char_data.char, 1.25, char_data.font[1], char_data.font[2])
-		return uid, pic_x[1], pic_y[1], nil, nil, ""
+		GuiText( pen.c.gui_data[1], pic_x[1] - 0.25*off_x, pic_y[1] - 0.25*off_y, char_data.char, 1.25, char_data.font[1], char_data.font[2])
+		return pic_x[1], pic_y[1], nil, nil, ""
 	end,
-	_italic = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
+	_italic = function( pic_x, pic_y, pic_z, char_data, color, index )
 		--get letter pic and angle it
-		return uid, pic_x[1], pic_y[1]
+		return pic_x[1], pic_y[1]
 	end,
-	crossed = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index ) --make this be font height related
-		pen.colourer( gui, color )
+	crossed = function( pic_x, pic_y, pic_z, char_data, color, index ) --make this be font height related
+		pen.colourer( color )
 		local off_x, off_y = unpack( char_data.dims )
-		uid = pen.new_image( gui, uid, pic_x[2] - 1, pic_y[2] + ( off_y - 1 )/2, pic_z + 0.001, pen.FILE_PIC_NUL, {
-			s_x = ( off_x + 2 )/2, s_y = 0.5 })
-		return uid, pic_x[1], pic_y[1]
+		pen.new_image( pic_x[2] - 1, pic_y[2] + ( off_y - 1 )/2, pic_z + 0.001, pen.FILE_PIC_NUL, { s_x = ( off_x + 2 )/2, s_y = 0.5 })
+		return pic_x[1], pic_y[1]
 	end,
-	underscore = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index ) --make this be font height related
-		pen.colourer( gui, color )
+	underscore = function( pic_x, pic_y, pic_z, char_data, color, index ) --make this be font height related
+		pen.colourer( color )
 		local off_x, off_y = unpack( char_data.dims )
-		uid = pen.new_image( gui, uid, pic_x[2], pic_y[2] + off_y*0.8, pic_z + 0.001, pen.FILE_PIC_NUL, { s_x = off_x*0.5, s_y = 0.5 })
-		return uid, pic_x[1], pic_y[1]
+		pen.new_image( pic_x[2], pic_y[2] + off_y*0.8, pic_z + 0.001, pen.FILE_PIC_NUL, { s_x = off_x*0.5, s_y = 0.5 })
+		return pic_x[1], pic_y[1]
 	end,
-	shadow = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
-		GuiZSetForNextWidget( gui, pic_z + 0.0001 )
-		pen.colourer( gui, pen.PALETTE.B, 0.8*(( color or {})[4] or 1 ))
-		GuiText( gui, pic_x[1] + 0.6, pic_y[1] + 0.6, char_data.char, 1, char_data.font[1], char_data.font[2])
-		return uid, pic_x[1], pic_y[1]
+	shadow = function( pic_x, pic_y, pic_z, char_data, color, index )
+		GuiZSetForNextWidget( pen.c.gui_data[1], pic_z + 0.0001 )
+		pen.colourer( pen.PALETTE.B, 0.8*(( color or {})[4] or 1 ))
+		GuiText( pen.c.gui_data[1], pic_x[1] + 0.6, pic_y[1] + 0.6, char_data.char, 1, char_data.font[1], char_data.font[2])
+		return pic_x[1], pic_y[1]
 	end,
-	runic = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
+	runic = function( pic_x, pic_y, pic_z, char_data, color, index )
 		local new_one = char_data.char
 		local new_byte = pen.magic_byte( new_one )
 		if( new_byte > 10000 ) then new_one = pen.magic_byte( 65 + new_byte%57 ) end
-		return uid, pic_x[1], pic_y[1], nil, { "data/fonts/font_pixel_runes.xml", true }, new_one == "$" and "!" or new_one
+		return pic_x[1], pic_y[1], nil, { "data/fonts/font_pixel_runes.xml", true }, new_one == "$" and "!" or new_one
 	end,
-	color = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
+	color = function( pic_x, pic_y, pic_z, char_data, color, index )
 		local new_color = nil
 		if( pen.vld( char_data.extra[1])) then
 			new_color = pen.t.pack( char_data.extra[ #char_data.extra ])
@@ -3248,36 +3278,35 @@ pen.FONT_MODS = {
 				char_data.ram.color_memo = new_color
 			else new_color = nil end
 		else new_color = char_data.ram.color_memo end
-		return uid, pic_x[1], pic_y[1], new_color
+		return pic_x[1], pic_y[1], new_color
 	end,
 
-	wave = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
+	wave = function( pic_x, pic_y, pic_z, char_data, color, index )
 		pic_y[1] = pic_y[1] + math.sin( 0.5*index.gbl + GameGetFrameNum()/7 )
-		return uid, pic_x[1], pic_y[1]
+		return pic_x[1], pic_y[1]
 	end,
-	quake = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
+	quake = function( pic_x, pic_y, pic_z, char_data, color, index )
 		pic_x[1] = pic_x[1] + pen.generic_random( 0, 100, nil, true )/200
 		pic_y[1] = pic_y[1] + pen.generic_random( 0, 100, nil, true )/200
-		return uid, pic_x[1], pic_y[1]
+		return pic_x[1], pic_y[1]
 	end,
-	cancer = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
+	cancer = function( pic_x, pic_y, pic_z, char_data, color, index )
 		local new_one = pen.magic_byte( pen.generic_random( 33, 127 ))
-		return uid, pic_x[1], pic_y[1], nil, nil, new_one == "$" and "!" or new_one
+		return pic_x[1], pic_y[1], nil, nil, new_one == "$" and "!" or new_one
 	end,
-	rainbow = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
+	rainbow = function( pic_x, pic_y, pic_z, char_data, color, index )
 		color = pen.magic_rgb( color, false, "hsv" )
 		color[1] = (( 5*index.gbl + GameGetFrameNum())%100 )/100
 		color[2] = math.max( color[2], 0.5 )
-		return uid, pic_x[1], pic_y[1], pen.magic_rgb( color, true, "hsv" )
+		return pic_x[1], pic_y[1], pen.magic_rgb( color, true, "hsv" )
 	end,
 	
-	button = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index, bid )
+	button = function( pic_x, pic_y, pic_z, char_data, color, index, bid )
 		local frame_num = GameGetFrameNum()
 		local clicked, r_clicked, is_hovered = pen.cache({ "hyperlink_state", bid or "dft_btn" }, function( old_val )
 			local out = old_val or {0,0,0}
 			local off_x, off_y = unpack( char_data.dims )
-			local clicked, r_clicked, is_hovered = false, false, false
-			uid, clicked, r_clicked, is_hovered = pen.new_interface( gui, uid, pic_x[1] - off_x*0.25, pic_y[1], off_x*1.5, off_y )
+			local clicked, r_clicked, is_hovered = pen.new_interface( pic_x[1] - off_x*0.25, pic_y[1], off_x*1.5, off_y )
 			
 			if( clicked ) then out[1] = frame_num end
 			if( r_clicked ) then out[2] = frame_num end
@@ -3292,16 +3321,16 @@ pen.FONT_MODS = {
 			color[3] = 0.8*color[3]
 			color = pen.magic_rgb( color, true, "hsv" )
 		end
-		return uid, pic_x[1], pic_y[1], color
+		return pic_x[1], pic_y[1], color
 	end,
-	tip = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index, tip_id, text )
+	tip = function( pic_x, pic_y, pic_z, char_data, color, index, tip_id, text )
 		tip_id = tip_id or "dft_tip"
 
 		local frame_num = GameGetFrameNum()
 		local clicked, r_clicked, is_hovered = pen.cache({ "hyperlink_state", tip_id })
 		if( index.lcl == 1 and frame_num < ( is_hovered or 0 )) then
 			local off_x, off_y = unpack( char_data.dims )
-			uid = pen.new_tooltip( gui, uid, text, {
+			pen.new_tooltip( text, {
 				tid = tip_id,
 				is_active = true,
 				pic_z = pic_z - 10,
@@ -3309,24 +3338,24 @@ pen.FONT_MODS = {
 			})
 		end
 		
-		return pen.FONT_MODS.button( gui, uid, pic_x, pic_y, pic_z, char_data, color, index, tip_id )
+		return pen.FONT_MODS.button( pic_x, pic_y, pic_z, char_data, color, index, tip_id )
 	end,
-	hyperlink = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index, link_id )
+	hyperlink = function( pic_x, pic_y, pic_z, char_data, color, index, link_id )
 		link_id = link_id or "dft_lnk"
 
 		local frame_num = GameGetFrameNum()
 		local clicked, r_clicked, is_hovered = pen.cache({ "hyperlink_state", link_id })
 		color = ( clicked or 0 ) == 0 and pen.PALETTE.VNL.MANA or pen.PALETTE.VNL.RED
 		if( frame_num < ( is_hovered or 0 )) then
-			uid = pen.FONT_MODS.underscore( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
+			pen.FONT_MODS.underscore( pic_x, pic_y, pic_z, char_data, color, index )
 		end
 		
-		return pen.FONT_MODS.button( gui, uid, pic_x, pic_y, pic_z, char_data, color, index, link_id )
+		return pen.FONT_MODS.button( pic_x, pic_y, pic_z, char_data, color, index, link_id )
 	end,
-	_dialogue = function( gui, uid, pic_x, pic_y, pic_z, char_data, color, index )
+	_dialogue = function( pic_x, pic_y, pic_z, char_data, color, index )
 		--char_data.extra for modifications (compare the index num with index.chr)
 		--letters appear through alpha sin interpolating top down 
-		return uid, pic_x[1], pic_y[1]
+		return pic_x[1], pic_y[1]
 	end,
 }
 
@@ -3485,100 +3514,107 @@ pen.ANIM_INTERS = {
 }
 
 pen.PALETTE = {
-	B = {0,0,0},
-	W = {255,255,255},
-	SHADOW = {46,34,47},
+	B = {0,0,0}, _="ff000000",
+	W = {255,255,255}, _="ffffffff",
+	SHADOW = {46,34,47}, _="ff2e222f",
 	VNL = {
-		YELLOW = {255,255,178},
-		GREY = {170,170,170},
-		RED = {208,70,70},
-		WARNING = {252,67,85},
-		DARK_SLOT = {185,220,223},
-		HP = {135,191,28},
-		FLIGHT = {255,170,64},
-		MANA = {66,168,226},
-		CAST = {252,138,67},
-		RUNIC = {121,201,153},
-		BROWN = {121,71,56},
+		HP = {135,191,28}, _="ff87bf1c",
+		RED = {208,70,70}, _="ffd04646",
+		MANA = {66,168,226}, _="ff42a8e2",
+		CAST = {252,138,67}, _="fffc8a43",
+		BROWN = {121,71,56}, _="ff794738",
+		GREY = {170,170,170}, _="ffaaaaaa",
+		FLIGHT = {255,170,64}, _="ffffaa40",
+		RUNIC = {121,201,153}, _="ff79c999",
+		WARNING = {252,67,85}, _="fffc4355",
+		YELLOW = {255,255,178}, _="ffffffb2",
+		DARK_SLOT = {185,220,223}, _="ffb9dcdf",
+		ACTION_PROJECTILE = {204,20,0}, _="ffcc1400",
+		ACTION_STATIC = {204,126,0}, _="ffcc7e00",
+		ACTION_MODIFIER = {0,7,204}, _="ff0007cc",
+		ACTION_DRAW = {0,163,204}, _="ff00a3cc",
+		ACTION_MATERIAL = {0,204,24}, _="ff00cc18",
+		ACTION_UTILITY = {187,0,204}, _="ffbb00cc",
+		ACTION_PASSIVE = {0,105,0}, _="ff006900",
+		ACTION_OTHER = {204,204,204}, _="ffcccccc",
 	},
 	HRMS = {
-		GOLD_1 = {205,104,61},
-		GOLD_2 = {230,144,78},
-		GOLD_3 = {251,185,84},
-		GREEN_1 = {35,144,99},
-		GREEN_2 = {30,188,115},
-		GREEN_3 = {145,219,105},
-		GREY_1 = {46,34,47},
-		GREY_2 = {105,79,98},
-		GREY_3 = {127,112,138},
-		GREY_4 = {155,171,178},
-		GREY_5 = {199,220,208},
-		RED_1 = {110,39,39},
-		RED_2 = {174,35,52},
-		RED_3 = {232,59,59},
-		BLUE_1 = {72,74,119},
-		BLUE_2 = {77,101,180},
-		BLUE_3 = {77,155,230},
+		GOLD_1 = {205,104,61}, _="ffcd683d",
+		GOLD_2 = {230,144,78}, _="ffe6904e",
+		GOLD_3 = {251,185,84}, _="fffbb954",
+		GREEN_1 = {35,144,99}, _="ff239063",
+		GREEN_2 = {30,188,115}, _="ff1ebc73",
+		GREEN_3 = {145,219,105}, _="ff91db69",
+		GREY_1 = {46,34,47}, _="ff2e222f",
+		GREY_2 = {105,79,98}, _="ff694f62",
+		GREY_3 = {127,112,138}, _="ff7f708a",
+		GREY_4 = {155,171,178}, _="ff9babb2",
+		GREY_5 = {199,220,208}, _="ffc7dcd0",
+		RED_1 = {110,39,39}, _="ff6e2727",
+		RED_2 = {174,35,52}, _="ffae2334",
+		RED_3 = {232,59,59}, _="ffe83b3b",
+		BLUE_1 = {72,74,119}, _="ff484a77",
+		BLUE_2 = {77,101,180}, _="ff4d65b4",
+		BLUE_3 = {77,155,230}, _="ff4d9be6",
 	},
 	PRSP = {
-		PURPLE = {179,141,232},
-		BLUE = {136,121,247},
-		RED = {245,132,132},
-		WHITE = {238,226,206},
-		GREEN = {157,245,132},
-		GREY = {176,176,176},
+		RED = {245,132,132}, _="fff58484",
+		BLUE = {136,121,247}, _="ff8879f7",
+		GREY = {176,176,176}, _="ffb0b0b0",
+		WHITE = {238,226,206}, _="ffeee2ce",
+		GREEN = {157,245,132}, _="ff9df584",
+		PURPLE = {179,141,232}, _="ffb38de8",
 	},
 	NCRS = {
-		GREY_1 = {21,29,40},
-		GREY_2 = {32,46,55},
-		GREY_3 = {57,74,80},
-		GREY_4 = {87,114,119},
-		RED_1 = {65,29,49},
-		RED_2 = {117,36,56},
-		RED_3 = {165,48,48},
-		RED_4 = {207,87,60},
-		RED_5 = {218,134,62},
-		GREEN_1 = {70,130,50},
-		GREEN_2 = {117,167,67},
-		GREEN_3 = {168,202,88},
-		GREEN_4 = {208,218,145},
-		PURPLE_1 = {36,21,39},
-		PURPLE_2 = {34,32,52},
-		PURPLE_3 = {69,40,60},
-		PURPLE_4 = {122,54,123},
-		PURPLE_5 = {162,62,140},
-		PURPLE_6 = {198,81,151},
+		GREY_1 = {21,29,40}, _="ff151d28",
+		GREY_2 = {32,46,55}, _="ff202e37",
+		GREY_3 = {57,74,80}, _="ff394a50",
+		GREY_4 = {87,114,119}, _="ff577277",
+		RED_1 = {65,29,49}, _="ff411d31",
+		RED_2 = {117,36,56}, _="ff752438",
+		RED_3 = {165,48,48}, _="ffa53030",
+		RED_4 = {207,87,60}, _="ffcf573c",
+		RED_5 = {218,134,62}, _="ffda863e",
+		GREEN_1 = {70,130,50}, _="ff468232",
+		GREEN_2 = {117,167,67}, _="ff75a743",
+		GREEN_3 = {168,202,88}, _="ffa8ca58",
+		GREEN_4 = {208,218,145}, _="ffd0da91",
+		PURPLE_1 = {36,21,39}, _="ff241527",
+		PURPLE_2 = {34,32,52}, _="ff222034",
+		PURPLE_3 = {69,40,60}, _="ff45283c",
+		PURPLE_4 = {122,54,123}, _="ff7a367b",
+		PURPLE_5 = {162,62,140}, _="ffa23e8c",
+		PURPLE_6 = {198,81,151}, _="ffc65197",
 	},
 	SWRD = {
-		IRON_1 = {32,46,55},
-		IRON_2 = {57,74,80},
-		IRON_3 = {87,114,119},
-		IRON_4 = {129,151,150},
-		IRON_5 = {147,152,161},
-		IRON_6 = {168,181,178},
-		STEEL_1 = {78,84,89},
-		STEEL_2 = {124,129,143},
-		STEEL_3 = {143,167,188},
-		STEEL_4 = {159,168,167},
-		STEEL_5 = {167,181,192},
-		SEAL_1 = {128,12,83},
-		SEAL_2 = {189,31,63},
-		EPEE_1 = {56,89,179},
-		EPEE_2 = {51,136,222},
-		FATE_1 = {30,64,88},
-		FATE_2 = {0,101,84},
-		HEIR_1 = {48,40,48},
-		HEIR_2 = {72,40,42},
-		CORE_1 = {124,21,120},
-		CORE_2 = {177,44,155},
-		CORE_3 = {219,48,144},
-		CORE_4 = {214,68,158},
-		CORE_5 = {232,86,146},
-		CORE_6 = {238,121,150},
-		CORE_7 = {230,154,167},
+		IRON_1 = {32,46,55}, _="ff202e37",
+		IRON_2 = {57,74,80}, _="ff394a50",
+		IRON_3 = {87,114,119}, _="ff577277",
+		IRON_4 = {129,151,150}, _="ff819796",
+		IRON_5 = {147,152,161}, _="ff9398a1",
+		IRON_6 = {168,181,178}, _="ffa8b5b2",
+		STEEL_1 = {78,84,89}, _="ff4e5459",
+		STEEL_2 = {124,129,143}, _="ff7c818f",
+		STEEL_3 = {143,167,188}, _="ff8fa7bc",
+		STEEL_4 = {159,168,167}, _="ff9fa8a7",
+		STEEL_5 = {167,181,192}, _="ffa7b5c0",
+		SIGIL_1 = {128,12,83}, _="ff800c53",
+		SIGIL_2 = {189,31,63}, _="ffbd1f3f",
+		EPEE_1 = {56,89,179}, _="ff3859b3",
+		EPEE_2 = {51,136,222}, _="ff3388de",
+		FATE_1 = {30,64,88}, _="ff1e4058",
+		FATE_2 = {0,101,84}, _="ff006554",
+		HEIR_1 = {48,40,48}, _="ff302830",
+		HEIR_2 = {72,40,42}, _="ff48282a",
+		CORE_1 = {124,21,120}, _="ff7c1578",
+		CORE_2 = {177,44,155}, _="ffb12c9b",
+		CORE_3 = {219,48,144}, _="ffdb3090",
+		CORE_4 = {214,68,158}, _="ffd6449e",
+		CORE_5 = {232,86,146}, _="ffe85692",
+		CORE_6 = {238,121,150}, _="ffee7996",
+		CORE_7 = {230,154,167}, _="ffe69aa7",
 	},
-
-	--every color must have a comment with hex
+	
 	--N40K: ammo types, classes, misc colors
 }
 pen.TUNES = {
@@ -5436,11 +5472,11 @@ pen.FILE_XML_FONT = [[
 ---@field skip_z_check boolean [DFT: false ]<br> Set to true to skip the z-level adjustment (it makes only the topmost button to activate on click, yet introduces a 2-frame long delay between the click and the event triggering).
 ---@field s_x number [DFT: 1 ]<br> Scale X
 ---@field s_y number [DFT: 1 ]<br> Scale Y
----@field lmb_event fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Gets called on click.
----@field rmb_event fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Gets called on r_click.
----@field hov_event fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Gets called on is_hovered.
----@field idle_event fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Get called on not( is_hovered )
----@field pic_func fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): uid:number Always gets called and get replaced with pen.new_image if is nil.
+---@field lmb_event fun( pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Gets called on click.
+---@field rmb_event fun( pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Gets called on r_click.
+---@field hov_event fun( pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Gets called on is_hovered.
+---@field idle_event fun( pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ): pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData Get called on not( is_hovered )
+---@field pic_func fun( pic_x:number, pic_y:number, pic_z:number, pic:path, data:PenmanButtonData ) Always gets called and get replaced with pen.new_image if is nil.
 
 ---@class PenmanTooltipData
 ---@field tid string [DFT: "dft" ]<br> The ID of the tooltip. Only one tip can be opened per unique ID.
@@ -5460,6 +5496,6 @@ pen.FILE_XML_FONT = [[
 ---@field list table|number [OBLIGATORY]<br> Can be set to either a table to iterate through or to a maximum number of "pages" to scroll one-by-one.
 ---@field page number [OBLIGATORY]<br> The current page.
 ---@field items_per_page number [DFT: 1 ]<br> How many elements one page should contain.
----@field func fun( gui:gui, uid:number, pic_x:number, pic_y:number, pic_z:number, absolute_i:number, element:any, relative_k:number, is_hidden:boolean ): uid:number, will_skip:boolean Draws the elements of the current page.
+---@field func fun( pic_x:number, pic_y:number, pic_z:number, absolute_i:number, element:any, relative_k:number, is_hidden:boolean ): will_skip:boolean Draws the elements of the current page.
 ---@field order_func function [DFT: pen.t.order ]<br> Sorts the list for later processing.
 ---@field click table [INTERNAL]<br> This is used to interface between visual and logical segments. The value of 1 means that the button was clicked and the value of -1 means that it was r_clicked.
