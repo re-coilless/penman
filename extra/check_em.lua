@@ -18,7 +18,8 @@ if( pen.c.testing_done ) then
         -- filing()
         -- raters()
         -- input()
-        tipping()
+        scrolling()
+        -- tipping()
         -- texting()
         -- fonting()
         -- cloner()
@@ -199,10 +200,30 @@ end
 
 -- *************************************************************************
 
+function scrolling()
+
+pen.new_pixel( 100, 100, 5, pen.PALETTE.W, 55, 30 )
+pen.new_scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
+    local dims = pen.new_text( 0, scroll_pos, 0, test_input[1], { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
+    return dims[2]
+end)
+
+pen.new_pixel( 100, 200, 5, pen.PALETTE.W, 60, 15 )
+pen.new_scroller( "ass", 100, 200, -5, 60, 15, function( scroll_pos )
+    local dims = pen.new_text( 0, scroll_pos, 0, test_input[1], { fully_featured = true, dims = {60,-1}, color = {0,255,0}})
+    return dims[2]
+end)
+
+pen.new_scrolling_text( "hmm", 100, 170, 5, 30, "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", { fully_featured = true,  })
+
+end
+
+-- *************************************************************************
+
 function tipping()
 
 local pic_x, pic_y, _, clicked, _, yep = pen.new_dragger( "balls", 400, 100, 100, 100 )
-_, _, yep = pen.new_image( pic_x, pic_y, 5, "data/ui_gfx/empty_white.png", { s_x = 50, s_y = 50, can_click = true })
+_, _, yep = pen.new_image( pic_x, pic_y, 5, pen.FILE_PIC_NUL, { s_x = 50, s_y = 50, can_click = true })
 -- pen.new_tooltip( test_input[1], { is_active = yep, tid = "bs2", is_over = true })
 pen.new_tooltip( test_input[2], { tid = "bs1" })
 -- pen.new_tooltip( test_input[1], { is_active = yep, tid = "bs3", is_left = true })

@@ -48,10 +48,9 @@ end
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---transition mnee and kappa to new gui
---scrolling text via new_cutout
 --probably move [COMPLEX] to libman and append FFT to ANIM_INTERS separately
 --pen.new_image interfacing must have xml offset support + integrate offsets with rotation
+--transition mnee and kappa to new gui
 --transition mrshll to penman
 
 -- pen.estimate
@@ -60,6 +59,7 @@ end
 -- pen.setting_get
 -- pen.get_creature_dimensions
 -- pen.FONT_MODS
+-- pen.new_scroller
 -- pen.new_input
 -- pen.new_plot
 -- pen.pid
@@ -73,7 +73,6 @@ end
 --notification system (gameprintimportant-like but unified and with more capabilities)
 --add pen.animate debugging that plots/demos motion/scaling in self-aligning grid
 --coroutine-based sequencer that accepts a table of events (use varstorage to preserve the state between restarts)
---custom scroller (static tip as background, cutout, custom graphics for all elements, wav interpolation of scrolling, global mouse wheel support)
 --raytrace_entities
 --sule-based lua context independent gateway (and steal ModMagicNumbersFileAdd from init.lua via it)
 --in-gui particle system
@@ -207,12 +206,12 @@ function pen.atimer( tid, duration, reset_now, stillborn )
 	end; return math.min( frame_num - pen.c.animation_timer[ tid ], duration or 0 )
 end
 
-function pen.estimate( eid, target, speed, min_delta ) --make it more advanced by stealiing animate funcs
+function pen.estimate( eid, target, speed, min_delta, max_delta ) --make it more advanced by stealiing animate funcs
 	pen.c.estimator_memo = pen.c.estimator_memo or {}
 	pen.c.estimator_memo[ eid ] = pen.c.estimator_memo[ eid ] or 0
 	local delta = target - pen.c.estimator_memo[ eid ]
 	pen.c.estimator_memo[ eid ] = pen.c.estimator_memo[ eid ]
-		+ pen.limiter( pen.limiter(( speed or 0.1 )*delta, min_delta or 1, true ), delta )
+		+ pen.limiter( pen.limiter(( speed or 0.1 )*delta, min_delta or 1, true ), pen.limiter( delta, max_delta or delta ))
 	return pen.c.estimator_memo[ eid ]
 end
 
@@ -2271,22 +2270,23 @@ function pen.rate_creature( entity_id, hooman, data )--hamis at 20m is 1
 end
 
 --[INTERFACE]
-function pen.new_gui( gui )
-	if( gui == false or ( gui == true and (( pen.c.gui_data or {})[2] or 2 ) < 2 )) then
+function pen.gui_builder( gui )
+	local frame_num = GameGetFrameNum()
+	if( gui == false or ( gui == true and (( pen.c.gui_data or {})[2] or 0 ) < 2 )) then
 		if(( pen.c.gui_data or {})[1]) then GuiDestroy( pen.c.gui_data[1]) end
 		pen.c.gui_data = nil
 		return
 	elseif( type( gui ) == "userdata" ) then
+		pen.c.gui_dump = pen.c.gui_dump or {}
 		if( pen.vld( pen.c.gui_data )) then
 			pen.c.gui_dump[ pen.c.gui_data[1]] = pen.t.clone( pen.c.gui_data )
 		end
 		if( pen.c.gui_dump[ gui ] ~= nil ) then
 			pen.c.gui_data = pen.t.clone( pen.c.gui_dump[ gui ])
-		else pen.c.gui_data = nil end
+		else pen.c.gui_data = { gui, 1, frame_num, ( pen.c.gui_data or {})[1]} end
 	end
 
-	local frame_num = GameGetFrameNum()
-	pen.c.gui_data = pen.c.gui_data or { gui or GuiCreate(), 1, frame_num }
+	pen.c.gui_data = pen.c.gui_data or { GuiCreate(), 1, frame_num }
 	if( pen.c.gui_data[3] ~= frame_num ) then
 		pen.c.gui_data[2], pen.c.gui_data[3] = 1, frame_num; GuiStartFrame( pen.c.gui_data[1])
 	else pen.c.gui_data[2] = pen.c.gui_data[2] + 1; GuiIdPush( unpack( pen.c.gui_data )) end
@@ -2388,7 +2388,7 @@ function pen.colourer( c, alpha )
 		b = c[3] or c[1] or 255,
 		a = c[4] or alpha or 1,
 	}
-	local gui = pen.new_gui(); pen.c.gui_data[2] = pen.c.gui_data[2] - 1
+	local gui = pen.gui_builder(); pen.c.gui_data[2] = pen.c.gui_data[2] - 1
 	GuiColorSetForNextWidget( gui, color.r/255, color.g/255, color.b/255, color.a )
 end
 
@@ -2635,11 +2635,10 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, ignore_multihover, is
 	
 	if( is_hovered ) then
 		if( is_debugging ) then
-			pen.new_image( pic_x, pic_y, 10*pen.Z_LAYERS.tips,
-				pen.FILE_PIC_NUL, { s_x = s_x/2, s_y = s_y/2, color = {255,0,0}, alpha = 0.75 })
+			pen.new_pixel( pic_x, pic_y, 10*pen.Z_LAYERS.tips, {255,0,0,0.75}, s_x, s_y )
 		end
 		
-		local gui, uid = pen.new_gui()
+		local gui, uid = pen.gui_builder()
 		GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
 		GuiImage( gui, uid, m_x - 10, m_y - 10, pen.FILE_PIC_NIL, 1, 10, 10 )
 
@@ -2675,10 +2674,19 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, ignore_multihover, is
 	return clicked, r_clicked, is_hovered
 end
 
+function pen.new_pixel( pic_x, pic_y, pic_z, color, s_x, s_y, angle, alpha )
+	local gui = pen.gui_builder()
+	GuiZSetForNextWidget( gui, pic_z )
+	GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
+	pen.c.gui_data[2] = pen.c.gui_data[2] - 1
+	GuiColorSetForNextWidget( gui, color[1]/255, color[2]/255, color[3]/255, 1 )
+	GuiImage( gui, 1020, pic_x, pic_y, pen.FILE_PIC_NUL, alpha or color[4] or 1, ( s_x or 1 )/2, ( s_y or 1 )/2, angle or 0 )
+end
+
 function pen.new_image( pic_x, pic_y, pic_z, pic, data )
 	data = data or {}
 
-	local gui, uid = pen.new_gui()
+	local gui, uid = pen.gui_builder()
 	pen.colourer( data.color )
 	GuiZSetForNextWidget( gui, pic_z )
 	GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
@@ -2767,17 +2775,87 @@ function pen.new_dragger( did, pic_x, pic_y, s_x, s_y, pic_z, allow_multihovers,
 	return pic_x, pic_y, state, clicked, r_clicked, is_hovered
 end
 
-function pen.new_cutout( pic_x, pic_y, size_x, size_y, func, args ) --credit goes to aarvlo
+function pen.new_cutout( pic_x, pic_y, size_x, size_y, func, scroll_pos ) --credit goes to aarvlo
 	local margin = 0
-	local gui, uid = pen.new_gui()
+	local gui, uid = pen.gui_builder()
 	GuiAnimateBegin( gui )
 	GuiAnimateAlphaFadeIn( gui, uid, 0, 0, true )
 	GuiBeginAutoBox( gui )
 	GuiBeginScrollContainer( gui, uid, pic_x - margin, pic_y - margin, size_x, size_y, false, margin, margin )
 	GuiEndAutoBoxNinePiece( gui )
 	GuiAnimateEnd( gui )
-	func( args )
+	local height = func( scroll_pos )
 	GuiEndScrollContainer( gui )
+	return height
+end
+
+function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data ) --wide scrolling visuals version
+	func = pen.get_hybrid_table( func )
+	func[2] = func[2] or function( pic_x, pic_y, pic_z, bar_size, progress, real_height, data )
+		local bar_y = ( size_y - ( 6 + bar_size ))
+		local bar_pos_y = pic_y + bar_y*progress + 3
+		local _,new_y,state,_,_,is_hovered = pen.new_dragger( sid.."_dragger", pic_x, bar_pos_y, 3, bar_size, pic_z )
+		pen.new_pixel( pic_x + 1, bar_pos_y, pic_z, {0,0,0,0.83}, 1, bar_size )
+		pen.new_pixel( pic_x, bar_pos_y, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ], 1, bar_size )
+		pen.new_pixel( pic_x + 2, bar_pos_y, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT_DARK" or "NINE_MAIN_DARK" ], 1, bar_size )
+
+		local eid = sid.."_anim"
+		local step = bar_y*( data.scroll_step or 11 )/real_height
+		local clicked, r_clicked = false, false
+		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, 3, 3, pic_z )
+		pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, {0,0,0,0.83})
+		pen.new_pixel( pic_x + 1, pic_y, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
+		pen.new_pixel( pic_x, pic_y + 1, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
+		pen.new_pixel( pic_x + 2, pic_y + 1, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT_DARK" or "NINE_MAIN_DARK" ])
+		if( data.can_scroll and ( InputIsMouseButtonDown( 4 ) or InputIsKeyJustDown( 86 ))) then clicked = 1 end
+		if( clicked ) then new_y = new_y - step elseif( r_clicked ) then new_y = 0 end
+		if( clicked or r_clicked ) then
+			pen.c.estimator_memo[ eid ] = ( new_y - ( pic_y + 3 ))/bar_y
+			pen.play_sound( pen.TUNES.VNL[ clicked == 1 and "hover" or ( r_clicked and "select" or "click" )])
+		end
+		
+		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y + size_y - 3, 3, 3, pic_z )
+		pen.new_pixel( pic_x + 1, pic_y + size_y - 2, pic_z, {0,0,0,0.83})
+		pen.new_pixel( pic_x + 1, pic_y + size_y - 1, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
+		pen.new_pixel( pic_x, pic_y + size_y - 2, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
+		pen.new_pixel( pic_x + 2, pic_y + size_y - 2, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT_DARK" or "NINE_MAIN_DARK" ])
+		if( data.can_scroll and ( InputIsMouseButtonDown( 5 ) or InputIsKeyJustDown( 87 ))) then clicked = 1 end
+		if( clicked ) then new_y = new_y + step elseif( r_clicked ) then new_y = pic_y + size_y end
+		if( clicked or r_clicked ) then
+			pen.c.estimator_memo[ eid ] = ( new_y - ( pic_y + 3 ))/bar_y
+			pen.play_sound( pen.TUNES.VNL[ clicked == 1 and "hover" or ( r_clicked and "select" or "click" )])
+		end
+
+		local buffer = 1
+		progress = math.min( math.max(( new_y - ( pic_y + 3 ))/bar_y, -buffer ), 1 + buffer )
+		progress = pen.estimate( eid, progress, math.min( bar_y/( 2*real_height ), 1 ), 0.01 )
+		if( state ~= 2 or pen.compare_float( new_y, bar_pos_y )) then return progress end
+		if( progress <= 0 or progress >= 1 ) then
+			pen.c.estimator_memo[ eid ] = math.min( math.max( pen.c.estimator_memo[ eid ], 0 ), 1 ); return progress
+		elseif( GameGetFrameNum()%5 ~= 0 ) then return progress end
+		pen.play_sound( pen.TUNES.VNL.hover )
+		return progress
+	end
+	
+	data = data or {}
+	if( data.scroll_always ) then
+		data.can_scroll = true
+	elseif( data.scroll_always ~= false ) then
+		_,_,data.can_scroll = pen.new_interface( pic_x, pic_y, size_x + 5, size_y )
+	end
+
+	pen.c.scroll_memo = pen.c.scroll_memo or {}
+	pen.c.scroll_memo[ sid ] = pen.c.scroll_memo[ sid ] or {}
+	local old_height = pen.c.scroll_memo[ sid ][2] or 1
+	local new_height = math.max( pen.new_cutout( pic_x, pic_y, size_x, size_y,
+		func[1], -old_height*( pen.c.scroll_memo[ sid ][1] or 0 )) - size_y, 1 )
+	pen.c.scroll_memo[ sid ][1] = math.min( math.max( func[2]( pic_x + size_x, pic_y, pic_z - 0.01,
+		( size_y - 6 )*math.min( size_y/new_height, 1 ), pen.c.scroll_memo[ sid ][1] or 0, new_height, data ), 0 ), 1 )
+	if( old_height ~= new_height ) then
+		local ratio = old_height/new_height
+		pen.c.scroll_memo[ sid ][1] = pen.c.scroll_memo[ sid ][1]*ratio
+		pen.c.scroll_memo[ sid ][2] = new_height
+	end
 end
 
 function pen.new_text( pic_x, pic_y, pic_z, text, data )
@@ -2801,7 +2879,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 		data.dims = dims
 	end
 	
-	local gui = pen.new_gui()
+	local gui = pen.gui_builder()
 	local function shadowed_text( pic_x, pic_y, pic_z, txt, scale, font, is_pixel, color, alpha, has_shadow )
 		local gui = pen.c.gui_data[1]
 		GuiZSetForNextWidget( gui, pic_z )
@@ -2962,6 +3040,23 @@ function pen.new_shadowed_text( pic_x, pic_y, pic_z, text, data )
 	return pen.new_text( pic_x, pic_y, pic_z, text, data )
 end
 
+function pen.new_scrolling_text( sid, pic_x, pic_y, pic_z, dims, text, data ) --modes are switched base on data.scroll_continuous
+	data, dims = data or {}, pen.get_hybrid_table( dims )
+	if( dims[2] ~= nil ) then return pen.new_scroller(  ) end --don't display the scrollbar if is the height is less than the cutout
+	--make sure interfaces work correctly with with cutter 
+	local w, h = pen.get_text_dims( text, true )
+	pen.c.scrolling_text_memo = pen.c.scrolling_text_memo or {}
+	pen.c.scrolling_text_memo[ sid ] = pen.c.scrolling_text_memo[ sid ] or false
+	if( w < dims[1]) then return pen.new_text( pic_x, pic_y, pic_z, text, data ) end
+	pen.new_cutout( pic_x, pic_y - h/2, dims[1], 2*h, function()
+		local is_left = pen.c.scrolling_text_memo[ sid ]
+		local target, buffer, spacing = w - dims[1], 15, 3
+		local shift = pen.estimate( sid.."_anim", is_left and -buffer or ( target + buffer ), data.scroll_speed or 0.01, 0.1, 0.75 )
+		if( shift > ( target + spacing ) or shift < -spacing ) then pen.c.scrolling_text_memo[ sid ] = not( is_left ) end
+		pen.new_text( -shift, h/2, pic_z, text, data )
+	end)
+end
+
 ---Tooltip framework.
 ---@param text? string
 ---@param data? PenmanTooltipData
@@ -2976,7 +3071,7 @@ function pen.new_tooltip( text, data, func )
 	data.allow_hover = data.allow_hover or false
 	data.do_corrections = data.do_corrections or not( pen.vld( data.pos ))
 	
-	local gui = pen.new_gui()
+	local gui = pen.gui_builder()
 	local frame_num = GameGetFrameNum()
 	pen.c.ttips = pen.c.ttips or {}
 	pen.c.ttips[ data.tid ] = pen.c.ttips[ data.tid ] or {
@@ -3021,6 +3116,7 @@ function pen.new_tooltip( text, data, func )
 		data.pos[3] = data.pic_z
 
 		func = func or function( text, d )
+			local gui = pen.gui_builder()
 			local size_x, size_y = unpack( d.dims )
 			local pic_x, pic_y, pic_z = unpack( d.pos )
 
@@ -3130,29 +3226,27 @@ function pen.new_plot( pic_x, pic_y, pic_z, data )
 	--cache it
 	--autoscaling
 	--should be capable of plotting a table
-	
+
 	local memo = {}
 	local last_dot = {}
-	local _,_,_,orig_gui = pen.new_gui( GuiCreate())
+	local _,_,_,orig_gui = pen.gui_builder( GuiCreate())
 	for x = data.range[1],(data.range[2]+data.step/2),data.step do
 		local y = data.func( data.input( x ))
 		if( pen.vld( last_dot )) then
 			local delta_x, delta_y = data.step, last_dot[2] - y
-			local width, rotation = data.thickness/2, math.atan2( delta_y, delta_x )
-			local x_shift, y_shift = pen.rotate_offset( 0, -width/2, rotation )
+			local width, rotation = data.thickness, math.atan2( delta_y, delta_x )
+			local x_shift, y_shift = pen.rotate_offset( 0, -width/4, rotation )
 			local pos_x, pos_y = pic_x + x_shift, pic_y - data.scale[2]*last_dot[2] + y_shift
-			pen.new_image( pos_x, pos_y, pic_z, pen.FILE_PIC_NUL, {
-				s_x = math.sqrt(( data.scale[1]*delta_x )^2 + ( data.scale[2]*delta_y )^2 )/2,
-				s_y = width, angle = rotation, color = data.color,
-			})
+			local length = math.sqrt(( data.scale[1]*delta_x )^2 + ( data.scale[2]*delta_y )^2 )
+			pen.new_pixel( pos_x, pos_y, pic_z, data.color, length, width, rotation )
 			pic_x = pic_x + data.scale[1]*data.step
 		end
 		last_dot = { x, y }
 		table.insert( memo, last_dot )
 	end
 	
-	pen.new_gui( false )
-	if( orig_gui ) then pen.new_gui( orig_gui ) end
+	pen.gui_builder( false )
+	if( orig_gui ) then pen.gui_builder( orig_gui ) end
 	return memo
 end
 
@@ -3245,15 +3339,13 @@ pen.FONT_MODS = {
 		return pic_x[1], pic_y[1]
 	end,
 	crossed = function( pic_x, pic_y, pic_z, char_data, color, index ) --make this be font height related
-		pen.colourer( color )
 		local off_x, off_y = unpack( char_data.dims )
-		pen.new_image( pic_x[2] - 1, pic_y[2] + ( off_y - 1 )/2, pic_z + 0.001, pen.FILE_PIC_NUL, { s_x = ( off_x + 2 )/2, s_y = 0.5 })
+		pen.new_pixel( pic_x[2] - 1, pic_y[2] + ( off_y - 1 )/2, pic_z + 0.001, color, ( off_x + 2 ), 1 )
 		return pic_x[1], pic_y[1]
 	end,
 	underscore = function( pic_x, pic_y, pic_z, char_data, color, index ) --make this be font height related
-		pen.colourer( color )
 		local off_x, off_y = unpack( char_data.dims )
-		pen.new_image( pic_x[2], pic_y[2] + off_y*0.8, pic_z + 0.001, pen.FILE_PIC_NUL, { s_x = off_x*0.5, s_y = 0.5 })
+		pen.new_pixel( pic_x[2], pic_y[2] + off_y*0.8, pic_z + 0.001, color, off_x, 1 )
 		return pic_x[1], pic_y[1]
 	end,
 	shadow = function( pic_x, pic_y, pic_z, char_data, color, index )
@@ -3390,7 +3482,7 @@ pen.ANIM_EASINGS = { --https://easings.net/
 	end,
 	log = function( t, a )
 		a = a or math.exp( 1 )
-		return math.log(( a - 1 )*t + 1 )/math.log( a )
+		return math.log(( a - 1 )*t + 1, a )
 	end,
 	wav = function( t, a )
 		t = 2*math.pi*math.floor( a or 2 )*( t - 1 )
@@ -3529,6 +3621,10 @@ pen.PALETTE = {
 		WARNING = {252,67,85}, _="fffc4355",
 		YELLOW = {255,255,178}, _="ffffffb2",
 		DARK_SLOT = {185,220,223}, _="ffb9dcdf",
+		NINE_MAIN = {180,159,129}, _="ffb49f81",
+		NINE_MAIN_DARK = {148,128,100}, _="ff948064",
+		NINE_ACCENT = {237,169,73}, _="ffeda949",
+		NINE_ACCENT_DARK = {201,137,48}, _="ffc98930",
 		ACTION_PROJECTILE = {204,20,0}, _="ffcc1400",
 		ACTION_STATIC = {204,126,0}, _="ffcc7e00",
 		ACTION_MODIFIER = {0,7,204}, _="ff0007cc",
