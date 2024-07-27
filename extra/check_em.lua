@@ -19,7 +19,7 @@ if( pen.c.testing_done ) then
         -- raters()
         -- input()
         scrolling()
-        -- tipping()
+        tipping()
         -- texting()
         -- fonting()
         -- cloner()
@@ -214,7 +214,15 @@ pen.new_scroller( "ass", 100, 200, -5, 60, 15, function( scroll_pos )
     return dims[2]
 end)
 
-pen.new_scrolling_text( "hmm", 100, 170, 5, 30, "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", { fully_featured = true,  })
+local item = "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!"
+pen.new_scrolling_text( "hmm", 100, 170, 5, 30, item, { fully_featured = true })
+
+pen.new_scrolling_text( "hhmm", 200, 170, 5, { 30, 30 }, item, { fully_featured = true, font_mods = {
+    e1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
+        return pen.FONT_MODS.tip( pic_x, pic_y, pic_z, char_data, color, indexes, "dfs", "LESSS GOOOOOO" )
+    end,
+}})
+pen.new_scrolling_text( "hmjm", 250, 170, 5, { 30, 30 }, "{>rainbow>{The Best Item}<rainbow<}", { fully_featured = true })
 
 end
 
@@ -348,7 +356,7 @@ pen.new_text( 100, 150, 0, test_input[1], {
     -- is_centered_x = true,
     -- is_right_x = true,
     is_centered_y = true,
-    funcs = {
+    font_mods = {
         c1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
             return pic_x[1], pic_y[1], {0,255,0,0.5}
         end,
