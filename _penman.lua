@@ -2366,7 +2366,7 @@ function pen.magic_rgb( c, to_rbg, mode )
 	
 	c = pen.get_hybrid_table( c, true )
 	c[1] = c[1] or 255; c[2] = c[2] or c[1]; c[3] = c[3] or c[1]
-	return pen.t.clone( pen.cache({
+	return { unpack( pen.cache({
 		"color_conversion", table.concat( c, "|" ), mode, pen.b2n( to_rgb ),
 	}, function()
 		local out = {({
@@ -2376,7 +2376,7 @@ function pen.magic_rgb( c, to_rbg, mode )
 		})[ mode ][ 1 + pen.b2n( to_rbg )]( unpack( c ))}
 		out[4] = c[4]
 		return out
-	end))
+	end))}
 end
 
 function pen.colourer( c, alpha )
@@ -2629,7 +2629,7 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, ignore_multihover, is
 
 	local is_hovered = false
 	local gui, uid = pen.gui_builder()
-	local real_x, real_y = pic_x, pic_y
+	local local_x, local_y = pic_x, pic_y
 	local m_x, m_y = pen.get_mouse_pos()
 	local is_inside = not( pen.vld( pen.c.cutter_dims ))
 	local m_pos = pen.c.interface_memo[3] or { m_x, m_y }
@@ -2643,7 +2643,7 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, ignore_multihover, is
 	
 	if( is_hovered ) then
 		if( is_debugging ) then
-			pen.new_pixel( real_x, real_y, 10*pen.Z_LAYERS.tips, {255,0,0,0.75}, s_x, s_y )
+			pen.new_pixel( local_x, local_y, 10*pen.Z_LAYERS.tips, {255,0,0,0.75}, s_x, s_y )
 		end
 
 		pen.c.gui_data[2] = pen.c.gui_data[2] + 1
@@ -2786,21 +2786,25 @@ end
 function pen.new_cutout( pic_x, pic_y, size_x, size_y, func, scroll_pos ) --credit goes to aarvlo
 	local margin = 0
 	local gui, uid = pen.gui_builder()
+
 	GuiAnimateBegin( gui )
 	GuiAnimateAlphaFadeIn( gui, uid, 0, 0, true )
 	GuiBeginAutoBox( gui )
+	GuiOptionsAddForNextWidget( gui, 50 ) --ScrollContainer_Smooth
 	GuiBeginScrollContainer( gui, uid, pic_x - margin, pic_y - margin, size_x, size_y, false, margin, margin )
 	GuiEndAutoBoxNinePiece( gui )
 	GuiAnimateEnd( gui )
-
-	if( pen.vld( pen.c.cutter_dims_memo )) then 
-		pen.c.cutter_dims_memo = pen.t.clone( pen.c.cutter_dims )
-	end
 	
+	local got_some = pen.vld( pen.c.cutter_dims )
+	pen.c.cutter_dims_memo = pen.c.cutter_dims_memo or {}
+	if( got_some ) then table.insert( pen.c.cutter_dims_memo, pen.t.clone( pen.c.cutter_dims )) end
 	pen.c.cutter_dims = {{pic_x,pic_y},{size_x,size_y}}
+	
 	local height = func( scroll_pos )
-	pen.c.cutter_dims = pen.c.cutter_dims_memo
-
+	
+	if( got_some ) then
+		pen.c.cutter_dims = table.remove( pen.c.cutter_dims_memo, #pen.c.cutter_dims_memo )
+	else pen.c.cutter_dims = nil end
 	GuiEndScrollContainer( gui )
 	return height
 end
@@ -2811,9 +2815,10 @@ function pen.unscroller() --huge thanks to Lamia for inspiration
 		GlobalsSetValue( pen.GLOBAL_UNSCROLLER_SAFETY, frame_num )
 	else return end
 
-	local gui, uid = pen.gui_builder()
-	uid = uid + 2*( 1 + GameGetFrameNum()%3 )
 	local m_x, m_y = pen.get_mouse_pos()
+	local gui, uid = pen.gui_builder()
+	uid = uid + 2*( 1 + frame_num%3 )
+	pen.c.gui_data[2] = uid
 
 	GuiAnimateBegin( gui )
 	GuiAnimateAlphaFadeIn( gui, uid, 0, 0, true )
@@ -2825,59 +2830,33 @@ function pen.unscroller() --huge thanks to Lamia for inspiration
 end
 function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data ) --wide scrolling visuals version
 	func = pen.get_hybrid_table( func )
-	func[2] = func[2] or function( pic_x, pic_y, pic_z, bar_size, progress, real_height, data )
-		local bar_y = ( size_y - ( 6 + bar_size ))
-		local bar_pos_y = pic_y + bar_y*progress + 3
-		local _,new_y,state,_,_,is_hovered = pen.new_dragger( sid.."_dragger", pic_x, bar_pos_y, 3, bar_size, pic_z )
-		pen.new_pixel( pic_x + 1, bar_pos_y, pic_z, {0,0,0,0.83}, 1, bar_size )
-		pen.new_pixel( pic_x, bar_pos_y, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ], 1, bar_size )
-		pen.new_pixel( pic_x + 2, bar_pos_y, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT_DARK" or "NINE_MAIN_DARK" ], 1, bar_size )
+	func[2] = func[2] or function( pic_x, pic_y, pic_z, bar_size, bar_pos, data )
+		local out = {}
 
-		local eid = sid.."_anim"
+		local _,new_y,state,_,_,is_hovered = pen.new_dragger( sid.."_dragger", pic_x, bar_pos, 3, bar_size, pic_z )
+		pen.new_pixel( pic_x + 1, bar_pos, pic_z, {0,0,0,0.83}, 1, bar_size )
+		pen.new_pixel( pic_x, bar_pos, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ], 1, bar_size )
+		pen.new_pixel( pic_x + 2, bar_pos, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT_DARK" or "NINE_MAIN_DARK" ], 1, bar_size )
+		out[1] = { new_y, state }
+
 		local clicked, r_clicked = false, false
-		local step = bar_y*( data.scroll_step or 11 )/real_height
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, 3, 3, pic_z )
-		if( clicked ) then print( "ass" ) end
 		pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, {0,0,0,0.83})
 		pen.new_pixel( pic_x + 1, pic_y, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
 		pen.new_pixel( pic_x, pic_y + 1, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
 		pen.new_pixel( pic_x + 2, pic_y + 1, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT_DARK" or "NINE_MAIN_DARK" ])
 		if( data.can_scroll and ( InputIsMouseButtonDown( 4 ) or InputIsKeyJustDown( 86 ))) then clicked = 1 end
-		if( clicked ) then pen.c.scroll_memo[ sid ][3] = math.max( new_y - step, pic_y + 3 )
-		elseif( r_clicked ) then pen.c.scroll_memo[ sid ][3] = pic_y + 3 end
-		if( clicked or r_clicked ) then
-			pen.c.estimator_memo[ eid ] = ( new_y - ( pic_y + 3 ))/bar_y
-			pen.play_sound( pen.TUNES.VNL[ clicked == 1 and "hover" or ( r_clicked and "select" or "click" )])
-		end
-		
+		out[2] = { clicked, r_clicked }
+
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y + size_y - 3, 3, 3, pic_z )
 		pen.new_pixel( pic_x + 1, pic_y + size_y - 2, pic_z, {0,0,0,0.83})
 		pen.new_pixel( pic_x + 1, pic_y + size_y - 1, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
 		pen.new_pixel( pic_x, pic_y + size_y - 2, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
 		pen.new_pixel( pic_x + 2, pic_y + size_y - 2, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT_DARK" or "NINE_MAIN_DARK" ])
 		if( data.can_scroll and ( InputIsMouseButtonDown( 5 ) or InputIsKeyJustDown( 87 ))) then clicked = 1 end
-		if( clicked ) then pen.c.scroll_memo[ sid ][3] = math.min( new_y + step, pic_y + bar_y + 3 )
-		elseif( r_clicked ) then pen.c.scroll_memo[ sid ][3] = pic_y + bar_y + 3 end
-		if( clicked or r_clicked ) then
-			pen.play_sound( pen.TUNES.VNL[ clicked == 1 and "hover" or ( r_clicked and "select" or "click" )])
-		end
+		out[3] = { clicked, r_clicked }
 
-		local discrete_target = pen.c.scroll_memo[ sid ][3]
-		if( discrete_target ~= nil ) then
-			if( pen.compare_float( discrete_target, new_y )) then
-				pen.c.scroll_memo[ sid ][3] = nil
-			else new_y = discrete_target end
-		end
-
-		local buffer = 1
-		progress = math.min( math.max(( new_y - ( pic_y + 3 ))/bar_y, -buffer ), 1 + buffer )
-		progress = pen.estimate( eid, progress, math.min( bar_y/( 2*real_height ), 1 ), 0.01 )
-		if( state ~= 2 or pen.compare_float( new_y, bar_pos_y )) then return progress end
-		if( progress <= 0 or progress >= 1 ) then
-			pen.c.estimator_memo[ eid ] = math.min( math.max( pen.c.estimator_memo[ eid ], 0 ), 1 ); return progress
-		elseif( GameGetFrameNum()%5 ~= 0 ) then return progress end
-		pen.play_sound( pen.TUNES.VNL.hover )
-		return progress
+		return out
 	end
 	
 	data = data or {}
@@ -2886,17 +2865,61 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	elseif( data.scroll_always ~= false ) then
 		_,_,data.can_scroll = pen.new_interface( pic_x, pic_y, size_x + 5, size_y, pic_z )
 	end
-	--for every consecutive frame the mouse wheel is down, multiply the resulting offset to allow fast scrolling
+
 	pen.c.scroll_memo = pen.c.scroll_memo or {}
 	pen.c.scroll_memo[ sid ] = pen.c.scroll_memo[ sid ] or {}
+	pen.c.scroll_memo[ sid ][3] = pen.c.scroll_memo[ sid ][3] or {}
+
 	local old_height = pen.c.scroll_memo[ sid ][2] or 1
 	local new_height = math.max( pen.new_cutout( pic_x, pic_y, size_x, size_y,
 		func[1], -old_height*( pen.c.scroll_memo[ sid ][1] or 0 )) - size_y, 1 )
 	if( new_height > size_y ) then
 		if( data.can_scroll ) then pen.unscroller() end
 	else return end
-	pen.c.scroll_memo[ sid ][1] = math.min( math.max( func[2]( pic_x + size_x, pic_y, pic_z - 0.01,
-		( size_y - 6 )*math.min( size_y/new_height, 1 ), pen.c.scroll_memo[ sid ][1] or 0, new_height, data ), 0 ), 1 )
+
+	local progress = pen.c.scroll_memo[ sid ][1] or 0
+	local bar_size = math.max(( size_y - 6 )*math.min( size_y/new_height, 1 ), 1 )
+	
+	local bar_y = ( size_y - ( 6 + bar_size ))
+	local bar_pos = pic_y + bar_y*progress + 3
+	local step = bar_y*( data.scroll_step or 11 )/new_height
+	local out = func[2]( pic_x + size_x, pic_y, pic_z - 0.01, bar_size, bar_pos, data )
+	local new_y = out[1][1]
+
+	local discrete_target = pen.c.scroll_memo[ sid ][4]
+	if( discrete_target ~= nil ) then
+		if( discrete_target == new_y ) then
+			pen.c.scroll_memo[ sid ][4] = nil
+		else new_y = discrete_target end
+	end
+
+	for i = 2,3 do
+		local k = pen.c.scroll_memo[ sid ][3][i] or 1
+		pen.c.scroll_memo[ sid ][3][i] = out[i][1] and 2*k or 1
+
+		if( out[i][1]) then
+			if( i == 2 ) then
+				pen.c.scroll_memo[ sid ][4] = math.max( new_y - step*k, pic_y + 3 )
+			else pen.c.scroll_memo[ sid ][4] = math.min( new_y + step*k, pic_y + bar_y + 3 ) end
+		elseif( out[i][2]) then pen.c.scroll_memo[ sid ][4] = pic_y + 3 + ( i == 3 and bar_y or 0 ) end
+		if( out[i][1] or out[i][2]) then
+			pen.play_sound( pen.TUNES.VNL[ out[i][1] == 1 and "hover" or ( out[1][2] and "select" or "click" )])
+		end
+	end
+
+	local buffer = 1
+	local eid = sid.."_anim"
+	progress = math.min( math.max(( new_y - ( pic_y + 3 ))/bar_y, -buffer ), 1 + buffer )
+	progress = pen.estimate( eid, progress, math.min( bar_y/( 3*new_height ), 1 ), 0.01 )
+
+	local is_time = GameGetFrameNum()%5 == 0
+	local is_clipped = progress > 0 or progress < 1
+	local is_static = out[1][2] ~= 2 or pen.compare_float( new_y, bar_pos )
+	if( not( is_clipped )) then
+		pen.c.estimator_memo[ eid ] = math.min( math.max( pen.c.estimator_memo[ eid ], 0 ), 1 )
+	elseif( not( is_static or is_time )) then pen.play_sound( pen.TUNES.VNL.hover ) end
+
+	pen.c.scroll_memo[ sid ][1] = math.min( math.max( progress, 0 ), 1 )
 	if( old_height ~= new_height ) then
 		local ratio = old_height/new_height
 		pen.c.scroll_memo[ sid ][1] = pen.c.scroll_memo[ sid ][1]*ratio
@@ -3019,13 +3042,22 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 	end, { reset_frame = 36000 })
 	
 	pen.c.font_ram = pen.c.font_ram or {}
-	
+
 	local c_gbl, c_lcl = 1, {}
+	local is_inside = pen.vld( pen.c.cutter_dims )
 	pen.t.loop( structure, function( i, element )
 		if( not( pen.vld( element.text ))) then return end
 
 		local pos_x = pic_x + data.scale*( off_x + element.x )
 		local pos_y = pic_y + data.scale*( off_y + element.y )
+		if( is_inside ) then
+			local real_x = pen.c.cutter_dims[1][1] + pos_x + 0.001
+			if( pos_x < 0 ) then real_x = pen.c.cutter_dims[1][1] end
+			local real_y = pen.c.cutter_dims[1][2] + pos_y + 0.001
+			if( pos_y < 0 ) then real_y = real_y + new_line + 1 end
+			if( not( pen.check_bounds({ real_x, real_y }, unpack( pen.c.cutter_dims )))) then return end
+		end
+
 		if( not( pen.vld( element.f ))) then
 			c_lcl = {}
 			shadowed_text( pos_x, pos_y, pic_z,
@@ -3157,7 +3189,7 @@ function pen.new_tooltip( text, data, func )
 		if( not( pen.vld( data.dims ))) then
 			data.dims = pen.get_tip_dims( text, { data.min_width or 121, data.max_width or 0.9*w }, h, data.line_offset or -2 )
 		end
-		data.dims = pen.t.clone( data.dims )
+		data.dims = { data.dims[1], data.dims[2]}
 		data.dims[1] = data.dims[1] + 2*data.edging - 1
 		data.dims[2] = data.dims[2] + 2*data.edging - 1
 

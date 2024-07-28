@@ -204,7 +204,8 @@ function scrolling()
 
 pen.new_pixel( 100, 100, 5, pen.PALETTE.W, 55, 30 )
 pen.new_scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
-    local dims = pen.new_text( 0, scroll_pos, 0, test_input[1], { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
+    local t = test_input[1]..test_input[1]..test_input[1]..test_input[1]..test_input[1]..test_input[1]
+    local dims = pen.new_text( 0, scroll_pos, 0, t..t..t..t..t, { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
     return dims[2]
 end)
 
@@ -223,6 +224,17 @@ pen.new_scrolling_text( "hhmm", 200, 170, 5, { 30, 30 }, item, { fully_featured 
     end,
 }})
 pen.new_scrolling_text( "hmjm", 250, 170, 5, { 30, 30 }, "{>rainbow>{The Best Item}<rainbow<}", { fully_featured = true })
+
+
+
+-- gui = gui or GuiCreate(); GuiStartFrame( gui )
+-- for i = 1,1000 do
+--     GuiOptionsAddForNextWidget( gui, 47 ) --NoSound
+-- 	GuiOptionsAddForNextWidget( gui, 50 ) --ScrollContainer_Smooth
+--     GuiBeginScrollContainer( gui, 1, 200, 200, 50, 50, false, 0, 0)
+--     -- pen.new_text( 0, 0, 0, test_input[1], { fully_featured = true, dims = {50,-1}, color = {0,255,0}})
+--     GuiEndScrollContainer( gui )
+-- end
 
 end
 
