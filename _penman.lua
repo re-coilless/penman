@@ -2626,26 +2626,26 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, ignore_multihover, is
 	pen.c.interface_memo = pen.c.interface_memo or {}
 
 	if( pic_z ~= nil and not( is_figuring )) then safety_update() end
+	local got_cutter = pen.vld( pen.c.cutter_dims )
 
 	local is_hovered = false
-	local gui, uid = pen.gui_builder()
+	local is_inside = not( got_cutter )
 	local local_x, local_y = pic_x, pic_y
 	local m_x, m_y = pen.get_mouse_pos()
-	local is_inside = not( pen.vld( pen.c.cutter_dims ))
 	local m_pos = pen.c.interface_memo[3] or { m_x, m_y }
 	local got_dragger = tonumber( GlobalsGetValue( pen.GLOBAL_DRAGGER_SAFETY, "1" )) > 0
 	if( not( is_inside )) then is_inside = pen.check_bounds( m_pos, unpack( pen.c.cutter_dims )) end
 	if( is_inside and ( got_dragger or not( ignore_multihover ))) then
-		GuiImage( gui, uid, pic_x, pic_y, pen.FILE_PIC_NIL, 1, s_x/2, s_y/2 )
-		_,_,is_hovered,pic_x,pic_y = GuiGetPreviousWidgetInfo( gui )
-		if( is_hovered ) then is_hovered = pen.check_bounds( m_pos, { pic_x, pic_y }, { s_x, s_y }) end
+		if( got_cutter ) then pic_x, pic_y = pen.c.cutter_dims[1][1] + pic_x, pen.c.cutter_dims[1][2] + pic_y end
+		is_hovered = pen.check_bounds( m_pos, { pic_x, pic_y }, { s_x, s_y })
 	end
 	
 	if( is_hovered ) then
 		if( is_debugging ) then
 			pen.new_pixel( local_x, local_y, 10*pen.Z_LAYERS.tips, {255,0,0,0.75}, s_x, s_y )
 		end
-
+		
+		local gui = pen.gui_builder()
 		pen.c.gui_data[2] = pen.c.gui_data[2] + 1
 		GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
 		GuiImage( gui, pen.c.gui_data[2], m_x - 10, m_y - 10, pen.FILE_PIC_NIL, 1, 10, 10 )
@@ -2751,7 +2751,7 @@ end
 function pen.new_dragger( did, pic_x, pic_y, s_x, s_y, pic_z, allow_multihovers, is_debugging )
 	pen.c.dragger_data = pen.c.dragger_data or {}
 	pen.c.dragger_data[ did ] = pen.c.dragger_data[ did ] or { is_going = false, old_state = true, off = {0,0}}
-
+	
 	local frame_num = GameGetFrameNum()
 	local is_new = math.abs( tonumber( GlobalsGetValue( pen.GLOBAL_DRAGGER_SAFETY, "0" ))) ~= frame_num
 	if( not( is_new )) then return pic_x, pic_y, 0 end
@@ -2832,13 +2832,13 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	func = pen.get_hybrid_table( func )
 	func[2] = func[2] or function( pic_x, pic_y, pic_z, bar_size, bar_pos, data )
 		local out = {}
-
+		
 		local _,new_y,state,_,_,is_hovered = pen.new_dragger( sid.."_dragger", pic_x, bar_pos, 3, bar_size, pic_z )
 		pen.new_pixel( pic_x + 1, bar_pos, pic_z, {0,0,0,0.83}, 1, bar_size )
 		pen.new_pixel( pic_x, bar_pos, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ], 1, bar_size )
 		pen.new_pixel( pic_x + 2, bar_pos, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT_DARK" or "NINE_MAIN_DARK" ], 1, bar_size )
 		out[1] = { new_y, state }
-
+		
 		local clicked, r_clicked = false, false
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, 3, 3, pic_z )
 		pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, {0,0,0,0.83})
@@ -2871,8 +2871,8 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	pen.c.scroll_memo[ sid ][3] = pen.c.scroll_memo[ sid ][3] or {}
 
 	local old_height = pen.c.scroll_memo[ sid ][2] or 1
-	local new_height = math.max( pen.new_cutout( pic_x, pic_y, size_x, size_y,
-		func[1], -old_height*( pen.c.scroll_memo[ sid ][1] or 0 )) - size_y, 1 )
+	local scroll_pos = ( size_y - old_height )*( pen.c.scroll_memo[ sid ][1] or 0 )
+	local new_height = pen.new_cutout( pic_x, pic_y, size_x, size_y, func[1], scroll_pos )
 	if( new_height > size_y ) then
 		if( data.can_scroll ) then pen.unscroller() end
 	else return end
@@ -2910,14 +2910,14 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	local buffer = 1
 	local eid = sid.."_anim"
 	progress = math.min( math.max(( new_y - ( pic_y + 3 ))/bar_y, -buffer ), 1 + buffer )
-	progress = pen.estimate( eid, progress, math.min( bar_y/( 3*new_height ), 1 ), 0.01 )
+	progress = pen.estimate( eid, progress, bar_y/new_height, 0.01 )
 
-	local is_time = GameGetFrameNum()%5 == 0
-	local is_clipped = progress > 0 or progress < 1
+	local is_waiting = GameGetFrameNum()%7 ~= 0
+	local is_clipped = progress > 0 and progress < 1
 	local is_static = out[1][2] ~= 2 or pen.compare_float( new_y, bar_pos )
 	if( not( is_clipped )) then
 		pen.c.estimator_memo[ eid ] = math.min( math.max( pen.c.estimator_memo[ eid ], 0 ), 1 )
-	elseif( not( is_static or is_time )) then pen.play_sound( pen.TUNES.VNL.hover ) end
+	elseif( not( is_static or is_waiting )) then pen.play_sound( pen.TUNES.VNL.hover ) end
 
 	pen.c.scroll_memo[ sid ][1] = math.min( math.max( progress, 0 ), 1 )
 	if( old_height ~= new_height ) then
@@ -3051,9 +3051,9 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 		local pos_x = pic_x + data.scale*( off_x + element.x )
 		local pos_y = pic_y + data.scale*( off_y + element.y )
 		if( is_inside ) then
-			local real_x = pen.c.cutter_dims[1][1] + pos_x + 0.001
+			local real_x = pen.c.cutter_dims[1][1] + pos_x
 			if( pos_x < 0 ) then real_x = pen.c.cutter_dims[1][1] end
-			local real_y = pen.c.cutter_dims[1][2] + pos_y + 0.001
+			local real_y = pen.c.cutter_dims[1][2] + pos_y
 			if( pos_y < 0 ) then real_y = real_y + new_line + 1 end
 			if( not( pen.check_bounds({ real_x, real_y }, unpack( pen.c.cutter_dims )))) then return end
 		end
@@ -3120,18 +3120,22 @@ end
 
 function pen.new_scrolling_text( sid, pic_x, pic_y, pic_z, dims, text, data )
 	data, dims = data or {}, pen.get_hybrid_table( dims )
-	if( dims[2] ~= nil ) then
+	
+	local _,wh = pen.liner( text, dims[1], -1, data.font, data )
+	pen.c.scrolling_text_memo = pen.c.scrolling_text_memo or {}
+	pen.c.scrolling_text_memo[ sid ] = pen.c.scrolling_text_memo[ sid ] or 0
+	
+	local w, h = unpack( wh )
+	if( w < dims[1] and h < ( dims[2] or h )) then
+		data.dims = { dims[1], -1 }
+		return pen.new_text( pic_x, pic_y, pic_z, text, data )
+	elseif( dims[2] ~= nil ) then
 		data.dims = { dims[1], -1 }
 		return pen.new_scroller( sid, pic_x, pic_y, pic_z - 0.001, dims[1], dims[2], function( scroll_pos )
 			local dims = pen.new_text( 0, scroll_pos, pic_z, text, data )
 			return dims[2]
 		end)
 	end
-	
-	local w, h = pen.get_text_dims( text, true )
-	pen.c.scrolling_text_memo = pen.c.scrolling_text_memo or {}
-	pen.c.scrolling_text_memo[ sid ] = pen.c.scrolling_text_memo[ sid ] or 0
-	if( w < dims[1]) then return pen.new_text( pic_x, pic_y, pic_z, text, data ) end
 
 	local speed = data.scroll_speed or 10
 	local type_a = function()
