@@ -215,15 +215,20 @@ function scrolling()
 --     return dims[2]
 -- end)
 
--- local item = "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!"
--- pen.new_scrolling_text( "hmm", 100, 170, 5, 30, item, { fully_featured = true })
+local item = "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!"
+pen.new_scrolling_text( "hmm", 100, 170, 5, 30, item, { fully_featured = true })
 
 -- pen.new_scrolling_text( "hhmm", 200, 170, 5, { 30, 30 }, item, { fully_featured = true, font_mods = {
 --     e1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
---         return pen.FONT_MODS.tip( pic_x, pic_y, pic_z, char_data, color, indexes, "dfs", "LESSS GOOOOOO" )
+--         return pen.uncutter( function( cut_x, cut_y, cut_w, cut_h )
+--             pic_x.g, pic_y.g = pic_x.g + cut_x, pic_y.g + cut_y
+--             pic_x.l, pic_y.l = pic_x.l + cut_x, pic_y.l + cut_y
+--             return pen.FONT_MODS.tip( pic_x, pic_y, pic_z, char_data, color, indexes, "dfs", "LESSS GOOOOOO" )
+--         end)
 --     end,
 -- }})
-pen.new_scrolling_text( "hmjm", 250, 170, 5, { 33, 33 }, "{>rainbow>{The Best Item EVER}<rainbow<}", { fully_featured = true })
+
+-- pen.new_scrolling_text( "hmjm", 250, 170, 5, { 33, 33 }, "{>rainbow>{The Best Item EVER}<rainbow<}", { fully_featured = true })
 
 
 
@@ -370,10 +375,10 @@ pen.new_text( 100, 150, 0, test_input[1], {
     is_centered_y = true,
     font_mods = {
         c1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
-            return pic_x[1], pic_y[1], {0,255,0,0.5}
+            return pic_x.l, pic_y.l, {0,255,0,0.5}
         end,
         c2 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
-            return pic_x[1], pic_y[1], pen.PALETTE.PRSP.RED
+            return pic_x.l, pic_y.l, pen.PALETTE.PRSP.RED
         end,
         
         e1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
