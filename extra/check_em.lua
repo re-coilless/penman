@@ -14,12 +14,12 @@ if( pen.c.testing_done ) then
     else
         -- pen.c.testing_done = 1
         
-        -- misc_tests()
+        misc_tests()
         -- filing()
         -- raters()
         -- input()
-        scrolling()
-        tipping()
+        -- scrolling()
+        -- tipping()
         -- texting()
         -- fonting()
         -- cloner()
@@ -41,11 +41,16 @@ local test_input = {
 
 function misc_tests()
 
+pen.new_image( 50, 100, 5, pen.FILE_PIC_NUL, { s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 0 )})
+pen.new_image( 100, 100, 5, pen.FILE_PIC_NUL, { s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( -45 )})
+pen.new_image( 100, 150, 5, pen.FILE_PIC_NUL, { s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 45 )})
+pen.new_image( 100, 200, 5, pen.FILE_PIC_NUL, { s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 5 )})
+
+--[[
 local gui = GuiCreate()
 local balls = {}; balls[ gui ] = 1
 print( balls[ gui ], tostring( gui ))
 
---[[
 local m_x, m_y = DEBUG_GetMouseWorld()
 if( InputIsKeyDown( 20 )) then --q
 local result = pen.get_xy_matter( m_x, m_y, -10 )
@@ -261,14 +266,14 @@ pen.new_tooltip( "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can D
     }
 })
 
--- pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+-- pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { ease_int = "jump", ease_in = "sin", ease_out = "flr0", frames = 15 }
 --     end,
 --     color = pen.PALETTE.PRSP.WHITE,
 -- })
-pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
     range = { 0, 2.5 },
     func = pen.animate,
     input = function( x )
@@ -276,7 +281,7 @@ pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
     end,
     color = pen.PALETTE.PRSP.BLUE,
 })
-pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
     range = { 0, 2.5 },
     func = pen.animate,
     input = function( x )
@@ -284,28 +289,28 @@ pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
     end,
     color = pen.PALETTE.PRSP.RED,
 })
-pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
     func = pen.animate,
     input = function( x )
         return 1, 15*x, { ease_in = "sin3", ease_out = "wav1", frames = 15 }
     end,
     color = pen.PALETTE.PRSP.RED,
 })
--- pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+-- pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { ease_out = {"exp","wav"}, frames = 15 }
 --     end,
 --     color = pen.PALETTE.PRSP.BLUE,
 -- })
--- pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+-- pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { ease_out = "bnc50", frames = 15 }
 --     end,
 --     color = pen.PALETTE.PRSP.GREEN,
 -- })
--- pen.new_plot( 100, 200, pen.Z_LAYERS.tips, {
+-- pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { type = "spke", ease_out = "pow", frames = 15 }

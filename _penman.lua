@@ -5,27 +5,83 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "PROSPERO_IS_REAL", "1" )
 end
 
---[COMPLEX]
-pen.i = { 
-	__mt = { --just steal the whole complex.lua
+--[CLASSES]
+pen.V = { --https://github.com/Wiseluster/lua-vector/blob/master/vector.lua
+	__mt = {
 		__add = function( a, b )
-			return pen.i.new( a.r + b.r, a.i + b.i )
+			if( type( b ) == "number" ) then
+				b = { x = b, y = b } end
+			return pen.V.new( a.x + b.x, a.y + b.y )
 		end,
 		__sub = function( a, b )
-			return pen.i.new( a.r - b.r, a.i - b.i )
+			if( type( b ) == "number" ) then
+				b = { x = b, y = b } end
+			return pen.V.new( a.x - b.x, a.y - b.y )
 		end,
 		__mul = function( a, b )
-			return pen.i.new( a.r*b.r - a.i*b.i, a.r*b.i + a.i*b.r )
+			if( type( b ) == "number" ) then
+				return pen.V.new( a.x*b, a.y*b ) end
+			return a.x*b.x + a.y*b.y
+		end,
+		__div = function( a, b )
+			if( type( b ) ~= "number" ) then
+				return a end
+			return pen.V.new( a.x/b, a.y/b )
+		end,
+		__eq = function( a, b )
+			if( type( b ) == "number" ) then
+				return false end
+			return a.x == b.x and a.y == b.y
+		end,
+		__unm = function( a )
+			return pen.V.new( -a.x, -a.y )
+		end,
+		__tostring = function( a )
+			return table.concat({ "[", a.x, ";", a.y, "]" })
+		end,
+	},
+	new = function( x, y )
+		return setmetatable({ x = x or 0, y = y or 0 }, pen.V.__mt )
+	end,
+	len = function( v )
+		return math.sqrt(( v.x )^2 + ( v.y )^2 )
+	end,
+	abs = function( v )
+		return pen.V.new( math.abs( v.x ), math.abs( v.y ))
+	end,
+	max = function( v, a )
+		return pen.V.new( math.max( v.x, a ), math.max( v.y, a ))
+	end,
+	min = function( v, a )
+		return pen.V.new( math.min( v.x, a ), math.min( v.y, a ))
+	end,
+	rot = function( v, a )
+		if( a == 0 ) then return v end
+		local x = v.x*math.cos( a ) + v.y*math.sin( a )
+		local y = v.x*math.sin( a ) - v.y*math.cos( a )
+		return pen.V.new( x, y )
+	end,
+}
+pen.I = { 
+	__mt = { --just steal the whole complex.lua
+		__add = function( a, b )
+			return pen.I.new( a.r + b.r, a.i + b.i )
+		end,
+		__sub = function( a, b )
+			return pen.I.new( a.r - b.r, a.i - b.i )
+		end,
+		__mul = function( a, b )
+			return pen.I.new( a.r*b.r - a.i*b.i, a.r*b.i + a.i*b.r )
 		end,
 		__tostring = function( a )
 			return table.concat({ "[", a.r, ";", a.i, "]" })
 		end,
 	},
 	new = function( r, i )
-		return setmetatable({ r = r, i = i or 0 }, pen.i.__mt )
+		return setmetatable({ r = r, i = i or 0 }, pen.I.__mt )
 	end,
 	expi = function( i )
-		return pen.i.new( math.cos( i ), math.sin( i ))
+		return pen.I.new( math.cos( i ), math.sin( i ))
 	end,
 }
 
@@ -48,8 +104,8 @@ end
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
+--port register_pic so interfacing supports xml offsets
 --probably move [COMPLEX] to libman and append FFT to ANIM_INTERS separately
---pen.new_image interfacing must have xml offset support + integrate offsets with rotation
 --transition mnee and kappa to new gui
 --transition mrshll to penman
 
@@ -86,7 +142,8 @@ end
 
 --[TODO]
 --dropdown with search capabilities (combine input with scroller)
---universal controller-capable interface (dpad/left stick to switch between, x to select (dragger should work), triangle for rmb)
+--universal controller-capable interface
+--(dpad/left_stick/keyborad_arrows to switch between, x/keypad_0 to select (dragger should work), triangle/keypad_. for rmb)
 --tinker with GamePlaySound and GameEntityPlaySound (thanks to lamia)
 --tinker with copi's spriteemitter image concept
 --add sfxes (separate banks for prospero, hermes, trigger) + pics
@@ -150,6 +207,7 @@ function pen.angle_reset( angle )
 end
 
 function pen.rotate_offset( x, y, angle )
+	if(( x == 0 and y == 0 ) or angle == 0 ) then return x, y end
 	return x*math.cos( angle ) - y*math.sin( angle ), x*math.sin( angle ) + y*math.cos( angle )
 end
 
@@ -1761,7 +1819,7 @@ function pen.get_tinker_state( hooman, x, y )
 	return pen.t.loop( EntityGetWithTag( "workshop" ), function( i, workshop )
 		local w_x, w_y = EntityGetTransform( workshop )
 		local box_comp = EntityGetFirstComponent( workshop, "HitboxComponent" )
-		if( pen.check_bounds({ x, y }, { w_x, w_y }, box_comp )) then
+		if( pen.check_bounds({ x, y }, box_comp, { w_x, w_y })) then
 			return true
 		end
 	end) or false
@@ -1946,23 +2004,31 @@ function pen.delayed_kill( entity_id, delay, comp_id )
 	return entity_id
 end
 
-function pen.check_bounds( dot, pos, box )
+function pen.check_bounds( dot, box, pos, distance_func ) --needs more testing
 	if( not( pen.vld( box, true ))) then return false end
 	
-	pos = pos or {}
+	pos = pos or { 0, 0 }
 	if( type( box ) ~= "table" ) then
+		local bx1 = ComponentGetValue2( box, "aabb_min_x" )
+		local bx2 = ComponentGetValue2( box, "aabb_max_x" )
+		local by1 = ComponentGetValue2( box, "aabb_min_y" )
+		local by2 = ComponentGetValue2( box, "aabb_max_y" )
 		local off_x, off_y = ComponentGetValue2( box, "offset" )
-		pos = {( pos[1] or 0 ) + off_x, ( pos[2] or 0 ) + off_y }
-		box = {
-			ComponentGetValue2( box, "aabb_min_x" ), ComponentGetValue2( box, "aabb_max_x" ),
-			ComponentGetValue2( box, "aabb_min_y" ), ComponentGetValue2( box, "aabb_max_y" ),
-		}
-	elseif( #box == 2 ) then
-		box = { 0, box[1], 0, box[2]}
+		pos = { pos[1] + off_x + bx1, pos[2] + off_y + by1 }
+		box = { bx2 - bx1, by2 - by1 }
+	elseif( distance_func == nil ) then
+		box = pen.get_hybrid_table( box )
+		if( #box == 4 ) then
+			pos = { pos[1] + box[1], pos[2] + box[3]}
+			box = { box[2] - box[1], box[4] - box[3]}
+		end
 	end
-
-	return dot[1] >= ( pos[1] + box[1]) and dot[2] >= ( pos[2] + box[3])
-		and dot[1] <= ( pos[1] + box[2]) and dot[2] <= ( pos[2] + box[4])
+	
+	local is_weird = #box ~= 2
+	local p = is_weird and box or pen.V.new( box[1], box[2])/2
+	local d = pen.V.new( pos[1] - dot[1], pos[2] - dot[2])
+	if( not( is_weird )) then d = d + pen.V.rot( p, pos[3] or 0 ) end
+	return ( distance_func or pen.SDF.BOX )( pen.V.rot( d, pos[3] or 0 ), p ) <= 0
 end
 
 function pen.scale_emitter( entity_id, emit_comp )
@@ -2572,7 +2638,8 @@ function pen.pic_builder( pic, w, h ) --apocalyptic thanks to Lamia and dextercd
 end
 
 --make non z-level adjusted stuff work with z-level adjusted, the latter must always be prioritized
-function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, ignore_multihover, is_debugging )
+function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, data )
+	data = data or {}
 	local frame_num = GameGetFrameNum()
 	local clicked, r_clicked = false, false
 	local lmb_state, rmb_state = InputIsMouseButtonDown( 1 ), InputIsMouseButtonDown( 2 )
@@ -2606,21 +2673,21 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, ignore_multihover, is
 	local m_x, m_y = pen.get_mouse_pos()
 	local m_pos = pen.c.interface_memo.m or { m_x, m_y }
 	local got_dragger = tonumber( GlobalsGetValue( pen.GLOBAL_DRAGGER_SAFETY, "1" )) > 0
-	if( not( is_inside )) then is_inside = pen.check_bounds( m_pos, pen.c.cutter_dims.xy, pen.c.cutter_dims.wh ) end
-	if( is_inside and ( got_dragger or not( ignore_multihover ))) then
+	if( not( is_inside )) then is_inside = pen.check_bounds( m_pos, pen.c.cutter_dims.wh, pen.c.cutter_dims.xy ) end
+	if( is_inside and ( got_dragger or not( data.ignore_multihover ))) then
 		if( got_cutter ) then pic_x, pic_y = pen.c.cutter_dims.xy[1] + pic_x, pen.c.cutter_dims.xy[2] + pic_y end
-		is_hovered = pen.check_bounds( m_pos, { pic_x, pic_y }, { s_x, s_y })
+		is_hovered = pen.check_bounds( m_pos, { s_x, s_y }, { pic_x, pic_y, data.angle }, data.distance_func )
 	end
 	
 	if( is_hovered ) then
-		if( is_debugging ) then
-			pen.new_pixel( local_x, local_y, 10*pen.Z_LAYERS.tips, {255,0,0,0.75}, s_x, s_y )
+		if( data.is_debugging ) then
+			pen.new_pixel( local_x, local_y, 10*pen.LAYERS.TIPS, {255,100,100,0.75}, s_x, s_y, data.angle )
 		end
 		
 		local gui = pen.gui_builder()
 		pen.c.gui_data.i = pen.c.gui_data.i + 1
-		GuiZSetForNextWidget( gui, 10*pen.Z_LAYERS.tips )
-		GuiImage( gui, pen.c.gui_data.i, m_x - 10, m_y - 10, pen.FILE_PIC_NIL, 1, 10, 10 )
+		GuiZSetForNextWidget( gui, 10*pen.LAYERS.TIPS )
+		GuiImage( gui, pen.c.gui_data.i, m_x - 10, m_y - 10, pen.FILE_PIC_NIL, 1, 10, 10, data.angle or 0 )
 
 		local is_new = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_FRAME, "0" )) ~= frame_num
 		local no_left = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_SAFETY_LL, "0" )) > 0
@@ -2685,7 +2752,7 @@ function pen.new_image( pic_x, pic_y, pic_z, pic, data )
 	end
 	if( data.can_click ) then
 		if( data.skip_z_check ) then pic_z = nil end
-		return pen.new_interface( pic_x, pic_y, w*( data.s_x or 1 ), h*( data.s_y or 1 ), pic_z, data.ignore_multihover )
+		return pen.new_interface( pic_x, pic_y, w*( data.s_x or 1 ), h*( data.s_y or 1 ), pic_z, data )
 	end
 end
 
@@ -2698,15 +2765,16 @@ end
 ---@return boolean clicked, boolean r_clicked, boolean is_hovered
 function pen.new_button( pic_x, pic_y, pic_z, pic, data )
 	data = data or {}
-	data.auid = data.auid or table.concat({ pic, pic_z })
+	data.ignore_multihover = true
 	data.no_anim = data.no_anim or false
 	data.pic_func = data.pic_func or pen.new_image
+	data.auid = data.auid or table.concat({ pic, pic_z })
 	
 	local pic_iz = pic_z
 	if( data.skip_z_check ) then pic_iz = nil end
 	data.dims = { pen.get_pic_dims( pen.get_hybrid_table( pic )[1])}
 	data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
-		pic_x, pic_y, data.dims[1]*( data.s_x or 1 ), data.dims[2]*( data.s_y or 1 ), pic_iz, true )
+		pic_x, pic_y, data.dims[1]*( data.s_x or 1 ), data.dims[2]*( data.s_y or 1 ), pic_iz, data )
 
 	if( data.lmb_event ~= nil and data.clicked ) then
 		pic_x, pic_y, pic_z, pic, data = data.lmb_event( pic_x, pic_y, pic_z, pic, data ) end
@@ -2720,7 +2788,8 @@ function pen.new_button( pic_x, pic_y, pic_z, pic, data )
 	return data.clicked, data.r_clicked, data.is_hovered
 end
 
-function pen.new_dragger( did, pic_x, pic_y, s_x, s_y, pic_z, allow_multihovers, is_debugging )
+function pen.new_dragger( did, pic_x, pic_y, s_x, s_y, pic_z, data )
+	data = data or {}
 	pen.c.dragger_data = pen.c.dragger_data or {}
 	pen.c.dragger_data[ did ] = pen.c.dragger_data[ did ] or { is_going = false, old_state = true, off = {0,0}}
 	
@@ -2734,7 +2803,7 @@ function pen.new_dragger( did, pic_x, pic_y, s_x, s_y, pic_z, allow_multihovers,
 	-- pen.c.dragger_data[ did ].old_pos = { m_x, m_y }
 	
 	local clicked = false
-	local _, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, false, is_debugging )
+	local _, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, data )
 	
 	local state = 0
 	local mouse_state = InputIsMouseButtonDown( 1 )
@@ -2751,7 +2820,8 @@ function pen.new_dragger( did, pic_x, pic_y, s_x, s_y, pic_z, allow_multihovers,
 		clicked, state = true, 1
 	else pen.c.dragger_data[ did ].old_state = mouse_state end
 	
-	if( state > 0 ) then GlobalsSetValue( pen.GLOBAL_DRAGGER_SAFETY, (( allow_multihovers or false ) and 1 or -1 )*frame_num ) end
+	if( state > 0 ) then
+		GlobalsSetValue( pen.GLOBAL_DRAGGER_SAFETY, (( data.allow_multihovers or false ) and 1 or -1 )*frame_num ) end
 	return pic_x, pic_y, state, clicked, r_clicked, is_hovered
 end
 
@@ -2888,7 +2958,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 			else pen.c.scroll_memo[ sid ].t = math.min( new_y + step*k, pic_y + bar_y + 3 ) end
 		elseif( out[i][2]) then pen.c.scroll_memo[ sid ].t = pic_y + 3 + ( i == 3 and bar_y or 0 ) end
 		if( out[i][1] or out[i][2]) then
-			pen.play_sound( pen.TUNES.VNL[ out[i][1] == 1 and "hover" or ( out[1][2] and "select" or "click" )])
+			pen.play_sound( pen.TUNES.VNL[ out[i][1] == 1 and "HOVER" or ( out[1][2] and "SELECT" or "CLICK" )])
 		end
 	end
 
@@ -2902,7 +2972,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	local is_static = out[1][2] ~= 2 or pen.compare_float( new_y, bar_pos )
 	if( not( is_clipped )) then
 		pen.c.estimator_memo[ eid ] = math.min( math.max( pen.c.estimator_memo[ eid ], 0 ), 1 )
-	elseif( not( is_static or is_waiting )) then pen.play_sound( pen.TUNES.VNL.hover ) end
+	elseif( not( is_static or is_waiting )) then pen.play_sound( pen.TUNES.VNL.HOVER ) end
 
 	pen.c.scroll_memo[ sid ].p = math.min( math.max( progress, 0 ), 1 )
 	if( old_height ~= new_height ) then
@@ -3040,7 +3110,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 			if( pos_x < 0 ) then real_x = pen.c.cutter_dims.xy[1] end
 			local real_y = pen.c.cutter_dims.xy[2] + pos_y
 			if( pos_y < 0 ) then real_y = real_y + new_line + 1 end
-			if( not( pen.check_bounds({ real_x, real_y }, pen.c.cutter_dims.xy, pen.c.cutter_dims.wh ))) then return end
+			if( not( pen.check_bounds({ real_x, real_y }, pen.c.cutter_dims.wh, pen.c.cutter_dims.xy ))) then return end
 		end
 
 		if( not( pen.vld( element.f ))) then
@@ -3157,7 +3227,7 @@ function pen.new_tooltip( text, data, func )
 	data.tid = data.tid or "dft"
 	data.edging = data.edging or 3
 	data.frames = data.frames or 15
-	data.pic_z = data.pic_z or pen.Z_LAYERS.tips
+	data.pic_z = data.pic_z or pen.LAYERS.TIPS
 	data.allow_hover = data.allow_hover or false
 	data.do_corrections = data.do_corrections or not( pen.vld( data.pos ))
 	
@@ -3489,7 +3559,7 @@ pen.FONT_MODS = {
 			if( r_clicked ) then out[2] = frame_num end
 			if( is_hovered ) then out[3] = frame_num + 5 end
 
-			if( clicked or r_clicked ) then pen.play_sound( pen.TUNES.VNL.click ) end
+			if( clicked or r_clicked ) then pen.play_sound( pen.TUNES.VNL.CLICK ) end
 			return unpack(( clicked or r_clicked or is_hovered ) and out or {})
 		end, { always_update = true, reset_count = 0 })
 
@@ -3672,7 +3742,7 @@ pen.ANIM_INTERS = {
 			fft( even ); fft( odd )
 
 			for k = 1,n/2 do
-				local t = even[k]*pen.i.expi( -2*math.pi*( k - 1 )/n )
+				local t = even[k]*pen.I.expi( -2*math.pi*( k - 1 )/n )
 				pen.c.fft_data[k], pen.c.fft_data[ k + n/2 ] = odd[k] + t, odd[k] - t
 			end
 			return pen.c.fft_data
@@ -3682,10 +3752,39 @@ pen.ANIM_INTERS = {
 		--check if it's looped properly and add buffer points (45 degree straight) if is not
 		return pen.cache({ "fft_memo", pen.t.pack( p )}, function()
 			pen.c.fft_data = {}
-			for i,v in ipairs( p or {}) do pen.c.fft_data[i] = pen.i.new( v ) end
+			for i,v in ipairs( p or {}) do pen.c.fft_data[i] = pen.I.new( v ) end
 			local out = fft( pen.c.fft_data ); pen.c.fft_data = nil
 			return pen.t.clone( out )
 		end)
+	end,
+}
+
+pen.SDF = { --https://iquilezles.org/articles/distfunctions2d/
+	CIRCLE = function( d, p )
+		return pen.V.len( d ) - p.x
+	end,
+	BOX = function( d, p )
+		local v = pen.V.abs( d ) - p
+		print( pen.V.len( pen.V.max( v, 0 )) + math.min( math.max( v.x, v.y ), 0 ))
+		return pen.V.len( pen.V.max( v, 0 )) + math.min( math.max( v.x, v.y ), 0 )
+	end,
+	POLYGON = function( d, p )
+		local n = #p - 1
+		local s, j = 1, n
+		local v = ( d - p[0])*( d - p[0])
+		for i = 0,n do
+			local e, w = p[j] - p[i], d - p[i]
+			local b = w - e*math.min( math.max(( w*e )/( e*e ), 0.0 ), 1.0 )
+			v = math.min( v, b*b )
+			
+			local c1 = d.y < p[j].y
+			local c2 = d.y >= p[i].y
+			local c3 = e.x*w.y > e.y*w.x
+			local c = c1 == c2 and c2 == c3
+			if( c ) then s = -s end
+			j = i
+		end
+		return s*math.sqrt( v )
 	end,
 }
 
@@ -3797,44 +3896,45 @@ pen.PALETTE = {
 	
 	--N40K: ammo types, classes, misc colors
 }
+
 pen.TUNES = {
 	VNL = {
-		click = {"data/audio/Desktop/ui.bank","ui/button_click"},
-		hover = {"data/audio/Desktop/ui.bank","ui/item_move_over_new_slot"},
-		error = {"data/audio/Desktop/ui.bank","ui/item_move_denied"},
-		reset = {"data/audio/Desktop/ui.bank","ui/replay_saved"},
+		CLICK = {"data/audio/Desktop/ui.bank","ui/button_click"},
+		HOVER = {"data/audio/Desktop/ui.bank","ui/item_move_over_new_slot"},
+		ERROR = {"data/audio/Desktop/ui.bank","ui/item_move_denied"},
+		RESET = {"data/audio/Desktop/ui.bank","ui/replay_saved"},
 
-		open = {"data/audio/Desktop/ui.bank","ui/inventory_open"},
-		close = {"data/audio/Desktop/ui.bank","ui/inventory_close"},
-		buy = {"data/audio/Desktop/event_cues.bank","event_cues/shop_item/create"},
-		drop = {"data/audio/Desktop/ui.bank","ui/item_remove"},
-		pick = {"data/audio/Desktop/event_cues.bank","event_cues/pick_item_generic/create"},
-		select = {"data/audio/Desktop/ui.bank","ui/item_equipped"},
-		move_empty = {"data/audio/Desktop/ui.bank","ui/item_move_success"},
-		move_item = {"data/audio/Desktop/ui.bank","ui/item_switch_places"},
+		OPEN = {"data/audio/Desktop/ui.bank","ui/inventory_open"},
+		CLOSE = {"data/audio/Desktop/ui.bank","ui/inventory_close"},
+		BUY = {"data/audio/Desktop/event_cues.bank","event_cues/shop_item/create"},
+		DROP = {"data/audio/Desktop/ui.bank","ui/item_remove"},
+		PICK = {"data/audio/Desktop/event_cues.bank","event_cues/pick_item_generic/create"},
+		SELECT = {"data/audio/Desktop/ui.bank","ui/item_equipped"},
+		MOVE_NONE = {"data/audio/Desktop/ui.bank","ui/item_move_success"},
+		MOVE_ITEM = {"data/audio/Desktop/ui.bank","ui/item_switch_places"},
 	}
 }
 
-pen.Z_LAYERS = {
-	world_back = 999,
-	world = 998,
-	world_front = 997,
-	world_ui = 10,
+pen.LAYERS = {
+	WORLD_BACK = 999,
+	WORLD = 998,
+	WORLD_FRONT = 997,
+	WORLD_UI = 10,
 	
-	background = 2, --general background
+	BACKGROUND = 2, --general background
 
-	main_far_back = 1, --slot background
-	main_back = 0.01, --bar background
-	main = 0, --bars, perks, effects
-	main_front = -0.01, --slot highlights
+	MAIN_DEEP = 1, --slot background
+	MAIN_BACK = 0.01, --bar background
+	MAIN = 0, --bars, perks, effects
+	MAIN_FRONT = -0.01, --slot highlights
 
-	icons_back = -0.09,
-	icons = -1, --inventory item icons
-	icons_front = -1.01, --spell charges
+	ICONS_BACK = -0.09,
+	ICONS = -1, --inventory item icons
+	ICONS_FRONT = -1.01, --spell charges
 
-	tips_back = -10100,
-	tips = -10101, --tooltips duh
-	tips_front = -10102,
+	TIPS_BACK = -10100,
+	TIPS = -10101, --tooltips
+	TIPS_FRONT = -10102,
 }
 
 pen.INIT_THREADS = {
@@ -5666,7 +5766,7 @@ pen.FILE_XML_FONT = [[
 ---@field min_width number [DFT: 121 ] The minimal width a tooltip can be if the dims field is left empty.
 ---@field max_width number [DFT: 0.9*screen_width ] The maximum width a tooltip can be if the dims field is left empty.
 ---@field pos table [DFT: mouse_pos ]<br> The position of the tooltip on the screen.
----@field pic_z number [DFT: pen.Z_LAYERS.tips ]<br> The depth to draw the tooltip at.
+---@field pic_z number [DFT: pen.LAYERS.TIPS ]<br> The depth to draw the tooltip at.
 ---@field is_left boolean [DFT: false ]<br> Will draw the tooltip to the left if set to true.
 ---@field is_over boolean [DFT: false ]<br> Will draw the tooltip up above if set to true.
 ---@field frames number [DFT: 15 ]<br> The duration of the opening animation.
