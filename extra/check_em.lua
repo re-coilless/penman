@@ -18,8 +18,8 @@ if( pen.c.testing_done ) then
         -- filing()
         -- raters()
         -- input()
-        -- scrolling()
-        -- tipping()
+        scrolling()
+        tipping()
         -- texting()
         -- fonting()
         -- cloner()
@@ -41,10 +41,18 @@ local test_input = {
 
 function misc_tests()
 
-pen.new_image( 50, 100, 5, pen.FILE_PIC_NUL, { s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 0 )})
-pen.new_image( 100, 100, 5, pen.FILE_PIC_NUL, { s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( -45 )})
-pen.new_image( 100, 150, 5, pen.FILE_PIC_NUL, { s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 45 )})
-pen.new_image( 100, 200, 5, pen.FILE_PIC_NUL, { s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 5 )})
+pen.new_pixel( 50 - 0.5, 100 - 0.5, 4, {255,0,0})
+pen.new_image( 50, 100, 5, pen.FILE_PIC_NUL, {
+    alpha = 0.5, s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 0 )})
+pen.new_pixel( 100 - 0.5, 100 - 0.5, 4, {255,0,0})
+pen.new_image( 100, 100, 5, pen.FILE_PIC_NUL, {
+    alpha = 0.5, s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( -30 )})
+pen.new_pixel( 100 - 0.5, 150 - 0.5, 4, {255,0,0})
+pen.new_image( 100, 150, 5, pen.FILE_PIC_NUL, {
+    alpha = 0.5, s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 60 )})
+pen.new_pixel( 100 - 0.5, 200 - 0.5, 4, {255,0,0})
+pen.new_image( 100, 200, 5, pen.FILE_PIC_NUL, {
+    alpha = 0.5, s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 5 )})
 
 --[[
 local gui = GuiCreate()
@@ -207,33 +215,33 @@ end
 
 function scrolling()
 
--- pen.new_pixel( 100, 100, 5, pen.PALETTE.W, 55, 30 )
--- pen.new_scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
---     local t = test_input[1]..test_input[1]..test_input[1]..test_input[1]..test_input[1]..test_input[1]
---     local dims = pen.new_text( 0, scroll_pos, 0, t..t..t..t..t, { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
---     return dims[2]
--- end)
+pen.new_pixel( 100, 100, 5, pen.PALETTE.W, 55, 30 )
+pen.new_scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
+    local t = test_input[1]..test_input[1]..test_input[1]..test_input[1]..test_input[1]..test_input[1]
+    local dims = pen.new_text( 0, scroll_pos, 0, t..t..t..t..t, { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
+    return dims[2]
+end)
 
--- pen.new_pixel( 100, 200, 5, pen.PALETTE.W, 60, 15 )
--- pen.new_scroller( "ass", 100, 200, -5, 60, 15, function( scroll_pos )
---     local dims = pen.new_text( 0, scroll_pos, 0, test_input[1], { fully_featured = true, dims = {60,-1}, color = {0,255,0}})
---     return dims[2]
--- end)
+pen.new_pixel( 100, 200, 5, pen.PALETTE.W, 60, 15 )
+pen.new_scroller( "ass", 100, 200, -5, 60, 15, function( scroll_pos )
+    local dims = pen.new_text( 0, scroll_pos, 0, test_input[1], { fully_featured = true, dims = {60,-1}, color = {0,255,0}})
+    return dims[2]
+end)
 
 local item = "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!"
 pen.new_scrolling_text( "hmm", 100, 170, 5, 30, item, { fully_featured = true })
 
--- pen.new_scrolling_text( "hhmm", 200, 170, 5, { 30, 30 }, item, { fully_featured = true, font_mods = {
---     e1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
---         return pen.uncutter( function( cut_x, cut_y, cut_w, cut_h )
---             pic_x.g, pic_y.g = pic_x.g + cut_x, pic_y.g + cut_y
---             pic_x.l, pic_y.l = pic_x.l + cut_x, pic_y.l + cut_y
---             return pen.FONT_MODS.tip( pic_x, pic_y, pic_z, char_data, color, indexes, "dfs", "LESSS GOOOOOO" )
---         end)
---     end,
--- }})
+pen.new_scrolling_text( "hhmm", 200, 170, 5, { 30, 30 }, item, { fully_featured = true, font_mods = {
+    e1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
+        return pen.uncutter( function( cut_x, cut_y, cut_w, cut_h )
+            pic_x.g, pic_y.g = pic_x.g + cut_x, pic_y.g + cut_y
+            pic_x.l, pic_y.l = pic_x.l + cut_x, pic_y.l + cut_y
+            return pen.FONT_MODS.tip( pic_x, pic_y, pic_z, char_data, color, indexes, "dfs", "LESSS GOOOOOO" )
+        end)
+    end,
+}})
 
--- pen.new_scrolling_text( "hmjm", 250, 170, 5, { 33, 33 }, "{>rainbow>{The Best Item EVER}<rainbow<}", { fully_featured = true })
+pen.new_scrolling_text( "hmjm", 250, 170, 5, { 33, 33 }, "{>rainbow>{The Best Item EVER}<rainbow<}", { fully_featured = true })
 
 
 

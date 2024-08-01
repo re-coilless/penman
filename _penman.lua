@@ -62,7 +62,7 @@ pen.V = { --https://github.com/Wiseluster/lua-vector/blob/master/vector.lua
 		return pen.V.new( x, y )
 	end,
 }
-pen.I = { 
+pen.I = {
 	__mt = { --just steal the whole complex.lua
 		__add = function( a, b )
 			return pen.I.new( a.r + b.r, a.i + b.i )
@@ -104,6 +104,7 @@ end
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
+--new_tooltip anim start is fucked
 --port register_pic so interfacing supports xml offsets
 --probably move [COMPLEX] to libman and append FFT to ANIM_INTERS separately
 --transition mnee and kappa to new gui
@@ -2004,7 +2005,7 @@ function pen.delayed_kill( entity_id, delay, comp_id )
 	return entity_id
 end
 
-function pen.check_bounds( dot, box, pos, distance_func ) --needs more testing
+function pen.check_bounds( dot, box, pos, distance_func )
 	if( not( pen.vld( box, true ))) then return false end
 	
 	pos = pos or { 0, 0 }
@@ -2025,9 +2026,9 @@ function pen.check_bounds( dot, box, pos, distance_func ) --needs more testing
 	end
 	
 	local is_weird = #box ~= 2
-	local p = is_weird and box or pen.V.new( box[1], box[2])/2
 	local d = pen.V.new( pos[1] - dot[1], pos[2] - dot[2])
-	if( not( is_weird )) then d = d + pen.V.rot( p, pos[3] or 0 ) end
+	local p = is_weird and box or pen.V.new( box[1], box[2])/2
+	if( not( is_weird )) then d = d + pen.V.new( pen.rotate_offset( p.x, p.y, pos[3] or 0 )) end
 	return ( distance_func or pen.SDF.BOX )( pen.V.rot( d, pos[3] or 0 ), p ) <= 0
 end
 
@@ -3765,7 +3766,6 @@ pen.SDF = { --https://iquilezles.org/articles/distfunctions2d/
 	end,
 	BOX = function( d, p )
 		local v = pen.V.abs( d ) - p
-		print( pen.V.len( pen.V.max( v, 0 )) + math.min( math.max( v.x, v.y ), 0 ))
 		return pen.V.len( pen.V.max( v, 0 )) + math.min( math.max( v.x, v.y ), 0 )
 	end,
 	POLYGON = function( d, p )
