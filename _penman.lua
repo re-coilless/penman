@@ -104,10 +104,9 @@ end
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---new_tooltip anim start is fucked
 --port register_pic so interfacing supports xml offsets
 --probably move [COMPLEX] to libman and append FFT to ANIM_INTERS separately
---transition mnee and kappa to new gui
+--default tips should have z level resolver
 --transition mrshll to penman
 
 -- pen.estimate
@@ -620,6 +619,7 @@ function pen.t.parse( data, is_pretty, full_precision )
 				out[ s2n( v )] = dser( string.gsub( v, name_pattern, "" ))
 			end
 			local l_pos, r_pos = 0, 0
+			str = string.gsub( str, ",,+", "," )
 			while( l_pos ~= nil ) do
 				local v = ""
 				l_pos, r_pos = string.find( str, ",%[.-,%[" )
@@ -660,8 +660,12 @@ function pen.t.print( tbl )
 	print( pen.t.parse( tbl, true ))
 end
 
-function pen.catch( f, input, fallback )
-	local out = { pcall( f, unpack( input or {}))}
+function pen.hallway( func )
+	return func()
+end
+
+function pen.catch( func, input, fallback )
+	local out = { pcall( func, unpack( input or {}))}
 	if( out[1]) then table.remove( out, 1 ); return unpack( out ) end
 	if( not( pen.c.silent_catch )) then print( out[2]) end
 	if( pen.vld( fallback )) then return unpack( fallback ) end
@@ -680,7 +684,7 @@ function pen.cache( structure, update_func, data )
 
 	local frame_num = GameGetFrameNum()
 	local is_too_many = data.reset_count > 0 and pen.c[ name ].cache_reset_count > data.reset_count
-	local is_too_long = data.reset_frame > 0 and frame_num > data.reset_frame
+	local is_too_long = data.reset_frame > 0 and pen.c[ name ].cache_reset_frame < frame_num
 	if( data.reset_now or ( update_func ~= nil and ( is_too_many or is_too_long ))) then
 		pen.c[ name ] = {}
 		pen.c[ name ].cache_reset_count = 0
@@ -705,9 +709,9 @@ function pen.cache( structure, update_func, data )
 	return unpack( the_one[ val ] or {})
 end
 
-function pen.chrono( f, input, storage_comp, name )
+function pen.chrono( func, input, storage_comp, name )
 	local check = GameGetRealWorldTimeSinceStarted()*1000
-	if( f == nil ) then
+	if( func == nil ) then
 		if( pen.c.chrono_memo ) then
 			print(( check - pen.c.chrono_memo ).."ms" )
 			pen.c.chrono_memo = nil
@@ -715,7 +719,7 @@ function pen.chrono( f, input, storage_comp, name )
 		return
 	end
 
-	local out = { f( unpack( pen.get_hybrid_table( input )))}
+	local out = { func( unpack( pen.get_hybrid_table( input )))}
 	check = GameGetRealWorldTimeSinceStarted()*1000 - check
 
 	if( pen.vld( storage_comp, true )) then
@@ -2025,10 +2029,10 @@ function pen.check_bounds( dot, box, pos, distance_func )
 		end
 	end
 	
-	local is_weird = #box ~= 2
+	local is_fancy = #box ~= 2
 	local d = pen.V.new( pos[1] - dot[1], pos[2] - dot[2])
-	local p = is_weird and box or pen.V.new( box[1], box[2])/2
-	if( not( is_weird )) then d = d + pen.V.new( pen.rotate_offset( p.x, p.y, pos[3] or 0 )) end
+	local p = is_fancy and box or pen.V.new( box[1], box[2])/2
+	if( not( is_fancy )) then d = d + pen.V.new( pen.rotate_offset( p.x, p.y, pos[3] or 0 )) end
 	return ( distance_func or pen.SDF.BOX )( pen.V.rot( d, pos[3] or 0 ), p ) <= 0
 end
 
@@ -2306,6 +2310,7 @@ end
 --[INTERFACE]
 function pen.gui_builder( gui )
 	local frame_num = GameGetFrameNum()
+	pen.c.gui_dump = pen.c.gui_dump or {}
 	if( gui == false or ( gui == true and (( pen.c.gui_data or {}).i or 0 ) < 2 )) then
 		if(( pen.c.gui_data or {}).g ) then
 			pen.c.gui_dump[ pen.c.gui_data.g ] = nil
@@ -2314,7 +2319,6 @@ function pen.gui_builder( gui )
 		pen.c.gui_data = nil
 		return
 	elseif( type( gui ) == "userdata" ) then
-		pen.c.gui_dump = pen.c.gui_dump or {}
 		if( pen.vld( pen.c.gui_data )) then
 			pen.c.gui_dump[ pen.c.gui_data.g ] = pen.t.clone( pen.c.gui_data )
 		end
@@ -2638,7 +2642,6 @@ function pen.pic_builder( pic, w, h ) --apocalyptic thanks to Lamia and dextercd
 	return pic_id, pic
 end
 
---make non z-level adjusted stuff work with z-level adjusted, the latter must always be prioritized
 function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, data )
 	data = data or {}
 	local frame_num = GameGetFrameNum()
@@ -2658,13 +2661,14 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, data )
 			end
 		end
 	end
-
+	
 	local update_frame = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_FRAME_Z, "0" ))
 	local top_z = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_Z, "nope" ))
 	local is_figuring = top_z ~= nil
-	if( is_figuring and frame_num - update_frame > 2 ) then pen.c.interface_memo = nil end
-	pen.c.interface_memo = pen.c.interface_memo or {}
-
+	if( is_figuring and frame_num - update_frame > 2 ) then
+		GameRemoveFlagRun( pen.FLAG_INTERFACE_TOGGLE ); GlobalsSetValue( pen.GLOBAL_INTERFACE_MEMO, "" ) end
+	local interface_memo = is_figuring and pen.t.parse( GlobalsGetValue( pen.GLOBAL_INTERFACE_MEMO, "" )) or {}
+	
 	if( pic_z ~= nil and not( is_figuring )) then safety_update() end
 	local got_cutter = pen.vld( pen.c.cutter_dims )
 
@@ -2672,7 +2676,7 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, data )
 	local is_inside = not( got_cutter )
 	local local_x, local_y = pic_x, pic_y
 	local m_x, m_y = pen.get_mouse_pos()
-	local m_pos = pen.c.interface_memo.m or { m_x, m_y }
+	local m_pos = interface_memo.m or { m_x, m_y }
 	local got_dragger = tonumber( GlobalsGetValue( pen.GLOBAL_DRAGGER_SAFETY, "1" )) > 0
 	if( not( is_inside )) then is_inside = pen.check_bounds( m_pos, pen.c.cutter_dims.wh, pen.c.cutter_dims.xy ) end
 	if( is_inside and ( got_dragger or not( data.ignore_multihover ))) then
@@ -2685,10 +2689,11 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, data )
 			pen.new_pixel( local_x, local_y, 10*pen.LAYERS.TIPS, {255,100,100,0.75}, s_x, s_y, data.angle )
 		end
 		
+		local size = 500
 		local gui = pen.gui_builder()
 		pen.c.gui_data.i = pen.c.gui_data.i + 1
 		GuiZSetForNextWidget( gui, 10*pen.LAYERS.TIPS )
-		GuiImage( gui, pen.c.gui_data.i, m_x - 10, m_y - 10, pen.FILE_PIC_NIL, 1, 10, 10, data.angle or 0 )
+		GuiImage( gui, pen.c.gui_data.i, m_x - size, m_y - size, pen.FILE_PIC_NIL, 1, size, size, data.angle or 0 )
 
 		local is_new = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_FRAME, "0" )) ~= frame_num
 		local no_left = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_SAFETY_LL, "0" )) > 0
@@ -2697,18 +2702,24 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, data )
 			if( is_new ) then clicked, r_clicked = GuiGetPreviousWidgetInfo( gui ) end
 		elseif( pic_z ~= nil and no_left and no_right ) then
 			clicked, r_clicked = lmb_state, rmb_state
-			if( not( clicked or r_clicked )) then pen.c.interface_memo.d = true end
+			if( not( clicked or r_clicked )) then GameAddFlagRun( pen.FLAG_INTERFACE_TOGGLE ) end
 
-			local down_toggle = pen.c.interface_memo.d
+			local down_toggle = GameHasFlagRun( pen.FLAG_INTERFACE_TOGGLE )
 			if( not( down_toggle ) or is_figuring or not( is_new )) then clicked, r_clicked = false, false end
 			if( is_figuring and frame_num - update_frame > 1 and pen.compare_float( pic_z, top_z, 0.001 )) then
-				clicked, r_clicked, pen.c.interface_memo.m = pen.c.interface_memo.lc, pen.c.interface_memo.rc, nil
+				clicked, r_clicked = interface_memo.lc, interface_memo.rc
 				GlobalsSetValue( pen.GLOBAL_INTERFACE_Z, "nope" )
+				GameRemoveFlagRun( pen.FLAG_INTERFACE_TOGGLE )
 				return clicked, r_clicked, true
 			end
 
 			if(( not( is_figuring ) and ( clicked or r_clicked )) or ( is_figuring and pic_z < top_z )) then
-				if( not( is_figuring )) then pen.c.interface_memo = { lc = clicked, rc = r_clicked, m = m_pos, d = false } end
+				if( not( is_figuring )) then
+					GameRemoveFlagRun( pen.FLAG_INTERFACE_TOGGLE )
+					interface_memo = { lc = clicked, rc = r_clicked, m = m_pos }
+					GlobalsSetValue( pen.GLOBAL_INTERFACE_MEMO, pen.t.parse( interface_memo ))
+				end
+
 				GlobalsSetValue( pen.GLOBAL_INTERFACE_FRAME_Z, frame_num )
 				GlobalsSetValue( pen.GLOBAL_INTERFACE_Z, pic_z )
 				clicked, r_clicked = false, false
@@ -2749,7 +2760,7 @@ function pen.new_image( pic_x, pic_y, pic_z, pic, data )
 		GuiZSetForNextWidget( gui, pic_z + 0.0001 )
 		local s_x, s_y = 1/(( data.s_x or 1 )*w ) + 1, 1/(( data.s_y or 1 )*h ) + 1
 		GuiImage( gui, uid, pic_x - 0.5, pic_y - 0.5,
-			pic, 0.6*( data.alpha or 1 ), s_x, s_y, data.angle or 0, data.anim_type or 2, data.anim or "" )
+			pic, 0.1*( data.alpha or 1 ), s_x, s_y, data.angle or 0, data.anim_type or 2, data.anim or "" )
 	end
 	if( data.can_click ) then
 		if( data.skip_z_check ) then pic_z = nil end
@@ -2928,17 +2939,17 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 
 	local progress = pen.c.scroll_memo[ sid ].p or 0
 	local old_height = pen.c.scroll_memo[ sid ].h or 1
-	local scroll_pos = ( size_y - old_height )*( pen.c.scroll_memo[ sid ].p or 0 )
+	local scroll_pos = ( size_y - old_height )*progress
 	local new_height = pen.new_cutout( pic_x, pic_y, size_x, size_y, func[1], scroll_pos )
 	if( new_height > size_y ) then
 		if( data.can_scroll ) then pen.unscroller() end
 	else return end
 
-	local bar_size = math.max(( size_y - 6 )*math.min( size_y/new_height, 1 ), 1 )
+	local bar_size = pen.rounder( math.max(( size_y - 6 )*math.min( size_y/new_height, 1 ), 1 ), -2 )
 	
 	local bar_y = ( size_y - ( 6 + bar_size ))
 	local bar_pos = pic_y + bar_y*progress + 3
-	local step = bar_y*( data.scroll_step or 11 )/new_height
+	local step = bar_y*( data.scroll_step or 11 )/( new_height - size_y )
 	local out = func[2]( pic_x + size_x, pic_y, pic_z - 0.01, bar_size, bar_pos, data )
 	local new_y = out[1][1]
 
@@ -2951,7 +2962,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 
 	local k = pen.c.scroll_memo[ sid ].m or 1
 	pen.c.scroll_memo[ sid ].m = ( out[2][1] or out[3][1]) and 2*k or 1
-
+	
 	for i = 2,3 do
 		if( out[i][1]) then
 			if( i == 2 ) then
@@ -2959,7 +2970,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 			else pen.c.scroll_memo[ sid ].t = math.min( new_y + step*k, pic_y + bar_y + 3 ) end
 		elseif( out[i][2]) then pen.c.scroll_memo[ sid ].t = pic_y + 3 + ( i == 3 and bar_y or 0 ) end
 		if( out[i][1] or out[i][2]) then
-			pen.play_sound( pen.TUNES.VNL[ out[i][1] == 1 and "HOVER" or ( out[1][2] and "SELECT" or "CLICK" )])
+			pen.play_sound( pen.TUNES.VNL[ out[i][1] == 1 and "HOVER" or ( out[i][2] and "CLICK" or "SELECT" )])
 		end
 	end
 
@@ -3012,7 +3023,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 		GuiText( gui, pic_x, pic_y, txt, scale, font, is_pixel )
 		if( not( has_shadow )) then return end
 		GuiZSetForNextWidget( gui, pic_z + 0.0001 )
-		pen.colourer( pen.PALETTE.SHADOW, 0.6*alpha )
+		pen.colourer( pen.PALETTE.SHADOW, 0.1*alpha )
 		GuiText( gui, pic_x + scale/2, pic_y + scale/2, txt, scale, font, is_pixel )
 	end
 	
@@ -3236,7 +3247,7 @@ function pen.new_tooltip( text, data, func )
 	local frame_num = GameGetFrameNum()
 	pen.c.ttips = pen.c.ttips or {}
 	pen.c.ttips[ data.tid ] = pen.c.ttips[ data.tid ] or {
-		going = 0, anim = { frame_num, 0, 0 }, inter_state = {}}
+		going = 0, anim = { frame_num - 1, 0, 0 }, inter_state = {}}
 	if( data.is_active == nil ) then _,_,data.is_active = GuiGetPreviousWidgetInfo( gui ) end
 	if( data.allow_hover and pen.vld( pen.c.ttips[ data.tid ].inter_state )) then
 		data.is_active = data.is_active or pen.c.ttips[ data.tid ].inter_state[3]
@@ -3247,7 +3258,7 @@ function pen.new_tooltip( text, data, func )
 		pen.c.ttips[ data.tid ].going = frame_num
 
 		local tip_anim = pen.c.ttips[ data.tid ].anim
-		if(( frame_num - tip_anim[2]) > ( data.frames + 5 )) then tip_anim[1] = frame_num -1 end
+		if(( frame_num - tip_anim[2]) > ( data.frames + 5 )) then tip_anim[1] = frame_num - 1 end
 		tip_anim[2], tip_anim[3] = frame_num, math.min( frame_num - tip_anim[1], data.frames )
 
 		local w, h = GuiGetScreenDimensions( gui )
@@ -3275,7 +3286,7 @@ function pen.new_tooltip( text, data, func )
 			data.pos[2] = math.max( data.pos[2], 1 )
 		end
 		data.pos[3] = data.pic_z
-
+		
 		func = func or function( text, d )
 			local size_x, size_y = unpack( d.dims )
 			local pic_x, pic_y, pic_z = unpack( d.pos )
@@ -3414,9 +3425,11 @@ end
 pen.FLAG_UPDATE_UTF = "PENMAN_UTF_MAP_UPDATE"
 pen.FLAG_FANCY_FONT = "PENMAN_FANCY_FONTING"
 pen.FLAG_RESTART_CHECK = "PENMAN_GAME_HAS_STARTED"
+pen.FLAG_INTERFACE_TOGGLE = "PENMAN_INTERFACE_DOWN"
 
 pen.GLOBAL_VIRTUAL_ID = "PENMAN_VIRTUAL_INDEX"
 pen.GLOBAL_INTERFACE_Z = "PENMAN_INTERFACE_Z"
+pen.GLOBAL_INTERFACE_MEMO = "PENMAN_INTERFACE_MEMO"
 pen.GLOBAL_INTERFACE_FRAME = "PENMAN_INTERFACE_FRAME"
 pen.GLOBAL_INTERFACE_FRAME_Z = "PENMAN_INTERFACE_FRAME_Z"
 pen.GLOBAL_INTERFACE_SAFETY_LL = "PENMAN_INTERFACE_SAFETY_LL"

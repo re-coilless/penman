@@ -215,10 +215,14 @@ end
 
 function scrolling()
 
+if( t_memo == nil ) then
+    local t = test_input[1]..test_input[1]..test_input[1]
+    t_memo = t..t..t..t..t..t..t..t..t..t..t..t..t..t..t
+end
+
 pen.new_pixel( 100, 100, 5, pen.PALETTE.W, 55, 30 )
 pen.new_scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
-    local t = test_input[1]..test_input[1]..test_input[1]..test_input[1]..test_input[1]..test_input[1]
-    local dims = pen.new_text( 0, scroll_pos, 0, t..t..t..t..t, { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
+    local dims = pen.new_text( 0, scroll_pos, 0, t_memo, { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
     return dims[2]
 end)
 
