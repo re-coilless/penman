@@ -18,8 +18,8 @@ if( pen.c.testing_done ) then
         -- filing()
         -- raters()
         -- input()
-        scrolling()
-        tipping()
+        -- scrolling()
+        -- tipping()
         -- texting()
         -- fonting()
         -- cloner()
@@ -41,6 +41,8 @@ local test_input = {
 
 function misc_tests()
 
+pen.new_image( 10, 250, 5, "data/fonts/font_small_numbers_ppb1.png" )
+
 pen.new_pixel( 50 - 0.5, 100 - 0.5, 4, {255,0,0})
 pen.new_image( 50, 100, 5, pen.FILE_PIC_NUL, {
     alpha = 0.5, s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 0 )})
@@ -48,7 +50,7 @@ pen.new_pixel( 100 - 0.5, 100 - 0.5, 4, {255,0,0})
 pen.new_image( 100, 100, 5, pen.FILE_PIC_NUL, {
     alpha = 0.5, s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( -30 )})
 pen.new_pixel( 100 - 0.5, 150 - 0.5, 4, {255,0,0})
-pen.new_image( 100, 150, 5, "data/enemies_gfx/player.xml", { anim = "intro_stand_up", 
+pen.new_image( 100, 150, 5, "data/enemies_gfx/player.xml", { anim = "stand", auid = "huh",
     alpha = 1, s_x = 1, s_y = 1, can_click = true, is_debugging = true, angle = math.rad( 60 )})
 pen.new_pixel( 100 - 0.5, 200 - 0.5, 4, {255,0,0})
 pen.new_image( 100, 200, 5, pen.FILE_PIC_NUL, {
