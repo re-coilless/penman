@@ -41,6 +41,21 @@ local test_input = {
 
 function misc_tests()
 
+--https://bottosson.github.io/posts/colorpicker/
+--https://github.com/behreajj/AsepriteOkHsl/blob/main/ok_color.lua#L719
+local function gradient_me( rgb, shift )
+    local min_s, min_v = 1, 0.25
+    local hsv = pen.magic_rgb( rgb, false, "hsv" )
+    return pen.magic_rgb({ hsv[1], min_s + ( 1 - min_s )*shift, min_v + ( 1 - min_v )*shift }, true, "hsv" )
+end
+local total_num = 100
+local frame_num = GameGetFrameNum()
+for i = 1,total_num do
+    pen.new_pixel( 100 + i, 10, 5, gradient_me( pen.PALETTE.VNL.RED, math.abs((( i + frame_num )%( 2*total_num ))/total_num - 1 )), 1, 5 )
+end
+
+
+
 pen.new_image( 10, 250, 5, "data/fonts/font_small_numbers_ppb1.png" )
 
 pen.new_pixel( 50 - 0.5, 100 - 0.5, 4, {255,0,0})

@@ -104,10 +104,18 @@ end
 
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
---option to easily center the pic
+--figure the coloring
+
+--make sure ignore multihover is working properly
+--transition penman and index to globals instead of varstorages
+--update penman in mnee
+
+--check how file caching works with loadfile, maybe one can edit one lua script at runtime
+--add commented-out section to the end that contain self-sufficient funcs for settings menu
 --probably move [COMPLEX] to libman and append FFT to ANIM_INTERS separately
 --transition mrshll to penman
 
+--jpading (can_jpad param)
 --Store 4 closest widgets for the left, right, up, down to the current focused one + store the widget closest to 0 to pick as focusable when the time comes, allow one to force focus
 --Allow emulating focusing inputs (0 is nothing, 1 is right, 2 is up, 3 is lmb, 4 is select, -1 is left, -2 is down, -3 is rmb, -4 is unselect)
 
@@ -351,7 +359,7 @@ function pen.v2s( value, is_pretty, full_precision )
 	full_precision = full_precision or false
 	return ( is_pretty or false ) and tostring( value ) or (({
 		["nil"] = function( v ) return "" end,
-		["number"] = function( v ) return full_precision and string.format( "%a", v ) or tostring( v ) end,
+		["number"] = function( v ) return full_precision and string.format( "%.16f", v ) or tostring( v ) end,
 		["string"] = function( v ) return string.format( "%q", v ) end,
 		["boolean"] = function( v ) return "bool"..pen.b2n( v ) end,
 		["function"] = function( v ) return string.format( "%q", tostring( v )) end,
@@ -383,10 +391,13 @@ end
 function pen.t.loop( tbl, func, return_tbl )
 	if( not( pen.vld( tbl ))) then return end
 	if( type( tbl ) ~= "table" ) then return func( 0, tbl ) end
-	for i,v in ipairs( tbl ) do
+
+	local is_unarray = pen.t.is_unarray( tbl )
+	for i,v in ( is_unarray and pairs or ipairs )( tbl ) do
 		local value = func( i, v )
 		if( value ~= nil ) then return value end
 	end
+
 	if( return_tbl ) then return tbl end
 end
 
@@ -1937,18 +1948,18 @@ function pen.get_xy_matter( x, y, duration )
 			if( v > 0 ) then data.mtr_list[ matter[i]], data.mtr_buff[ matter[i]] = ( data.mtr_list[ matter[i]] or 0 ) + v, v end
 		end)
 		
-		if( duration < 0 ) then
-			pen.magic_comp( data.probe, "LifetimeComponent", function( comp_id, v, is_enabled )
-				v.kill_frame = GameGetFrameNum() + data.frames; return true
-			end)
+		if( duration >= 0 ) then return end
+		
+		pen.magic_comp( data.probe, "LifetimeComponent", function( comp_id, v, is_enabled )
+			v.kill_frame = GameGetFrameNum() + data.frames; return true
+		end)
 
-			table.insert( data.mtr_memo, data.mtr_buff ); data.mtr_buff = {}
-			if( data.frames < #data.mtr_memo ) then
-				for m,v in pairs( data.mtr_memo[1]) do
-					data.mtr_list[m] = data.mtr_list[m] - v
-				end; table.remove( data.mtr_memo, 1 )
-				return pen.t.get_max( data.mtr_list )
-			end
+		table.insert( data.mtr_memo, data.mtr_buff ); data.mtr_buff = {}
+		if( data.frames < #data.mtr_memo ) then
+			for m,v in pairs( data.mtr_memo[1]) do
+				data.mtr_list[m] = data.mtr_list[m] - v
+			end; table.remove( data.mtr_memo, 1 )
+			return pen.t.get_max( data.mtr_list )
 		end
 	else
 		local mtr = pen.t.get_max( data.mtr_list ); EntityKill( data.probe )
@@ -2357,8 +2368,8 @@ function pen.magic_rgb( c, to_rbg, mode )
 	end
 	--HSV: https://github.com/iskolbin/lhsx/blob/master/hsx.lua
 	local function rgb2hsv( r, g, b )
-		local M, m = math.max( r, g, b ), math.min( r, g, b )
-		local C = M - m
+		local M = math.max( r, g, b )
+		local C = M - math.min( r, g, b )
 		local K = 1/( 6*C )
 		local h = 0
 		if( C ~= 0 ) then
@@ -2370,11 +2381,11 @@ function pen.magic_rgb( c, to_rbg, mode )
 				h = K*( r - g ) + 2/3
 			end
 		end
-		return h, M == 0 and 0 or C/M, M
+		return h, M == 0 and 0 or C/M, M/255
 	end
 	local function hsv2rgb( h, s, v )
-		local C = v*s
-		local m = v - C
+		local C = 255*v*s
+		local m = 255*v - C
 		local r, g, b = m, m, m
 		if( h == h ) then
 			local h_ = ( h%1 )*6
@@ -2780,6 +2791,8 @@ function pen.new_pixel( pic_x, pic_y, pic_z, color, s_x, s_y, alpha, angle )
 	GuiZSetForNextWidget( gui, pic_z )
 	GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
 	pen.c.gui_data.i = pen.c.gui_data.i - 1
+
+	color = color or pen.PALETTE.W
 	GuiColorSetForNextWidget( gui, color[1]/255, color[2]/255, color[3]/255, 1 )
 	GuiImage( gui, 1020, pic_x, pic_y, pen.FILE_PIC_NUL, alpha or color[4] or 1, ( s_x or 1 )/2, ( s_y or 1 )/2, angle or 0 )
 end
@@ -2792,7 +2805,9 @@ function pen.new_image( pic_x, pic_y, pic_z, pic, data )
 	local off_x, off_y, angle = 0, 0, data.angle or 0
 	local w, h, xml_offs, is_anim = pen.get_pic_dims({ pic, data.anim }, data.update_xml )
 	if( xml_offs ) then off_x, off_y = pen.rotate_offset( xml_offs[1], xml_offs[2], angle ) end
+
 	local s_x, s_y = data.s_x or 1, data.s_y or 1; w, h = s_x*w, s_y*h
+	if( data.is_centered ) then pic_x, pic_y = pic_x - w/2, pic_y - h/2 end
 
 	local is_inside = pen.vld( pen.c.cutter_dims )
 	if( is_inside ) then
@@ -2814,8 +2829,7 @@ function pen.new_image( pic_x, pic_y, pic_z, pic, data )
 	if( will_anim ) then
 		gui = gui or GuiCreate()
 		pen.c.anim_guis[ uid ] = gui
-		GuiStartFrame( gui )
-		uid = 1
+		GuiStartFrame( gui ); uid = 1
 	else gui, uid = pen.gui_builder() end
 	
 	pen.colourer( gui, data.color )
@@ -2828,14 +2842,13 @@ function pen.new_image( pic_x, pic_y, pic_z, pic, data )
 		pen.colourer( gui, pen.PALETTE.SHADOW )
 		GuiZSetForNextWidget( gui, pic_z + 0.0001 )
 		GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
-		GuiImage( gui, uid, pic_x - 0.5, pic_y - 0.5,
-			pic, 0.1*( data.alpha or 1 ), ss_x, ss_y, data.angle or 0, data.anim_type or 2, data.anim or "" )
+		GuiImage( gui, uid, pic_x - 0.5, pic_y - 0.5, pic,
+			0.1*( data.alpha or 1 ), ss_x, ss_y, data.angle or 0, data.anim_type or 2, data.anim or "" )
 	end
 
-	if( data.can_click ) then
-		if( data.skip_z_check ) then pic_z = nil end
-		return pen.new_interface( pic_x, pic_y, w, h, pic_z, data )
-	end
+	if( not( data.can_click )) then return end
+	if( data.skip_z_check ) then pic_z = nil end
+	return pen.new_interface( pic_x, pic_y, w, h, pic_z, data )
 end
 
 ---Button framework.
@@ -3307,7 +3320,7 @@ end
 function pen.new_tooltip( text, data, func )
 	data = data or {}
 	data.tid = data.tid or "dft"
-	data.edging = data.edging or 3
+	data.edging = data.edging or 2
 	data.frames = data.frames or 15
 	data.pic_z = data.pic_z or pen.LAYERS.TIPS
 	data.allow_hover = data.allow_hover or false
@@ -4021,25 +4034,28 @@ pen.TUNES = {
 }
 
 pen.LAYERS = {
-	WORLD_BACK = 999,
-	WORLD = 998,
-	WORLD_FRONT = 997,
-	WORLD_UI = 10,
+	WORLD_BACK = 10110,
+	WORLD = 10105,
+	WORLD_FRONT = 10100,
+	WORLD_UI = 500,
 	
-	BACKGROUND = 2, --general background
+	BACKGROUND = 100,
 
-	MAIN_DEEP = 1, --slot background
-	MAIN_BACK = 0.01, --bar background
-	MAIN = 0, --bars, perks, effects
-	MAIN_FRONT = -0.01, --slot highlights
+	MAIN_DEEP = 10,
+	MAIN_BACK = 5,
+	MAIN = 0,
+	MAIN_FRONT = -5,
+	MAIN_UI = -10,
 
-	ICONS_BACK = -0.09,
-	ICONS = -1, --inventory item icons
-	ICONS_FRONT = -1.01, --spell charges
+	ICONS_BACK = -10,
+	ICONS = -15,
+	ICONS_FRONT = -20,
+
+	FOREGROUND = -100,
 
 	TIPS_BACK = -10100,
-	TIPS = -10101, --tooltips
-	TIPS_FRONT = -10102,
+	TIPS = -10105,
+	TIPS_FRONT = -10110,
 }
 
 pen.INIT_THREADS = {
