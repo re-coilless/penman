@@ -102,22 +102,26 @@ if( pen.magic_write ~= nil ) then
 	end
 end
 
---https://github.com/LuaLS/lua-language-server/wiki/Annotations
-
---figure the coloring
-
---make sure ignore multihover is working properly
 --transition penman and index to globals instead of varstorages
+--redo pen.magic_storage and pen.magic_comp to be more straightforward
+--make sure ignore multihover is working properly
 --update penman in mnee
 
+--https://github.com/LuaLS/lua-language-server/wiki/Annotations
+
+--check this https://github.com/Copious-Modding-Industries/Noitilities
+--add full mod version check and report the internal filepath + "got an old shit"
+--add this https://github.com/TakWolf/fusion-pixel-font + proper unicode font
+
 --check how file caching works with loadfile, maybe one can edit one lua script at runtime
---add commented-out section to the end that contain self-sufficient funcs for settings menu
+--add commented-out section to the end that contain self-sufficient widget funcs for settings menu
 --probably move [COMPLEX] to libman and append FFT to ANIM_INTERS separately
 --transition mrshll to penman
 
---jpading (can_jpad param)
---Store 4 closest widgets for the left, right, up, down to the current focused one + store the widget closest to 0 to pick as focusable when the time comes, allow one to force focus
+--jpading for buttons (can_jpad param)
+--Store 4 closest widgets for the left, right, up, down to the currently focused one + store the widget closest to 0 to pick as focusable when the time comes, allow one to force focus through code
 --Allow emulating focusing inputs (0 is nothing, 1 is right, 2 is up, 3 is lmb, 4 is select, -1 is left, -2 is down, -3 is rmb, -4 is unselect)
+--make sure this has an inherent compatibility with multiplayer (4 players max)
 
 -- pen.estimate
 -- pen.animate
@@ -135,7 +139,8 @@ end
 -- pen.rate_creature
 
 --slider
---a system that converts images into a pixel table to be drawn in settings.lua
+--basic window container func (Hermes styled by default)
+--a system that converts images into a pixel table to be drawn in settings.lua or assembled in real time
 --some kind of message system (check how MQTT works)
 --notification system (gameprintimportant-like but unified and with more capabilities)
 --add pen.animate debugging that plots/demos motion/scaling in self-aligning grid
@@ -143,21 +148,23 @@ end
 --raytrace_entities
 --sule-based lua context independent gateway (and steal ModMagicNumbersFileAdd from init.lua via it)
 --in-gui particle system
---extract hybrid gui from 19a and make it better
 --separate table getting part from clone_comp/clone_entity to get_comp_data/get_entity_data
---cached get_terrain via raymarched GetSurfaceNormal (https://youtu.be/BNZtUB7yhX4?t=92)
 --lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
---add full-ish unicode font
 --actually test all the stuff
 
 --[TODO]
+--extract hybrid gui from 19a and make it better
 --dropdown with search capabilities (combine input with scroller)
+--cached get_terrain via raymarched GetSurfaceNormal (https://youtu.be/BNZtUB7yhX4?t=92)
 --universal controller-capable interface
 --(dpad/left_stick/keyborad_arrows to switch between, x/keypad_0 to select (dragger should work), triangle/keypad_. for rmb)
 --tinker with GamePlaySound and GameEntityPlaySound (thanks to lamia)
 --tinker with copi's spriteemitter image concept
 --add sfxes (separate banks for prospero, hermes, trigger) + pics
 --make heres ferrei be compatible with controller and upload it to steam
+--testing environment that has full in-world function simulation and supports autotesting
+--things.lua which has a baseline collection of props 19a-style
+--https://link.springer.com/content/pdf/10.1023/A:1007670802811.pdf for AI? (an environemnt where the data is being collected by dev roleplaying as enemy; https://vk.com/away.php?to=https%3A%2F%2Fmachinelearningmastery.com%2Fa-tour-of-machine-learning-algorithms%2F&utf=1)
 
 --[MATH]
 function pen.b2n( a )
@@ -295,7 +302,7 @@ function pen.animate( delta, frame, data ) --https://www.febucci.com/2018/08/eas
 	if( delta[2] == nil ) then delta[2] = delta[1]; delta[1] = 0 end
 	
 	local is_looped = frame == true
-	local frame_num = GameGetFrameNum()
+	local frame_num = data.frame_num or GameGetFrameNum()
 	if( type( frame ) == "string" ) then
 		frame = pen.atimer( frame, data.frames, data.reset_now, data.stillborn )
 	elseif( is_looped ) then frame = frame_num%data.frames end
@@ -331,7 +338,7 @@ function pen.animate( delta, frame, data ) --https://www.febucci.com/2018/08/eas
 		end
 		
 		if( eases[1] ~= nil and eases[2] ~= nil ) then
-			time = pen.ANIM_INTERS[ data.ease_int ]( orig_time, eases, data.params_ease )
+			time = pen.ANIM_INTERS[ data.ease_int ]( orig_time, eases, data.params_int )
 		else time = eases[1] or eases[2] or orig_time end
 	end
 	
@@ -1743,15 +1750,16 @@ function pen.get_killable( c_x, c_y, r )
 	return pen.t.loop( mortal, function( i, v ) pen.t.insert_new( hittable, v ) end, true )
 end
 
-function pen.get_creature_centre( entity_id, x, y )
-	if( x == nil or y == nil ) then x, y = EntityGetTransform( entity_id ) end
+function pen.get_creature_centre( entity_id )
+	local x, y = EntityGetTransform( entity_id )
 	local char_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterDataComponent" )
-	if( pen.vld( char_comp, true )) then y = y + ComponentGetValue2( char_comp, "buoyancy_check_offset_y" ) end
+	if( pen.vld( char_comp, true )) then y = y + ComponentGetValue2( char_comp, "buoyancy_check_offset_y" )
+	else x, y = EntityGetFirstHitboxCenter( entity_id ) end
 	return x, y
 end
 
-function pen.get_creature_head( entity_id, x, y )
-	if( x == nil or y == nil ) then x, y = EntityGetTransform( entity_id ) end
+function pen.get_creature_head( entity_id )
+	local x, y = EntityGetTransform( entity_id )
 	local custom_off = pen.magic_storage( entity_id, "head_offset", "value_int" )
 	if( pen.vld( custom_off )) then return x, y + custom_off end
 
@@ -1762,7 +1770,7 @@ function pen.get_creature_head( entity_id, x, y )
 	elseif( pen.vld( crouch_comp, true )) then
 		local off_x, off_y = ComponentGetValue2( crouch_comp, "offset" )
 		y = y + off_y + 3
-	end
+	else x, y = EntityGetFirstHitboxCenter( entity_id ) end
 	return x, y
 end
 
@@ -2360,6 +2368,7 @@ function pen.gui_builder( gui )
 end
 
 function pen.magic_rgb( c, to_rbg, mode )
+	--REFERENCE: https://bottosson.github.io/misc/colorpicker/#ff0088
 	local function gam2lin( c )
 		return c >= 0.04045 and math.pow(( c + 0.055 )/1.055, 2.4 ) or c/12.92
 	end
@@ -2423,9 +2432,180 @@ function pen.magic_rgb( c, to_rbg, mode )
 		local m = math.pow( L - 0.1055613458*a - 0.0638541728*b, 3 )
 		local s = math.pow( L - 0.0894841775*a - 1.2914855480*b, 3 )
 		return
-			255*lin2gam( 4.0767416621*l - 3.3077115913*m + 0.2309699292*s ),
-			255*lin2gam( -1.2684380046*l + 2.6097574011*m - 0.3413193965*s ),
-			255*lin2gam( -0.0041960863*l - 0.7034186147*m + 1.7076147010*s )
+			4.0767416621*l - 3.3077115913*m + 0.2309699292*s,
+			-1.2684380046*l + 2.6097574011*m - 0.3413193965*s,
+			-0.0041960863*l - 0.7034186147*m + 1.7076147010*s
+	end
+	local function okl2rgb_fixed( L, a, b )
+		local r, g, b = okl2rgb( L, a, b )
+		return pen.rounder( 255*lin2gam( r ), 1 ), pen.rounder( 255*lin2gam( g ), 1 ), pen.rounder( 255*lin2gam( b ), 1 )
+	end
+	--OKHSV: https://github.com/behreajj/AsepriteOkHsl/blob/main/ok_color.lua
+	local function compute_max_saturation( a, b )
+		if( a == 0 and b == 0 ) then return 0 end
+
+		local k0, k1 = 1.35733652, -0.00915799
+		local k2, k3, k4 = -1.1513021, -0.50559606, 0.00692167
+		local wl, wm, ws = -0.0041960863, -0.7034186147, 1.707614701
+		if(( -1.88170328*a - 0.80936493*b ) > 1 ) then
+			k0, k1 = 1.19086277, 1.76576728
+			k2, k3, k4 = 0.59662641, 0.75515197, 0.56771245
+			wl, wm, ws = 4.0767416621, -3.3077115913, 0.2309699292
+		elseif(( 1.81444104*a - 1.19445276*b ) > 1 ) then
+			k0, k1 = 0.73956515, -0.45954404
+			k2, k3, k4 = 0.08285427, 0.1254107, 0.14503204
+			wl, wm, ws = -1.2684380046, 2.6097574011, -0.3413193965
+		end
+		
+		local S = k0 + k1*a + k2*b + k3*a*a + k4*a*b
+		local k_l = 0.3963377774*a + 0.2158037573*b
+		local k_m = -0.1055613458*a - 0.0638541728*b
+		local k_s = -0.0894841775*a - 1.291485548*b
+		
+		local l_, m_, s_ = 1 + S*k_l, 1 + S*k_m, 1 + S*k_s
+		local l_sq, m_sq, s_sq = l_*l_, m_*m_, s_*s_
+		local l, m, s = l_sq*l_, m_sq*m_, s_sq*s_
+		local l_dS, m_dS, s_dS = 3*k_l*l_sq, 3*k_m*m_sq, 3*k_s*s_sq
+		local l_dS2, m_dS2, s_dS2 = 6*k_l*k_l*l_, 6*k_m*k_m*m_, 6*k_s*k_s*s_
+		
+		local f = wl*l + wm*m + ws*s
+		local f1 = wl*l_dS + wm*m_dS + ws*s_dS
+		local f2 = wl*l_dS2 + wm*m_dS2 + ws*s_dS2
+		local s_denom = f1*f1 - 0.5*f*f2
+		if( s_denom ~= 0 ) then
+			return S - f*f1/s_denom
+		else return S end
+	end
+	local function find_cusp( a, b )
+		local S_cusp = compute_max_saturation( a, b )
+		local max_comp = math.max( okl2rgb( 1, S_cusp*a, S_cusp*b ))
+		if( max_comp == 0 ) then return 0, 0 end
+
+		local L_cusp = ( 1/max_comp )^( 1/3 )
+		return L_cusp, L_cusp*S_cusp
+	end
+	local function to_ST( L, C )
+		if( L ~= 0 and L ~= 1 ) then
+			return C/L, C/( 1 - L )
+		elseif( L ~= 0 ) then
+			return C/L, 0
+		elseif( L ~= 1 ) then
+			return 0, C/( 1 - L )
+		else return 0, 0 end
+	end
+	local function toe( x, is_inv )
+		local k = 1.170873786407767
+		if( is_inv ) then
+			local denom = k*( x + 0.03 )
+			if( denom == 0 ) then return 0 end
+			return ( x*x + 0.206*x )/denom
+		else
+			local y = k*x - 0.206
+			return 0.5*( y + math.sqrt( y*y + 0.14050485436893204*x ))
+		end
+	end
+	local function okl2okv( L, a, b )
+		if L >= 1 then return 0, 0, 1 end
+		if L <= 0 then return 0, 0, 0 end
+
+		local Csq = a*a + b*b
+		if( Csq <= 0 ) then return 0, 0, L end
+
+		local C = math.sqrt( Csq )
+		a, b = a/C, b/C
+		
+		local S_0 = 0.5
+		local cuspL, cuspC = find_cusp( a, b )
+		local S_max, T_max = to_ST( cuspL, cuspC )
+		local k = ( S_max ~= 0 ) and ( 1 - S_0/S_max ) or 1
+
+		local t_denom = C + L*T_max
+		local t = ( t_denom ~= 0 ) and ( T_max/t_denom ) or 0
+		local L_v, C_v = t*L, t*C
+
+		local L_vt = toe( L_v, true )
+		local C_vt = ( L_v ~= 0 ) and ( C_v*L_vt/L_v ) or 0
+
+		local r_s, g_s, b_s = okl2rgb( L_vt, a*C_vt, b*C_vt )
+		local scale_denom, scale_L = math.max( r_s, g_s, b_s, 0 ), 0
+		if( scale_denom ~= 0 ) then
+			scale_L = ( 1/scale_denom )^( 1/3 )
+			L, C = L/scale_L, C/scale_L
+		end
+
+		local toel = toe( L )
+		C, L = C*toel/L, toel
+
+		local h = math.atan2( -b, -a )*0.1591549430919 + 0.5
+
+		local s = 0.0
+		local s_denom = (( T_max*S_0 ) + T_max*k*C_v )
+		if( s_denom ~= 0 ) then s = ( S_0 + T_max )*C_v/s_denom end
+
+		local v = 0.0
+		if( L_v ~= 0 ) then v = L/L_v end
+		
+		return h, s, v
+	end
+	local function okv2okl( h, s, v )
+		if v <= 0 then return 0, 0, 0 end
+		if v > 1 then v = 1 end
+		
+		local sCl = math.min( math.max( s, 0 ), 1 )
+	
+		local h_rad = h*6.283185307179586
+		local a, b = math.cos( h_rad ), math.sin( h_rad )
+		
+		local S_0 = 0.5
+		local cuspL, cuspC = find_cusp( a, b )
+		local S_max, T_max = to_ST( cuspL, cuspC )
+		local k = ( S_max ~= 0 ) and ( 1 - S_0/S_max ) or 1
+		
+		local L_v, C_v = 1, 0
+		local v_denom = S_0 + T_max - T_max*k*sCl
+		if( v_denom ~= 0 ) then
+			L_v = 1 - sCl*S_0/v_denom
+			C_v = sCl*T_max*S_0/v_denom
+		end
+	
+		local L, C = v*L_v, v*C_v
+		local L_vt = toe( L_v, true )
+		local C_vt = ( L_v ~= 0 ) and ( C_v*L_vt/L_v ) or 0
+		
+		local L_new = toe( L, true )
+		if( L ~= 0 ) then
+			C = C*L_new/L
+		else C = 0 end
+		L = L_new
+		
+		local r_s, g_s, b_s = okl2rgb( L_vt, a*C_vt, b*C_vt )
+		local max_comp = math.max( r_s, g_s, b_s, 0 )
+		local scale_L = ( max_comp ~= 0 ) and ( 1/max_comp )^( 1/3 ) or 0
+		
+		C = C*scale_L
+		return L*scale_L, C*a, C*b
+	end
+	local function rgb2okv( r, g, b )
+		return okl2okv( rgb2okl( r, g, b ))
+	end
+	local function okv2rgb( h, s, v )
+		return okl2rgb_fixed( okv2okl( h, s, v ))
+	end
+	--OKLCH: https://github.com/echasnovski/mini.colors/blob/main/lua/mini/colors.lua
+	local function okl2okh( L, a, b )
+		local h, c = -1, math.sqrt( a*a + b*b )
+		if( c > 0 ) then h = math.deg( math.atan2( b, a )) end
+		return L, c, h
+	end
+	local function okh2okl( l, c, h )
+		if( c <= 0 or h < 0 ) then return l, 0, 0 end
+		return l, c*math.cos( math.rad( h )), c*math.sin( math.rad( h ))
+	end
+	local function rgb2okh( r, g, b )
+		return okl2okh( rgb2okl( r, g, b ))
+	end
+	local function okh2rgb( l, c, h )
+		return okl2rgb_fixed( okh2okl( l, c, h ))
 	end
 	
 	c = pen.get_hybrid_table( c, true )
@@ -2436,7 +2616,9 @@ function pen.magic_rgb( c, to_rbg, mode )
 		local out = {({
 			gamma = { gam2lin, lin2gam },
 			hsv = { rgb2hsv, hsv2rgb },
-			oklab = { rgb2okl, okl2rgb },
+			oklab = { rgb2okl, okl2rgb_fixed },
+			okhsv = { rgb2okv, okv2rgb },
+			oklch = { rgb2okh, okh2rgb },
 		})[ mode ][ 1 + pen.b2n( to_rbg )]( unpack( c ))}
 		out[4] = c[4]
 		return out
@@ -2549,21 +2731,18 @@ function pen.get_tip_dims( text, width, height, line_offset )
 	return dims
 end
 
----Returns both GUI grid size and window size.
----@return number w, number h, number real_w, number real_h
-function pen.get_screen_data() --thanks Horscht
+---Returns GUI grid, in-game viewport and true window sizes.
+---@return number w, number h, number view_w, number view_h, number real_w, number real_h
+function pen.get_screen_data() --thanks to ImmortalDamned and Horscht
 	local gui = GuiCreate()
+	local real_w, real_h = GuiGetScreenDimensions( gui )
 	GuiStartFrame( gui )
-
 	local w, h = GuiGetScreenDimensions( gui )
-	local m_x, m_y = InputGetMousePosOnScreen()
-	local max_x = tonumber( GlobalsGetValue( pen.GLOBAL_SCREEN_X, "1280" ))
-	local max_y = tonumber( GlobalsGetValue( pen.GLOBAL_SCREEN_Y, "720" ))
-	if( m_x > max_x ) then GlobalsSetValue( pen.GLOBAL_SCREEN_X, m_x ) end
-	if( m_y > max_y ) then GlobalsSetValue( pen.GLOBAL_SCREEN_Y, m_y ) end
-
 	GuiDestroy( gui )
-	return w, h, max_x, max_y
+
+	local view_w = tonumber( MagicNumbersGetValue( "VIRTUAL_RESOLUTION_X" ))
+	local view_h = view_w*real_h/real_w
+	return w, h, view_w, view_h, real_w, real_h
 end
 
 ---Returns delta in GUI units between in-world and on-screen pointer position.
@@ -2572,44 +2751,24 @@ end
 ---@param real_w? number
 ---@param real_h? number
 ---@return number delta_x, number delta_y
-function pen.get_camera_shake( w, h, real_w, real_h, k )
-	if( w == nil ) then w, h, real_w, real_h = pen.get_screen_data() end
-	local function purify( a, max )
-		return math.min( math.max( pen.rounder( a, -2 ), 0 ), max )
-	end
+function pen.get_camera_shake( w, h, real_w, real_h )
+	if( w == nil ) then w, h, _,_, real_w, real_h = pen.get_screen_data() end
+	local function purify( a, max ) return math.min( math.max( pen.rounder( a, -2 ), 0 ), max ) end
 
-	local x, y = DEBUG_GetMouseWorld()
-	local world_x, world_y, zoom = pen.world2gui( x, y, false, true )
-	world_x, world_y = purify( world_x, w ) + 1, purify( world_y, h )
-	
+	local m_x, m_y = DEBUG_GetMouseWorld()
 	local screen_x, screen_y = InputGetMousePosOnScreen()
-	screen_x, screen_y = purify( w*screen_x/real_w, w ), purify( h*screen_y/real_h, h )
-	if( screen_x < 1 ) then
-		screen_x, world_x = 0, 0
-	elseif( screen_x <= 214 ) then
-		screen_x = screen_x - 1
-	elseif( screen_x < 427 ) then
-		screen_x = screen_x - 0.5
-	end
-	if( screen_y >= 296 ) then
-		screen_y = screen_y - 0.5
-	elseif( screen_y <= 147 ) then
-		screen_y = screen_y + 0.5
-	end
-	
-	k = k or 1
-	local delta_x, delta_y = screen_x - world_x, screen_y - world_y
-	if( math.abs( delta_x ) >= k or math.abs( delta_y ) >= k ) then
-		return delta_x, delta_y
-	else return 0, 0 end
+	local world_x, world_y = pen.world2gui( m_x, m_y, false, true )
+	local delta_x = purify( w*screen_x/real_w, w ) - purify( world_x, w )
+	local delta_y = purify( h*screen_y/real_h, h ) - purify( world_y, h )
+	return delta_x, delta_y
 end
 
 ---Returns on-screen pointer position.
 ---@return number pointer_x, number pointer_y
 function pen.get_mouse_pos()
-	local w, h, screen_w, screen_h = pen.get_screen_data()
+	local w, h, _,_, real_w, real_h = pen.get_screen_data()
 	local m_x, m_y = InputGetMousePosOnScreen()
-	return w*m_x/screen_w, h*m_y/screen_h
+	return m_x*w/real_w, m_y*h/real_h
 end
 
 ---Calculates on-screen position from in-world coordinates.
@@ -2617,23 +2776,35 @@ end
 ---@param y number
 ---@param is_raw? boolean
 ---@param no_shake? boolean
----@return number pic_x, number pic_y, table screen_scale
-function pen.world2gui( x, y, is_raw, no_shake ) --thanks to ImmortalDamned for the fix
-	local w, h, real_w, real_h = pen.get_screen_data()
-	local view_x = MagicNumbersGetValue( "VIRTUAL_RESOLUTION_X" ) + MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_X" )
-	local view_y = MagicNumbersGetValue( "VIRTUAL_RESOLUTION_Y" ) + MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_Y" )
-	local massive_balls_x, massive_balls_y = w/view_x, h/view_y
+---@param is_inversed? boolean
+---@return number pic_x, number pic_y, table scale_values
+function pen.world2gui( x, y, is_raw, no_shake, is_inversed ) --thanks to ImmortalDamned for the fix (x2 combo)
+	local w, h, view_w, view_h, real_w, real_h = pen.get_screen_data()
+	local massive_balls_x, massive_balls_y = w/view_w, h/view_h
 	
+	if( is_inversed ) then x, y = x/massive_balls_x, y/massive_balls_y end
 	if( not( is_raw )) then
 		local cam_x, cam_y = GameGetCameraPos()
-		x, y = ( x - ( cam_x - view_x/2 )), ( y - ( cam_y - view_y/2 ))
+		local _,_, cam_w, cam_h = GameGetCameraBounds()
+		local off_w = tonumber( MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_X" ))
+		local off_h = tonumber( MagicNumbersGetValue( "VIRTUAL_RESOLUTION_OFFSET_Y" ))
+		
+		local off_x, off_y = cam_x - cam_w/2 - off_w, cam_y - cam_h/2 - off_h
+		if( is_inversed ) then off_x, off_y = -off_x, -off_y end
+		x, y = x - off_x, y - off_y
 	end
 	if( not( no_shake or is_raw )) then
-		local shake_x, shake_y = pen.get_camera_shake( w, h, real_w, real_h, view_x/421 )
+		local shake_x, shake_y = pen.get_camera_shake( w, h, real_w, real_h )
+		if( is_inversed ) then shake_x, shake_y = -shake_x, -shake_y end
 		x, y = x + shake_x, y + shake_y
 	end
+	if( not( is_inversed )) then x, y = x*massive_balls_x, y*massive_balls_y end
 
-	return massive_balls_x*x, massive_balls_y*y, { massive_balls_x, massive_balls_y }
+	return x, y, { massive_balls_x, massive_balls_y }
+end
+
+function pen.gui2world( pic_x, pic_y, is_raw )
+    return pen.world2gui( pic_x, pic_y, is_raw, nil, true )
 end
 
 function pen.pic_wiper( pic_id, wh )
@@ -2645,10 +2816,12 @@ function pen.pic_wiper( pic_id, wh )
 end
 function pen.pic_paster( new_id, old_id, wh, new_xy, old_xy )
 	new_xy, old_xy = new_xy or { 0, 0 }, old_xy or { 0, 0 }
-	for i = 0,( wh[1] - 1 ) do for e = 0,( wh[2] - 1 ) do
-		local pixel = ModImageGetPixel( old_id, old_xy[1] + i, old_xy[2] + e )
-		ModImageSetPixel( new_id, new_xy[1] + i, new_xy[2] + e, pixel )
-	end end
+	for i = 0,( wh[1] - 1 ) do
+		for e = 0,( wh[2] - 1 ) do
+			local pixel = ModImageGetPixel( old_id, old_xy[1] + i, old_xy[2] + e )
+			ModImageSetPixel( new_id, new_xy[1] + i, new_xy[2] + e, pixel )
+		end
+	end
 	return new_id
 end
 function pen.pic_cloner( old_pic, new_pic, dims )
@@ -2751,7 +2924,7 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, data )
 		local is_new = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_FRAME, "0" )) ~= frame_num
 		local no_left = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_SAFETY_LL, "0" )) > 0
 		local no_right = tonumber( GlobalsGetValue( pen.GLOBAL_INTERFACE_SAFETY_LR, "0" )) > 0
-		if( not( is_figuring ) and pic_z == nil ) then --safety won't work since vanilla ui is clicked on_up
+		if( not( is_figuring ) and pic_z == nil ) then --safety won't work since vanilla ui is clicked on up
 			if( is_new ) then clicked, r_clicked = GuiGetPreviousWidgetInfo( gui ) end
 		elseif( pic_z ~= nil and no_left and no_right ) then
 			clicked, r_clicked = lmb_state, rmb_state
@@ -2904,15 +3077,19 @@ function pen.new_dragger( did, pic_x, pic_y, s_x, s_y, pic_z, data )
 	local mouse_state = InputIsMouseButtonDown( 1 )
 	if( pen.c.dragger_data[ did ].is_going ) then
 		if( mouse_state ) then
+			state = 2
 			pic_x = m_x + pen.c.dragger_data[ did ].off[1]
 			pic_y = m_y + pen.c.dragger_data[ did ].off[2]
-			state = 2
-		else pen.c.dragger_data[ did ] = nil; state = -1; GlobalsSetValue( pen.GLOBAL_DRAGGER_SAFETY, 1 ) end
+		else
+			state = -1
+			pen.c.dragger_data[ did ] = nil
+			GlobalsSetValue( pen.GLOBAL_DRAGGER_SAFETY, 1 )
+		end
 	elseif( is_hovered and ( mouse_state and not( pen.c.dragger_data[ did ].old_state ))) then
-		pen.c.dragger_data[ did ].off = { pic_x - m_x, pic_y - m_y }
-		pen.c.dragger_data[ did ].old_state = true
-		pen.c.dragger_data[ did ].is_going = true
 		clicked, state = true, 1
+		pen.c.dragger_data[ did ].is_going = true
+		pen.c.dragger_data[ did ].old_state = true
+		pen.c.dragger_data[ did ].off = { pic_x - m_x, pic_y - m_y }
 	else pen.c.dragger_data[ did ].old_state = mouse_state end
 	
 	if( state > 0 ) then

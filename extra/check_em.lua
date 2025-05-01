@@ -15,6 +15,8 @@ if( pen.c.testing_done ) then
         -- pen.c.testing_done = 1
         
         misc_tests()
+        -- coloring()
+        -- world2gui()
         -- filing()
         -- raters()
         -- input()
@@ -40,23 +42,6 @@ local test_input = {
 -- *************************************************************************
 
 function misc_tests()
-
---https://bottosson.github.io/posts/colorpicker/
---https://github.com/behreajj/AsepriteOkHsl/blob/main/ok_color.lua#L719
-local function gradient_me( rgb, shift )
-    local min_s, min_v = 1, 0.25
-    local hsv = pen.magic_rgb( rgb, false, "hsv" )
-    return pen.magic_rgb({ hsv[1], min_s + ( 1 - min_s )*shift, min_v + ( 1 - min_v )*shift }, true, "hsv" )
-end
-local total_num = 100
-local frame_num = GameGetFrameNum()
-for i = 1,total_num do
-    pen.new_pixel( 100 + i, 10, 5, gradient_me( pen.PALETTE.VNL.RED, math.abs((( i + frame_num )%( 2*total_num ))/total_num - 1 )), 1, 5 )
-end
-
-
-
-pen.new_image( 10, 250, 5, "data/fonts/font_small_numbers_ppb1.png" )
 
 pen.new_pixel( 50 - 0.5, 100 - 0.5, 4, {255,0,0})
 pen.new_image( 50, 100, 5, pen.FILE_PIC_NUL, {
@@ -191,6 +176,57 @@ pen.magic_comp( hooman, { "DamageModelComponent", "balls" }, function( comp_id, 
 end)
 
 ]]end
+
+-- *************************************************************************
+
+function coloring()
+
+local function gradient_me( rgb, shift, type )
+    local min_s, min_v = 1, 0.25
+    local hsv = pen.magic_rgb( rgb, false, type )
+    return pen.magic_rgb({ hsv[1], min_s + ( 1 - min_s )*shift, min_v + ( 1 - min_v )*shift }, true, type )
+end
+for e = 1,2 do
+    for i = 1,100 do
+        local frame_num = GameGetFrameNum() + i
+        pen.new_pixel( 100 + i, 5 + ( e - 1 )*5, 5, gradient_me( pen.PALETTE.VNL.RED, pen.animate( 1, true, { frames = 100, frame_num = frame_num, type = "sine" }), e == 1 and "hsv" or "okhsv" ), 1, 5 )
+    end
+end
+
+local rgb = { 123, 45, 6 }
+print( "RGB: "..pen.t.parse( rgb, true ))
+local hsv = pen.magic_rgb( rgb, false, "hsv" )
+print( "HSV: "..( 360*hsv[1])..", "..( 100*hsv[2] )..", "..( 100*hsv[3])) --20, 95, 48
+rgb = pen.magic_rgb( hsv, true, "hsv" )
+print( "TO_RGB: "..pen.t.parse( rgb, true ))
+local okl = pen.magic_rgb( rgb, false, "oklab" )
+print( "OKL: "..pen.t.parse( okl, true ))
+rgb = pen.magic_rgb( okl, true, "oklab" )
+print( "TO_RGB: "..pen.t.parse( rgb, true ))
+local okv = pen.magic_rgb( rgb, false, "okhsv" )
+print( "OKV: "..( 360*okv[1])..", "..( 100*okv[2] )..", "..( 100*okv[3])) --42, 96, 49
+rgb = pen.magic_rgb( okv, true, "okhsv" )
+print( "TO_RGB: "..pen.t.parse( rgb, true ))
+local okh = pen.magic_rgb( rgb, false, "oklch" )
+print( "OKH: "..pen.t.parse( okh, true ))
+rgb = pen.magic_rgb( okh, true, "oklch" )
+print( "TO_RGB: "..pen.t.parse( rgb, true ))
+
+end
+
+-- *************************************************************************
+
+function world2gui()
+
+local player_x, player_y = EntityGetTransform( hooman )
+local pic_x, pic_y = pen.world2gui( player_x, player_y )
+local new_x, new_y = pen.gui2world( pic_x, pic_y )
+print( player_x.."="..new_x.." | "..player_y.."="..new_y )
+pen.new_text( pic_x, pic_y - 30, pen.LAYERS.WORLD_UI, "monkey", { is_centered_x = true, color = pen.PALETTE.VNL.RUNIC })
+pic_x, pic_y = pen.get_mouse_pos()
+pen.new_text( pic_x, pic_y, pen.LAYERS.WORLD_UI, "balls", { is_centered_x = true, color = pen.PALETTE.VNL.WARNING })
+
+end
 
 -- *************************************************************************
 
