@@ -8,6 +8,65 @@ end
 
 --logo is prospero themed book
 
+--https://github.com/LuaLS/lua-language-server/wiki/Annotations
+
+--check this https://github.com/Copious-Modding-Industries/Noitilities
+--add full mod version check and report the internal filepath + "got an old shit"
+--add this https://github.com/TakWolf/fusion-pixel-font + proper unicode font
+
+--check how file caching works with loadfile, maybe one can edit one lua script at runtime
+--add commented-out section to the end that contain self-sufficient widget funcs for settings menu
+--probably move [COMPLEX] to libman and append FFT to ANIM_INTERS separately
+--transition mrshll to penman
+
+--jpading for buttons (can_jpad param)
+--Store 4 closest widgets for the left, right, up, down to the currently focused one + store the widget closest to 0 to pick as focusable when the time comes, allow one to force focus through code
+--Allow emulating focusing inputs (0 is nothing, 1 is right, 2 is up, 3 is lmb, 4 is select, -1 is left, -2 is down, -3 is rmb, -4 is unselect)
+--make sure this has an inherent compatibility with multiplayer (4 players max)
+
+-- pen.estimate
+-- pen.animate
+-- pen.setting_set
+-- pen.setting_get
+-- pen.get_creature_dimensions
+-- pen.FONT_MODS
+-- pen.new_scroller
+-- pen.new_input
+-- pen.new_plot
+-- pen.pid
+-- pen.rate_projectile
+-- pen.rate_spell
+-- pen.rate_wand
+-- pen.rate_creature
+
+--slider
+--basic window container func (Hermes styled by default)
+--a system that converts images into a pixel table to be drawn in settings.lua or assembled in real time
+--some kind of message system (check how MQTT works)
+--notification system (gameprintimportant-like but unified and with more capabilities)
+--add pen.animate debugging that plots/demos motion/scaling in self-aligning grid
+--coroutine-based sequencer that accepts a table of events (use varstorage to preserve the state between restarts)
+--raytrace_entities
+--sule-based lua context independent gateway (and steal ModMagicNumbersFileAdd from init.lua via it)
+--in-gui particle system
+--separate table getting part from clone_comp/clone_entity to get_comp_data/get_entity_data
+--lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
+--actually test all the stuff
+
+--[TODO]
+--extract hybrid gui from 19a and make it better
+--dropdown with search capabilities (combine input with scroller)
+--cached get_terrain via raymarched GetSurfaceNormal (https://youtu.be/BNZtUB7yhX4?t=92)
+--universal controller-capable interface
+--(dpad/left_stick/keyborad_arrows to switch between, x/keypad_0 to select (dragger should work), triangle/keypad_. for rmb)
+--tinker with GamePlaySound and GameEntityPlaySound (thanks to lamia)
+--tinker with copi's spriteemitter image concept
+--add sfxes (separate banks for prospero, hermes, trigger) + pics
+--make heres ferrei be compatible with controller and upload it to steam
+--testing environment that has full in-world function simulation and supports autotesting
+--things.lua which has a baseline collection of props 19a-style
+--https://link.springer.com/content/pdf/10.1023/A:1007670802811.pdf for AI? (an environemnt where the data is being collected by dev roleplaying as enemy; https://vk.com/away.php?to=https%3A%2F%2Fmachinelearningmastery.com%2Fa-tour-of-machine-learning-algorithms%2F&utf=1)
+
 penman_d = penman_d or ModImageMakeEditable
 penman_r = penman_r or ModTextFileGetContent
 penman_w = penman_w or ModTextFileSetContent

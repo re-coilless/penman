@@ -102,70 +102,6 @@ if( pen.magic_write ~= nil ) then
 	end
 end
 
---transition penman and index to globals instead of varstorages
---redo pen.magic_storage and pen.magic_comp to be more straightforward
---make sure ignore multihover is working properly
---update penman in mnee
-
---https://github.com/LuaLS/lua-language-server/wiki/Annotations
-
---check this https://github.com/Copious-Modding-Industries/Noitilities
---add full mod version check and report the internal filepath + "got an old shit"
---add this https://github.com/TakWolf/fusion-pixel-font + proper unicode font
-
---check how file caching works with loadfile, maybe one can edit one lua script at runtime
---add commented-out section to the end that contain self-sufficient widget funcs for settings menu
---probably move [COMPLEX] to libman and append FFT to ANIM_INTERS separately
---transition mrshll to penman
-
---jpading for buttons (can_jpad param)
---Store 4 closest widgets for the left, right, up, down to the currently focused one + store the widget closest to 0 to pick as focusable when the time comes, allow one to force focus through code
---Allow emulating focusing inputs (0 is nothing, 1 is right, 2 is up, 3 is lmb, 4 is select, -1 is left, -2 is down, -3 is rmb, -4 is unselect)
---make sure this has an inherent compatibility with multiplayer (4 players max)
-
--- pen.estimate
--- pen.animate
--- pen.setting_set
--- pen.setting_get
--- pen.get_creature_dimensions
--- pen.FONT_MODS
--- pen.new_scroller
--- pen.new_input
--- pen.new_plot
--- pen.pid
--- pen.rate_projectile
--- pen.rate_spell
--- pen.rate_wand
--- pen.rate_creature
-
---slider
---basic window container func (Hermes styled by default)
---a system that converts images into a pixel table to be drawn in settings.lua or assembled in real time
---some kind of message system (check how MQTT works)
---notification system (gameprintimportant-like but unified and with more capabilities)
---add pen.animate debugging that plots/demos motion/scaling in self-aligning grid
---coroutine-based sequencer that accepts a table of events (use varstorage to preserve the state between restarts)
---raytrace_entities
---sule-based lua context independent gateway (and steal ModMagicNumbersFileAdd from init.lua via it)
---in-gui particle system
---separate table getting part from clone_comp/clone_entity to get_comp_data/get_entity_data
---lists of every single vanilla thing (maybe ask nathan for modfile checking thing to get true lists of every entity)
---actually test all the stuff
-
---[TODO]
---extract hybrid gui from 19a and make it better
---dropdown with search capabilities (combine input with scroller)
---cached get_terrain via raymarched GetSurfaceNormal (https://youtu.be/BNZtUB7yhX4?t=92)
---universal controller-capable interface
---(dpad/left_stick/keyborad_arrows to switch between, x/keypad_0 to select (dragger should work), triangle/keypad_. for rmb)
---tinker with GamePlaySound and GameEntityPlaySound (thanks to lamia)
---tinker with copi's spriteemitter image concept
---add sfxes (separate banks for prospero, hermes, trigger) + pics
---make heres ferrei be compatible with controller and upload it to steam
---testing environment that has full in-world function simulation and supports autotesting
---things.lua which has a baseline collection of props 19a-style
---https://link.springer.com/content/pdf/10.1023/A:1007670802811.pdf for AI? (an environemnt where the data is being collected by dev roleplaying as enemy; https://vk.com/away.php?to=https%3A%2F%2Fmachinelearningmastery.com%2Fa-tour-of-machine-learning-algorithms%2F&utf=1)
-
 --[MATH]
 function pen.b2n( a )
 	return ( a or false ) and 1 or 0
@@ -224,7 +160,7 @@ function pen.angle_reset( angle )
 end
 
 function pen.rotate_offset( x, y, angle )
-	if(( x == 0 and y == 0 ) or angle == 0 ) then return x, y end
+	if(( x == 0 and y == 0 ) or ( angle or 0 ) == 0 ) then return x, y end
 	return x*math.cos( angle ) - y*math.sin( angle ), x*math.sin( angle ) + y*math.cos( angle )
 end
 
@@ -1384,13 +1320,14 @@ function pen.magic_comp( id, data, func )
 	end
 end
 
-function pen.magic_storage( entity_id, name, field, value )
-	local storages = EntityGetComponentIncludingDisabled( entity_id, "VariableStorageComponent" )
-	local out = pen.t.loop( storages, function( i, comp )
+function pen.magic_storage( entity_id, name, field, value, force_create )
+	if( force_create == nil ) then force_create = value ~= nil end
+	local out = pen.t.loop( EntityGetComponentIncludingDisabled( entity_id, "VariableStorageComponent" ), function( i, comp )
 		if( ComponentGetValue2( comp, "name" ) == name ) then return comp end
 	end)
+
 	if( field ~= nil ) then
-		if( not( pen.vld( out, true )) and value ~= nil ) then
+		if( not( pen.vld( out, true )) and force_create ) then
 			out = EntityAddComponent2( entity_id, "VariableStorageComponent", { name = name })
 		end
 		if( pen.vld( out, true )) then return pen.magic_comp( out, field, value ) end
@@ -2953,7 +2890,7 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, data )
 		end
 
 		GlobalsSetValue( pen.GLOBAL_INTERFACE_FRAME, frame_num )
-		is_hovered = is_new or not( ignore_multihover )
+		is_hovered = is_new or not( data.ignore_multihover )
 	end
 
 	return clicked, r_clicked, is_hovered
@@ -2978,9 +2915,12 @@ function pen.new_image( pic_x, pic_y, pic_z, pic, data )
 	local off_x, off_y, angle = 0, 0, data.angle or 0
 	local w, h, xml_offs, is_anim = pen.get_pic_dims({ pic, data.anim }, data.update_xml )
 	if( xml_offs ) then off_x, off_y = pen.rotate_offset( xml_offs[1], xml_offs[2], angle ) end
-
+	
 	local s_x, s_y = data.s_x or 1, data.s_y or 1; w, h = s_x*w, s_y*h
-	if( data.is_centered ) then pic_x, pic_y = pic_x - w/2, pic_y - h/2 end
+	if( data.is_centered ) then
+		local drift_x, drift_y = pen.rotate_offset( -w/2, -h/2, angle )
+		pic_x, pic_y = pic_x + drift_x, pic_y + drift_y
+	end
 
 	local is_inside = pen.vld( pen.c.cutter_dims )
 	if( is_inside ) then
@@ -3041,8 +2981,11 @@ function pen.new_button( pic_x, pic_y, pic_z, pic, data )
 	local pic_iz = pic_z
 	if( data.skip_z_check ) then pic_iz = nil end
 	data.dims = { pen.get_pic_dims( pen.get_hybrid_table( pic )[1], data.update_xml )}
-	data.clicked, data.r_clicked, data.is_hovered = pen.new_interface(
-		pic_x, pic_y, data.dims[1]*( data.s_x or 1 ), data.dims[2]*( data.s_y or 1 ), pic_iz, data )
+
+	local off_x, off_y = 0, 0
+	local w, h = data.dims[1]*( data.s_x or 1 ), data.dims[2]*( data.s_y or 1 )
+	if( data.is_centered ) then off_x, off_y = pen.rotate_offset( -w/2, -h/2, data.angle ) end
+	data.clicked, data.r_clicked, data.is_hovered = pen.new_interface( pic_x + off_x, pic_y + off_y, w, h, pic_iz, data )
 
 	if( data.lmb_event ~= nil and data.clicked ) then
 		pic_x, pic_y, pic_z, pic, data = data.lmb_event( pic_x, pic_y, pic_z, pic, data ) end

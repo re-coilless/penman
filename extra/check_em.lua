@@ -14,7 +14,8 @@ if( pen.c.testing_done ) then
     else
         -- pen.c.testing_done = 1
         
-        misc_tests()
+        -- misc_tests()
+        buttons()
         -- coloring()
         -- world2gui()
         -- filing()
@@ -176,6 +177,54 @@ pen.magic_comp( hooman, { "DamageModelComponent", "balls" }, function( comp_id, 
 end)
 
 ]]end
+
+-- *************************************************************************
+
+function buttons()
+
+pen.new_pixel( 50, 50, -99, pen.PALETTE.VNL.RED )
+
+pen.new_button( 50, 50, 0,
+    pen.FILE_PIC_NUL, {
+    auid = "testing_bruh",
+    tip = "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!",
+    no_anim = false, highlight = pen.PALETTE.HRMS.BLUE_3,
+    s_x = 10, s_y = 10, angle = math.rad(45),
+    is_centered = true, is_debugging = false,
+    ignore_multihover = true,
+
+    lmb_event = function( pic_x, pic_y, pic_z, pic, d )
+        if( not( d.no_anim )) then pen.atimer( d.auid.."l", nil, true ) end
+        return pic_x, pic_y, pic_z, pic, d
+    end,
+    rmb_event = function( pic_x, pic_y, pic_z, pic, d )
+        if( not( d.no_anim )) then pen.atimer( d.auid.."r", nil, true ) end
+        return pic_x, pic_y, pic_z, pic, d
+    end,
+    hov_event = function( pic_x, pic_y, pic_z, pic, d )
+        if( pen.vld( d.tip )) then pen.new_tooltip( d.tip, { is_active = true }) end
+        if( d.highlight ) then
+            local off_x, off_y = -1, -1
+            local s_x = ( d.s_x or 1 )*d.dims[1] + 2
+            local s_y = ( d.s_y or 1 )*d.dims[2] + 2
+            if( d.is_centered ) then off_x, off_y = -s_x/2, -s_y/2 end
+            off_x, off_y = pen.rotate_offset( off_x, off_y, d.angle )
+            pen.new_pixel( pic_x + off_x, pic_y + off_y, pic_z + 0.001, d.highlight, s_x, s_y, nil, d.angle )
+        end
+
+        return pic_x, pic_y, pic_z, pic, d
+    end,
+    pic_func = function( pic_x, pic_y, pic_z, pic, d )
+        local a = ( d.no_anim or false ) and 1 or math.min(
+            pen.animate( 1, d.auid.."l", { type = "sine", frames = d.frames, stillborn = true }),
+            pen.animate( 1, d.auid.."r", { ease_out = "sin3", frames = d.frames, stillborn = true }))
+        local s_anim = {( 1 - a )/d.dims[1], ( 1 - a )/d.dims[2]}
+        return pen.new_image( pic_x, pic_y, pic_z, pic, { is_centered = true,
+            s_x = ( d.s_x or 1 )*( 1 - s_anim[1]), s_y = ( d.s_y or 1 )*( 1 - s_anim[2]), angle = d.angle })
+    end,
+})
+
+end
 
 -- *************************************************************************
 
