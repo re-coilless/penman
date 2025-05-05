@@ -1,6 +1,7 @@
-pen = pen or {}
-pen.t = pen.t or {}
-pen.c = pen.c or {}
+-- if you are using this as a standalone library, it is highly recommended to covert the "pen" table to a local variable
+pen = pen or {} -- replace this line with "local pen = {}"
+pen.t = pen.t or {} -- table funcs
+pen.c = pen.c or {} -- cache table
 if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "PROSPERO_IS_REAL", "1" )
 end
@@ -60,28 +61,6 @@ pen.V = { --https://github.com/Wiseluster/lua-vector/blob/master/vector.lua
 		local x = v.x*math.cos( a ) + v.y*math.sin( a )
 		local y = v.x*math.sin( a ) - v.y*math.cos( a )
 		return pen.V.new( x, y )
-	end,
-}
-pen.I = {
-	__mt = { --just steal the whole complex.lua
-		__add = function( a, b )
-			return pen.I.new( a.r + b.r, a.i + b.i )
-		end,
-		__sub = function( a, b )
-			return pen.I.new( a.r - b.r, a.i - b.i )
-		end,
-		__mul = function( a, b )
-			return pen.I.new( a.r*b.r - a.i*b.i, a.r*b.i + a.i*b.r )
-		end,
-		__tostring = function( a )
-			return table.concat({ "[", a.r, ";", a.i, "]" })
-		end,
-	},
-	new = function( r, i )
-		return setmetatable({ r = r, i = i or 0 }, pen.I.__mt )
-	end,
-	expi = function( i )
-		return pen.I.new( math.cos( i ), math.sin( i ))
 	end,
 }
 
@@ -1335,9 +1314,9 @@ function pen.magic_storage( entity_id, name, field, value, force_create )
 	return out
 end
 
-function pen.clone_comp( entity_id, comp_id, mutators )
+function pen.get_comp_data( entity_id, comp_id, mutators )
 	if( not( pen.vld( comp_id, true ))) then return end
-	
+
 	mutators = mutators or {}
 	local comp_name = ComponentGetTypeName( comp_id )
 	local main_values, object_values, extra_values = {
@@ -1391,8 +1370,18 @@ function pen.clone_comp( entity_id, comp_id, mutators )
 		end
 	end
 
-	if( pen.clone_comp_debug ) then print( comp_name ) end
 	get_stuff()
+
+	return main_values, object_values, extra_values
+end
+
+function pen.clone_comp( entity_id, comp_id, mutators )
+	if( not( pen.vld( comp_id, true ))) then return end
+	local comp_name = ComponentGetTypeName( comp_id )
+	if( pen.clone_comp_debug ) then print( comp_name ) end
+
+	local main_values, object_values, extra_values = pen.get_comp_data( entity_id, comp_id, mutators )
+	
 	if(( pen.clone_comp_debug or 1 ) == 1 ) then
 		comp_id = EntityAddComponent2( entity_id, comp_name, main_values )
 		for object,values in pairs( object_values ) do
@@ -3348,19 +3337,20 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 				if( v[1] == letter_id ) then extra_list[n] = v[2] end
 			end)
 
-			local clr, char, font = data.color or {}, pen.magic_byte( char_id ), {data.font,is_pixel_font}
+			local char = pen.magic_byte( char_id )
+			local clr = data.color or pen.PALETTE.W
+			local font = { data.font, is_pixel_font }
 			local off = { pen.get_char_dims( char, char_id, font[1])}
 			for e,func in ipairs( element.f ) do
 				local new_x, new_y = nil, nil
 				local new_clr, new_font, new_char = {}, {}, nil
 				local font_mod = data.font_mods[ func ] or pen.FONT_MODS[ func ]
 				if( font_mod ~= nil ) then
-					clr[4] = clr[4] or data.alpha
 					c_lcl[ func ] = ( c_lcl[ func ] or 0 ) + 1
 					new_x, new_y, new_clr, new_font, new_char = font_mod(
 						{ l = pos_x, g = orig_x }, { l = pos_y, g = orig_y }, pic_z,
 						{ char = char, dims = off, font = font, extra = extra_list, ram = pen.c.font_ram },
-						clr, { gbl = c_gbl, lcl = c_lcl[ func ], chr = letter_id }
+						{ clr[1], clr[2], clr[3], clr[4] or data.alpha }, { gbl = c_gbl, lcl = c_lcl[ func ], chr = letter_id }
 					)
 				end
 
@@ -3464,11 +3454,16 @@ function pen.new_tooltip( text, data, func )
 		if(( frame_num - tip_anim[2]) > ( data.frames + 5 )) then tip_anim[1] = frame_num - 1 end
 		tip_anim[2], tip_anim[3] = frame_num, math.min( frame_num - tip_anim[1], data.frames )
 
+		local off_x, off_y = 0, 0
+		if( pen.vld( data.text_prefunc )) then text, off_x, off_y = data.text_prefunc( text, data ) end
+
 		local w, h = GuiGetScreenDimensions( gui )
 		if( not( pen.vld( data.dims ))) then
 			data.dims = pen.get_tip_dims( text, { data.min_width or 121, data.max_width or 0.9*w }, h, data.line_offset or -2 )
 		end
-		data.dims = { data.dims[1], data.dims[2]}
+		data.dims = {
+			data.dims[1] + ( off_x or 0 ),
+			data.dims[2] + ( off_y or 0 )}
 		data.dims[1] = data.dims[1] + 2*data.edging - 1
 		data.dims[2] = data.dims[2] + 2*data.edging - 1
 
@@ -3738,8 +3733,22 @@ pen.FONT_MODS = {
 		pen.new_pixel( pic_x.g - 1, pic_y.g + ( off_y - 1 )/2, pic_z + 0.001, color, ( off_x + 2 ), 1 )
 	end,
 	underscore = function( pic_x, pic_y, pic_z, char_data, color, index ) --make this be font height related
+		local alpha = color[4]
+		local new_color = color
+		if( not( char_data.ram.under_color_locked ) and pen.vld( char_data.extra[1])) then
+			new_color = pen.t.pack( char_data.extra[ #char_data.extra ])
+			if( pen.vld( new_color )) then
+				if( type( new_color[1]) == "string" ) then
+					if( index.lcl == 1 and new_color[3] == "FORCED" ) then
+						char_data.ram.under_color_locked = true end
+					new_color = pen.PALETTE[ new_color[1]][ new_color[2]]
+				end
+				char_data.ram.under_color_memo = new_color
+			else new_color = color end
+		else new_color = char_data.ram.under_color_memo or color end
+		
 		local off_x, off_y = unpack( char_data.dims )
-		pen.new_pixel( pic_x.g, pic_y.g + off_y*0.8, pic_z + 0.001, color, off_x, 1 )
+		pen.new_pixel( pic_x.g, pic_y.g + off_y*0.8, pic_z + 0.001, new_color, off_x, 1, alpha )
 	end,
 	shadow = function( pic_x, pic_y, pic_z, char_data, color, index )
 		GuiZSetForNextWidget( pen.c.gui_data.g, pic_z + 0.0001 )
@@ -3765,6 +3774,9 @@ pen.FONT_MODS = {
 		return nil, nil, new_color
 	end,
 
+	indent = function( pic_x, pic_y, pic_z, char_data, color, index )
+		return pic_x.l + 2, pic_y.l
+	end,
 	wave = function( pic_x, pic_y, pic_z, char_data, color, index )
 		return nil, pic_y.l + math.sin( 0.5*index.gbl + GameGetFrameNum()/7 )
 	end,
@@ -3965,34 +3977,6 @@ pen.ANIM_INTERS = {
 		--https://uploads.gamedev.net/monthly_2019_10/code.png.2b57c8e848a842330559286e38cecd03.png
 		p = p or {}; local a, k = p[1] or -10, p[2] or -1.9
 		return delta[1] + ( delta[2] - delta[1])*math.log(( a + 1 )/( math.exp( k*math.sin( 1.5*math.pi*t )) + a ))
-	end,
-	frir = function( t, delta, p ) --https://rosettacode.org/wiki/Fast_Fourier_transform#Lua
-		local function fft( tbl ) --literal shit, write custom implementation
-			local n = #tbl
-			if( n <= 1 ) then return end
-
-			local odd, even = {}, {}
-			for i = 1,n,2 do
-				table.insert( odd, tbl[i])
-				table.insert( even, tbl[ i + 1 ])
-			end
-			fft( even ); fft( odd )
-
-			for k = 1,n/2 do
-				local t = even[k]*pen.I.expi( -2*math.pi*( k - 1 )/n )
-				pen.c.fft_data[k], pen.c.fft_data[ k + n/2 ] = odd[k] + t, odd[k] - t
-			end
-			return pen.c.fft_data
-		end
-		
-		--come up with a good default param set
-		--check if it's looped properly and add buffer points (45 degree straight) if is not
-		return pen.cache({ "fft_memo", pen.t.pack( p )}, function()
-			pen.c.fft_data = {}
-			for i,v in ipairs( p or {}) do pen.c.fft_data[i] = pen.I.new( v ) end
-			local out = fft( pen.c.fft_data ); pen.c.fft_data = nil
-			return pen.t.clone( out )
-		end)
 	end,
 }
 
@@ -6020,3 +6004,7 @@ pen.FILE_XML_FONT = [[
 ---@field func fun( pic_x:number, pic_y:number, pic_z:number, absolute_i:number, element:any, relative_k:number, is_hidden:boolean ): will_skip:boolean Draws the elements of the current page.
 ---@field order_func function [DFT: pen.t.order ]<br> Sorts the list for later processing.
 ---@field click table [INTERNAL]<br> This is used to interface between visual and logical segments. The value of 1 means that the button was clicked and the value of -1 means that it was r_clicked.
+
+--<{> MAGICAL APPEND MARKER <}>--
+
+return pen

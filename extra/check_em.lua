@@ -12,10 +12,10 @@ if( pen.c.testing_done ) then
     if( pen.c.testing_done == 1 ) then
         return
     else
-        -- pen.c.testing_done = 1
+        pen.c.testing_done = 1
         
         -- misc_tests()
-        buttons()
+        -- buttons()
         -- coloring()
         -- world2gui()
         -- filing()
@@ -36,7 +36,7 @@ pen.c.testing_done = true
 local test_input = {
     "#$%& (45\n|{-}you_should_not_see_this{-}|{>wave>{\n\thmmmmm {-}balls{-}NOPQ {>quake>{{-}ass{-}6LM.,}<wave<}\n/_;;;;; NOPQ}<quake<} 6LM.,efghÃÄÅ{>e1>{ÇÈÉтуzab cфхцgaш”6LM.,}<e1<}g{>c2>{{>shadow>{efjjg}<shadow<}{>runic>{{>color>{{-}|255|0|0|{-}ghghㅃÃту}<color<}}<runic<}ф{>color>{хцчш}<color<}”„…∞{>rainbow>{でとどぬballlls}<rainbow<} {>crossed>{{>cancer>{;ass}<cancer<}}<crossed<} hmmmでとg}<c2<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf",
     "#$%& (45\n||\n\thmmmmm NOPQ 6LM.,\n/_;;;;; NOPQ 6LM.,efghÃÄÅÇÈÉтуzab cфхцgaш”6LM.,efjjgghghÃÉтуфхцчш”„…∞でとどぬballlls ;ass hmmmでとgg ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf",
-    "{>shadow>{000{>color>{{-}|PRSP|BLUE|{-}abc{-}|PRSP|RED|{-}de}<shadow<}fg}<color<}",
+    "{>underscore>{{>shadow>{{-}|HRMS|RED_2|FORCED|{-}000{>color>{{-}|PRSP|BLUE|{-}abc{-}|PRSP|RED|{-}de}<shadow<}fg}<color<}}<underscore<}",
     "dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf"
 }
 
@@ -219,6 +219,9 @@ pen.new_button( 50, 50, 0,
             pen.animate( 1, d.auid.."l", { type = "sine", frames = d.frames, stillborn = true }),
             pen.animate( 1, d.auid.."r", { ease_out = "sin3", frames = d.frames, stillborn = true }))
         local s_anim = {( 1 - a )/d.dims[1], ( 1 - a )/d.dims[2]}
+        
+        if( not( d.is_centered )) then
+			pic_x, pic_y = pic_x + d.dims[1]/2, pic_y + d.dims[2]/2 end
         return pen.new_image( pic_x, pic_y, pic_z, pic, { is_centered = true,
             s_x = ( d.s_x or 1 )*( 1 - s_anim[1]), s_y = ( d.s_y or 1 )*( 1 - s_anim[2]), angle = d.angle })
     end,
@@ -369,7 +372,7 @@ function tipping()
 local pic_x, pic_y, _, clicked, _, yep = pen.new_dragger( "balls", 400, 100, 100, 100 )
 _, _, yep = pen.new_image( pic_x, pic_y, 5, pen.FILE_PIC_NUL, { s_x = 50, s_y = 50, can_click = true })
 -- pen.new_tooltip( test_input[1], { is_active = yep, tid = "bs2", is_over = true })
-pen.new_tooltip( test_input[2], { tid = "bs1" })
+pen.new_tooltip( test_input[3], { tid = "bs1" })
 -- pen.new_tooltip( test_input[1], { is_active = yep, tid = "bs3", is_left = true })
 -- pen.new_tooltip( test_input[2], { is_active = yep, tid = "bs4", is_over = true, is_left = true })
 pen.new_tooltip( "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", {

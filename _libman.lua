@@ -11,7 +11,7 @@ pen.lib = pen.lib or {}; pen.LOCAL_PATH = LOCAL_PATH
 for i,v in ipairs({ "nxml", "csv", "base64", "matrix", "complex", "EZWand" }) do
 	pen.lib[ v ] = dofile_once( table.concat({ pen.LOCAL_PATH, "lib/", v, ".lua" }))
 end
---dialog
+--dialog (modify to be more generalized)
 --gusgui
 --parallax
 
@@ -42,6 +42,57 @@ if( GameHasFlagRun( pen.FLAG_UPDATE_UTF )) then
 		end
 		print("\n")
 	end
+end
+
+pen.I = {
+	__mt = { --just steal the whole complex.lua
+		__add = function( a, b )
+			return pen.I.new( a.r + b.r, a.i + b.i )
+		end,
+		__sub = function( a, b )
+			return pen.I.new( a.r - b.r, a.i - b.i )
+		end,
+		__mul = function( a, b )
+			return pen.I.new( a.r*b.r - a.i*b.i, a.r*b.i + a.i*b.r )
+		end,
+		__tostring = function( a )
+			return table.concat({ "[", a.r, ";", a.i, "]" })
+		end,
+	},
+	new = function( r, i )
+		return setmetatable({ r = r, i = i or 0 }, pen.I.__mt )
+	end,
+	expi = function( i )
+		return pen.I.new( math.cos( i ), math.sin( i ))
+	end,
+}
+pen.ANIM_INTERS.frir = function( t, delta, p ) --https://rosettacode.org/wiki/Fast_Fourier_transform#Lua
+	local function fft( tbl ) --literal shit, write custom implementation
+		local n = #tbl
+		if( n <= 1 ) then return end
+
+		local odd, even = {}, {}
+		for i = 1,n,2 do
+			table.insert( odd, tbl[i])
+			table.insert( even, tbl[ i + 1 ])
+		end
+		fft( even ); fft( odd )
+
+		for k = 1,n/2 do
+			local t = even[k]*pen.I.expi( -2*math.pi*( k - 1 )/n )
+			pen.c.fft_data[k], pen.c.fft_data[ k + n/2 ] = odd[k] + t, odd[k] - t
+		end
+		return pen.c.fft_data
+	end
+	
+	--come up with a good default param set
+	--check if it's looped properly and add buffer points (45 degree straight) if is not
+	return pen.cache({ "fft_memo", pen.t.pack( p )}, function()
+		pen.c.fft_data = {}
+		for i,v in ipairs( p or {}) do pen.c.fft_data[i] = pen.I.new( v ) end
+		local out = fft( pen.c.fft_data ); pen.c.fft_data = nil
+		return pen.t.clone( out )
+	end)
 end
 
 -- pen.magic_draw = pen.magic_draw or function( path, w, h ) --fucking bullshit
