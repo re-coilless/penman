@@ -166,8 +166,13 @@ function pen.hash_me( str, is_huge )
 			a = ( a + string.byte( str, i ))%c
 			b = ( a + b )%c
 		end
-		return tostring( b*c + a )
+		return string.format( "%.0f", b*c + a )
 	end, { reset_frame = pen.CACHE_RESET_DELAY })
+end
+
+function pen.key_me( str )
+	str = string.gsub( string.gsub( str, pen.KEY, pen.HOLE ), "%c", pen.HOLE )
+	return string.gsub( string.gsub( str, pen.DIV_1, pen.HOLE ), pen.DIV_2, pen.HOLE )
 end
 
 --add autotuning with visualizer via new_plot
@@ -277,12 +282,12 @@ function pen.get_hybrid_function( func, input )
 	else return func end
 end
 
-function pen.v2s( value, is_pretty, full_precision )
-	full_precision = full_precision or false
+function pen.v2s( value, is_pretty, full_precision, unquote )
+	full_precision, unquote = full_precision or false, unquote or false
 	return ( is_pretty or false ) and tostring( value ) or (({
 		["nil"] = function( v ) return "" end,
 		["number"] = function( v ) return full_precision and string.format( "%.16f", v ) or tostring( v ) end,
-		["string"] = function( v ) return string.format( "%q", v ) end,
+		["string"] = function( v ) return unquote and v or string.format( "%q", v ) end,
 		["boolean"] = function( v ) return "bool"..pen.b2n( v ) end,
 		["function"] = function( v ) return string.format( "%q", tostring( v )) end,
 		["userdata"] = function( v ) return string.format( "%q", tostring( v )) end,
@@ -373,7 +378,7 @@ function pen.t.bins( tbl, value )
 end
 
 function pen.t.is_unarray( tbl )
-	return pen.t.count( tbl, true ) > 0 and #tbl == 0
+	return pen.t.count( tbl ) ~= #tbl
 end
 
 function pen.t.unarray( tbl, dft )
@@ -410,11 +415,9 @@ function pen.t.get( tbl, id, custom_key, will_nuke, default )
 			if( not( is_multi )) then break end
 		end
 	end
-
-	if( not( will_nuke )) then
-		return is_multi and out or ( out[1] or default ), tbl_id
-	end
-	for i,v in ipairs( out ) do table.remove( tbl, v ) end
+	
+	if( not( will_nuke )) then return is_multi and out or ( out[1] or default ), tbl_id end
+	for i = #out,1,-1 do table.remove( tbl, out[i]) end
 end
 
 function pen.t.get_max( tbl )
@@ -466,10 +469,9 @@ function pen.t.insert_new( tbl, new )
 end
 
 function pen.t.clone( orig, copies )
-	local copy = {}
-	if( type( orig ) ~= "table" ) then
-		copy = orig; return copy end
+	if( type( orig ) ~= "table" ) then return orig end
 	
+	local copy = {}
     copies = copies or {}
 	if( copies[ orig ] == nil ) then
 		copies[ orig ] = copy
@@ -490,9 +492,9 @@ function pen.t.pack( data )
 		return pen.DIV_1..pen.t.loop_concat( tbl, function( i, cell )
 			if( type( cell ) == "table" ) then
 				return { pen.DIV_2, pen.t.loop_concat( cell, function( e, v )
-					return { type( v ) == "table" and "\0" or pen.v2s( v ), pen.DIV_2 }
+					return { type( v ) == "table" and "\0" or pen.v2s( v, nil, nil, true ), pen.DIV_2 }
 				end), pen.DIV_1 }
-			else return { pen.v2s( cell ), pen.DIV_1 } end
+			else return { pen.v2s( cell, nil, nil, true ), pen.DIV_1 } end
 		end)
 	end
 	local function dser( str )
@@ -537,7 +539,7 @@ function pen.t.parse( data, is_pretty, full_precision )
 		else return pen.v2s( tbl, is_pretty, full_precision ) end
 	end
 	local function dser( str )
-		return pen.cache({ "table_parse", pen.hash_me( str, true )}, function()
+		return pen.cache({ "table_parse", pen.key_me( str, true )}, function()
 			if( string.find( str, "^{.+}$" ) == nil ) then return {} end
 			str = ","..string.sub( string.sub( str, 2, -1 ), 1, -2 )..",["
 			
@@ -611,6 +613,8 @@ function pen.cache( structure, update_func, data )
 	data.reset_count = data.reset_count or 9999
 	data.reset_delay = data.reset_delay or 60
 	data.reset_frame = data.reset_frame or 0
+	data.force_update = data.force_update or false
+	data.always_update = data.always_update or false
 
 	local name = structure[1]
 	pen.c[ name ] = pen.c[ name ] or {}
@@ -646,7 +650,7 @@ function pen.cache( structure, update_func, data )
 	if( data.always_update ) then
 		local new_val = { update_func( the_one[ val ])}
 		if( pen.vld( new_val )) then the_one[ val ] = new_val end
-	elseif( the_one[ val ] == nil and update_func ~= nil ) then
+	elseif(( data.force_update or the_one[ val ] == nil ) and update_func ~= nil ) then
 		local new_val = { update_func()}
 		if( not( pen.vld( new_val ))) then return end
 		the_one[ val ], pen.c[ name ].cache_reset_count = new_val, pen.c[ name ].cache_reset_count + 1
@@ -811,7 +815,8 @@ end
 function pen.t2l( str, string_indexed )
 	return pen.ctrn( pen.t2t( str ), "\n", string_indexed )
 end
-function pen.t2w( str )
+function pen.t2w( str, is_raw )
+	if( is_raw ) then return { pen.t2t( str, true )} end
 	return pen.ctrn( str )
 end
 
@@ -1012,15 +1017,15 @@ function pen.liner( text, length, height, font, data )
 	end
 
 	return pen.cache({ "font_liner", length, height, text, font }, function()
-		local formatted, max_l, h = {}, 0, 0
-		local full_text = table.concat({ pen.DIV_0,
-			string.gsub( pen.t2t( string.gsub( string.gsub( text, " + ", "\t" ), "\t", pen.MARKER_TAB )), "\n", pen.DIV_0 ),
+		local full_text, formatted, max_l, h = text, {}, 0, 0
+		full_text = table.concat({ pen.DIV_0,
+			string.gsub( pen.t2t( string.gsub( string.gsub( full_text, " + ", "\t" ), "\t", pen.MARKER_TAB )), "\n", pen.DIV_0 ),
 		pen.DIV_0 })
 
 		for paragraph in string.gmatch( full_text, pen.ptrn( 0 )) do
 			local line, l = "", 0
 			if( paragraph ~= "" ) then
-				for i,raw_word in ipairs( pen.t2w( pen.t2t( paragraph, true ))) do
+				for i,raw_word in ipairs( pen.t2w( pen.t2t( paragraph, true ), data.aggressive )) do
 					local new_line, new_l, new_h = do_a_word( formatted, line, l, h, raw_word )
 					if( new_line ) then
 						line, l, h = new_line, new_l, new_h
@@ -1525,22 +1530,25 @@ function pen.random_sign( var )
 	return pen.random_bool( var ) and 1 or -1
 end
 
-function pen.setting_set( id, value ) --update cache (cache is stored in globals)
+function pen.setting_set( id, value )
+	-- local setting_set_memo = pen.t.unarray( pen.t.pack( GlobalsGetValue( pen.GLOBAL_SETTINGS_CACHE, "" )))
+	-- setting_set_memo[ id ] = GameGetFrameNum()
+	-- GlobalsSetValue( pen.t.pack( pen.t.unarray( setting_set_memo )))
+
 	ModSettingSet( id, value )
 	ModSettingSetNextValue( id, value, false )
 end
-function pen.setting_get( id ) --cache
-	-- local settings = pen.cache({ "setting_dump", "stuff" }, function()
-	-- 	local stuff = {}
-	-- 	for i = 0,ModSettingGetCount() do
-	-- 		local name = ModSettingGetAtIndex( i )
-	-- 		if( pen.vld( name )) then stuff[ name ] = i end
-	-- 	end
-	-- 	return stuff
-	-- end)
-	
-	-- local _, value, value_next = ModSettingGetAtIndex( settings[ id ] or -1 )
-	return ModSettingGetNextValue( id ), ModSettingGet( id )
+function pen.setting_get( id )
+	-- local frame_num = GameGetFrameNum()
+	-- local setting_set_memo = pen.t.unarray( pen.t.pack( GlobalsGetValue( pen.GLOBAL_SETTINGS_CACHE, "" )))
+	-- pen.c.setting_get_memo = pen.c.setting_get_memo or {}
+	-- pen.c.setting_get_memo[ id ] = pen.c.setting_get_memo[ id ] or 1
+	-- local is_old = pen.c.setting_get_memo[ id ] <= ( setting_set_memo[ id ] or 0 )
+	-- pen.c.setting_get_memo[ id ] = frame_num
+
+	-- return pen.cache({ "settings", id }, function()
+		return ModSettingGetNextValue( id ), ModSettingGet( id )
+	-- end, { reset_count = 0, reset_frame = pen.CACHE_RESET_DELAY, force_update = is_old })
 end
 
 function pen.get_time( secs )
@@ -2634,7 +2642,7 @@ function pen.get_pic_dims( path, update_xml )
 		end)
 
 		return dims
-	end, { reset_count = 0, reset_now = update_xml })
+	end, { reset_count = 0, force_update = update_xml })
 	if( pen.vld( real_dims )) then return unpack( real_dims ) end
 
 	return pen.cache({ "pic_dimensions", path[1]}, function()
@@ -2962,11 +2970,22 @@ end
 ---@return boolean clicked, boolean r_clicked, boolean is_hovered
 function pen.new_button( pic_x, pic_y, pic_z, pic, data )
 	data = data or {}
-	data.ignore_multihover = true
 	data.no_anim = data.no_anim or false
-	data.pic_func = data.pic_func or pen.new_image
 	data.auid = data.auid or table.concat({ pic, pic_z })
 	
+	data.pic_func = data.pic_func or function( pic_x, pic_y, pic_z, pic, d )
+		local a = ( d.no_anim or false ) and 1 or math.min(
+			pen.animate( 1, d.auid.."l", { type = "sine", frames = d.frames, stillborn = true }),
+			pen.animate( 1, d.auid.."r", { ease_out = "sin3", frames = d.frames, stillborn = true }))
+		local s_anim = {( 1 - a )/d.dims[1], ( 1 - a )/d.dims[2] }
+
+		if( not( d.is_centered )) then
+			pic_x = pic_x + ( d.s_x or 1 )*d.dims[1]/2
+			pic_y = pic_y + ( d.s_y or 1 )*d.dims[2]/2 end
+		return pen.new_image( pic_x, pic_y, pic_z, pic, { is_centered = true,
+			s_x = ( d.s_x or 1 )*( 1 - s_anim[1]), s_y = ( d.s_y or 1 )*( 1 - s_anim[2]), angle = d.angle })
+	end
+
 	local pic_iz = pic_z
 	if( data.skip_z_check ) then pic_iz = nil end
 	data.dims = { pen.get_pic_dims( pen.get_hybrid_table( pic )[1], data.update_xml )}
@@ -3087,34 +3106,44 @@ function pen.unscroller() --huge thanks to Lamia for inspiration
 	GuiAnimateEnd( gui )
 	GuiEndScrollContainer( gui )
 end
-function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data ) --wide scrolling visuals version
+function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data )
 	func = pen.get_hybrid_table( func )
 	func[2] = func[2] or function( pic_x, pic_y, pic_z, bar_size, bar_pos, data )
 		local out = {}
-		
+		local color = data.color or {
+			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
+			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
+			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
+			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
+			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
+			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
+			{0,0,0,0.83}
+		}
+		color[14] = color[14] or color[13]
+
 		local _,new_y,state,_,_,is_hovered = pen.new_dragger( sid.."_dragger", pic_x, bar_pos, 3, bar_size, pic_z )
-		pen.new_pixel( pic_x + 1, bar_pos, pic_z, {0,0,0,0.83}, 1, bar_size )
-		pen.new_pixel( pic_x, bar_pos, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ], 1, bar_size )
-		pen.new_pixel( pic_x + 2, bar_pos, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT_DARK" or "NINE_MAIN_DARK" ], 1, bar_size )
+		pen.new_pixel( pic_x + 1, bar_pos, pic_z, color[ is_hovered and 14 or 13 ], 1, bar_size )
+		pen.new_pixel( pic_x, bar_pos, pic_z, color[ is_hovered and 2 or 1 ], 1, bar_size )
+		pen.new_pixel( pic_x + 2, bar_pos, pic_z, color[ is_hovered and 4 or 3 ], 1, bar_size )
 		out[1] = { new_y, state }
 		
 		local clicked, r_clicked = false, false
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, 3, 3, pic_z )
-		pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, {0,0,0,0.83})
-		pen.new_pixel( pic_x + 1, pic_y, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
-		pen.new_pixel( pic_x, pic_y + 1, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
-		pen.new_pixel( pic_x + 2, pic_y + 1, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT_DARK" or "NINE_MAIN_DARK" ])
+		pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, color[ is_hovered and 14 or 13 ])
+		pen.new_pixel( pic_x + 1, pic_y, pic_z, color[ is_hovered and 6 or 5 ])
+		pen.new_pixel( pic_x, pic_y + 1, pic_z, color[ is_hovered and 6 or 5 ])
+		pen.new_pixel( pic_x + 2, pic_y + 1, pic_z, color[ is_hovered and 8 or 7 ])
 		if( data.can_scroll and ( InputIsMouseButtonDown( 4 ) or InputIsKeyJustDown( 86 ))) then clicked = 1 end
 		out[2] = { clicked, r_clicked }
 
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y + size_y - 3, 3, 3, pic_z )
-		pen.new_pixel( pic_x + 1, pic_y + size_y - 2, pic_z, {0,0,0,0.83})
-		pen.new_pixel( pic_x + 1, pic_y + size_y - 1, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
-		pen.new_pixel( pic_x, pic_y + size_y - 2, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT" or "NINE_MAIN" ])
-		pen.new_pixel( pic_x + 2, pic_y + size_y - 2, pic_z, pen.PALETTE.VNL[ is_hovered and "NINE_ACCENT_DARK" or "NINE_MAIN_DARK" ])
+		pen.new_pixel( pic_x + 1, pic_y + size_y - 2, pic_z, color[ is_hovered and 14 or 13 ])
+		pen.new_pixel( pic_x + 1, pic_y + size_y - 1, pic_z, color[ is_hovered and 10 or 9 ])
+		pen.new_pixel( pic_x, pic_y + size_y - 2, pic_z, color[ is_hovered and 10 or 9 ])
+		pen.new_pixel( pic_x + 2, pic_y + size_y - 2, pic_z, color[ is_hovered and 12 or 11 ])
 		if( data.can_scroll and ( InputIsMouseButtonDown( 5 ) or InputIsKeyJustDown( 87 ))) then clicked = 1 end
 		out[3] = { clicked, r_clicked }
-
+		
 		return out
 	end
 	
@@ -3197,6 +3226,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 		data.dims = pen.get_hybrid_table( data.dims ); data.dims[2] = data.dims[2] or -1
 		text, dims, new_line = pen.liner( text, data.dims[1]/data.scale, data.dims[2]/data.scale, data.font, {
 			nil_val = data.nil_val,
+			aggressive = data.aggressive,
 			line_offset = data.line_offset,
 		})
 	else
@@ -3653,6 +3683,7 @@ pen.GLOBAL_INTERFACE_SAFETY_LL = "PENMAN_INTERFACE_SAFETY_LL"
 pen.GLOBAL_INTERFACE_SAFETY_TL = "PENMAN_INTERFACE_SAFETY_TL"
 pen.GLOBAL_INTERFACE_SAFETY_LR = "PENMAN_INTERFACE_SAFETY_LR"
 pen.GLOBAL_INTERFACE_SAFETY_TR = "PENMAN_INTERFACE_SAFETY_TR"
+pen.GLOBAL_SETTINGS_CACHE = "PENMAN_SETTINGS_CACHE"
 
 pen.MARKER_TAB = "\\_"
 pen.MARKER_FANCY_TEXT = { "{>%S->{", "}<%S-<}", "{%-}%S-{%-}" }
@@ -3670,6 +3701,8 @@ pen.INDEX_WRITER = "PENMAN_WRITE_INDEX"
 pen.INDEX_T2F = "PENMAN_VIRTUAL_INDEX"
 pen.INDEX_DRAWER = "PENMAN_PIC_INDEX"
 
+pen.KEY = "$"
+pen.HOLE = "#"
 pen.DIV_0 = "@"
 pen.DIV_1 = "|"
 pen.DIV_2 = "!"

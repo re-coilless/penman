@@ -6,9 +6,10 @@ function OnWorldPreUpdate()
 	end
 end
 
---translations for marshall
---update mnee, kappa, marshall on steam
---add github readmes to everything
+--make index bootable
+--mrshll CANCER pack (actually good meme songs)
+--update and test most based modpack
+--rhytm addon for mrshll (get song bpms; two modes: buff, if any song is playing then every shot made on bit will deal extra damage, and challenge, where shooting without a song playing or not on beat deals damage to the player)
 
 --logo is prospero themed book
 
@@ -20,11 +21,8 @@ end
 
 -- pen.estimate
 -- pen.animate
--- pen.setting_set
--- pen.setting_get
 -- pen.get_creature_dimensions
 -- pen.FONT_MODS
--- pen.new_scroller
 -- pen.new_input
 -- pen.new_plot
 -- pen.pid
@@ -34,6 +32,7 @@ end
 -- pen.rate_creature
 
 --[TODO]
+--periodically executed functions
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 --check this https://github.com/Copious-Modding-Industries/Noitilities
 --add this https://github.com/TakWolf/fusion-pixel-font + proper unicode font
