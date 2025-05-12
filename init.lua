@@ -7,7 +7,7 @@ function OnWorldPreUpdate()
 end
 
 --make index bootable
---mrshll CANCER pack (actually good meme songs)
+--mrshll update + CANCER pack (actually good meme songs) + balance the pahntom pack better
 --update and test most based modpack
 --rhytm addon for mrshll (get song bpms; two modes: buff, if any song is playing then every shot made on bit will deal extra damage, and challenge, where shooting without a song playing or not on beat deals damage to the player)
 
