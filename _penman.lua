@@ -1822,7 +1822,7 @@ function pen.get_spell_data( spell_id )
 	return pen.cache({ "spell_data", spell_id }, function()
 		clean_my_gun()
 
-		local spell_data = pen.t.clone( pen.t.get( actions, spell_id, nil, nil, {}))
+		local spell_data = pen.t.clone( pen.t.get( actions, spell_id, nil, nil, {}), nil )
 		if( spell_data.action == nil ) then return spell_data end
 		
 		draw_actions_old = draw_actions

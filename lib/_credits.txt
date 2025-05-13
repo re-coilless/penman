@@ -1,4 +1,4 @@
-nxml.lua - https://github.com/zatherz/luanxml
+nxml.lua - https://github.com/NathanSnail/luanxml
 csv.lua - https://github.com/geoffleyland/lua-csv
 bitser.lua - https://github.com/gvx/bitser
 base64.lua - https://github.com/iskolbin/lbase64

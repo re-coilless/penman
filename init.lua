@@ -32,6 +32,7 @@ end
 -- pen.rate_creature
 
 --[TODO]
+--investigate gui shaders
 --periodically executed functions
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 --check this https://github.com/Copious-Modding-Industries/Noitilities
