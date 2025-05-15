@@ -2897,7 +2897,8 @@ function pen.get_pic_dims( path, update_xml )
 end
 
 function pen.get_tip_dims( text, width, height, line_offset )
-	width = width or {}; width[1], width[2] = width[1] or 121, width[2] or 525
+	width = pen.get_hybrid_table( width or {})
+	width[1], width[2] = width[1] or 121, width[2] or 525
 
 	local _,dims = pen.liner( text ); local s_x, s_y = unpack( dims )
 	if( string.find( text, "[\n@]" ) ~= nil ) then s_x = 2*s_x end
@@ -3486,8 +3487,8 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 		pen.colourer( gui, color, alpha )
 		GuiText( gui, pic_x, pic_y, txt, scale, font, is_pixel )
 		if( not( has_shadow )) then return end
-		GuiZSetForNextWidget( gui, pic_z + 0.0001 )
-		pen.colourer( gui, pen.PALETTE.SHADOW, 0.1*alpha )
+		GuiZSetForNextWidget( gui, pic_z + 0.001 )
+		pen.colourer( gui, pen.PALETTE.SHADOW, 0.5*alpha )
 		GuiText( gui, pic_x + scale/2, pic_y + scale/2, txt, scale, font, is_pixel )
 	end
 	
@@ -4296,6 +4297,7 @@ pen.PALETTE = {
 		DAMAGE = {166,70,56}, _="ffa64638",
 		HP_LOW = {106,44,35}, _="ff6a2c23",
 		GREY = {170,170,170}, _="ffaaaaaa",
+		LGREY = {207,207,207}, _="ffcfcfcf",
 		FLIGHT = {255,170,64}, _="ffffaa40",
 		RUNIC = {121,201,153}, _="ff79c999",
 		WARNING = {252,67,85}, _="fffc4355",
