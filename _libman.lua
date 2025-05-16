@@ -180,7 +180,7 @@ function pen.lib.font_builder( font, chars, atlas, data )
 		if( not( pen.vld( pic_id ))) then return end
 		xml:first_of( "Texture" ).content = { pic }
 		pen.t.loop( new_chars, function( i, v )
-			pen.pic_paster( pic_id, pen.magic_draw( atlas, 0, 0 ), {v[3],pic_h}, {v[4],v[5]}, {v[1],v[2]})
+			pen.pic_paster( pic_id, pen.magic_draw( atlas, 0, 0 ), { v[3], pic_h }, { v[4], v[5]}, { v[1], v[2]})
 		end)
 	end
 	

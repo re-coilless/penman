@@ -727,7 +727,7 @@ function pen.ctrn( str, marker, is_unarrayed )
 end
 
 function pen.capitalizer( str )
-	return string.gsub( tostring( str ), "^%s-%l", string.upper )
+	return string.gsub( string.gsub( tostring( str ), "^%a", string.upper ), "%s%a", string.upper )
 end
 function pen.despacer( str )
 	return string.gsub( tostring( str ), "%s+$", "" )
@@ -1877,7 +1877,8 @@ function pen.get_spell_data( spell_id )
 
 			local xml = pen.lib.nxml.parse( pen.magic_read( c.projs[1][2]))
 			local xml_kid = xml:first_of( "ProjectileComponent" )
-			xml_kid = xml_kid or xml:first_of( "Base" ):first_of( "ProjectileComponent" )
+			local bs = { first_of = function() return end }
+			xml_kid = xml_kid or ( xml:first_of( "Base" ) or bs ):first_of( "ProjectileComponent" )
 			if( not( pen.vld( xml_kid ))) then return end
 
 			metadata.state_proj = {
@@ -1921,7 +1922,7 @@ function pen.get_spell_data( spell_id )
 			}
 
 			local dmg_kid = xml_kid:first_of( "damage_by_type" )
-			if( dmg_kid ) then
+			if( pen.vld( dmg_kid )) then
 				metadata.state_proj.damage[ "projectile" ] = metadata.state_proj.damage.projectile
 					+ tonumber( dmg_kid.attr.projectile or 0 )
 				metadata.state_proj.damage[ "curse" ] = tonumber( dmg_kid.attr.curse or 0 )
@@ -1941,7 +1942,7 @@ function pen.get_spell_data( spell_id )
 			end
 
 			local exp_kid = xml_kid:first_of( "config_explosion" )
-			if( exp_kid ) then
+			if( pen.vld( exp_kid )) then
 				metadata.state_proj.explosion = {
 					damage_mortals = tonumber( exp_kid.attr.damage_mortals or 1 ) > 0,
 					damage = tonumber( exp_kid.attr.damage or 0 ),
@@ -1953,17 +1954,17 @@ function pen.get_spell_data( spell_id )
 			end
 
 			local crit_kid = xml_kid:first_of( "damage_critical" )
-			if( crit_kid ) then
+			if( pen.vld( crit_kid )) then
 				metadata.state_proj.crit = {
 					chance = tonumber( crit_kid.attr.chance or 0 ),
 					damage_multiplier = tonumber( crit_kid.attr.damage_multiplier or 1 ),
 				}
 			end
 
-			xml_kid = xml:first_of( "LightningComponent" ) or xml:first_of( "Base" ):first_of( "LightningComponent" )
-			if( xml_kid ) then
+			xml_kid = xml:first_of( "LightningComponent" ) or ( xml:first_of( "Base" ) or bs ):first_of( "LightningComponent" )
+			if( pen.vld( xml_kid )) then
 				local lght_kid = xml_kid:first_of( "config_explosion" )
-				if( lght_kid ) then
+				if( pen.vld( lght_kid )) then
 					metadata.state_proj.lightning = {
 						damage_mortals = tonumber( lght_kid.attr.damage_mortals or 1 ) > 0,
 						damage = tonumber( lght_kid.attr.damage or 0 ),
@@ -1975,10 +1976,10 @@ function pen.get_spell_data( spell_id )
 				end
 			end
 
-			xml_kid = xml:first_of( "LaserEmitterComponent" ) or xml:first_of( "Base" ):first_of( "LaserEmitterComponent" )
-			if( xml_kid ) then
+			xml_kid = xml:first_of( "LaserEmitterComponent" ) or ( xml:first_of( "Base" ) or bs ):first_of( "LaserEmitterComponent" )
+			if( pen.vld( xml_kid )) then
 				local laser_kid = xml_kid:first_of( "laser" )
-				if( laser_kid ) then
+				if( pen.vld( laser_kid )) then
 					metadata.state_proj.laser = {
 						max_length = tonumber( laser_kid.attr.max_length or 0 ),
 						beam_radius = tonumber( laser_kid.attr.beam_radius or 0 ),
@@ -3193,10 +3194,10 @@ function pen.new_image( pic_x, pic_y, pic_z, pic, data )
 	if( data.has_shadow ) then
 		local ss_x, ss_y = 1/w + 1, 1/h + 1
 		pen.colourer( gui, pen.PALETTE.SHADOW )
-		GuiZSetForNextWidget( gui, pic_z + 0.0001 )
+		GuiZSetForNextWidget( gui, pic_z + 0.001 )
 		GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
 		GuiImage( gui, uid, pic_x - 0.5, pic_y - 0.5, pic,
-			0.1*( data.alpha or 1 ), ss_x, ss_y, data.angle or 0, data.anim_type or 2, data.anim or "" )
+			0.5*( data.alpha or 1 ), ss_x, ss_y, data.angle or 0, data.anim_type or 2, data.anim or "" )
 	end
 
 	if( not( data.can_click )) then return end
@@ -4291,6 +4292,7 @@ pen.PALETTE = {
 	VNL = {
 		HP = {135,191,28}, _="ff87bf1c",
 		RED = {208,70,70}, _="ffd04646",
+		GREEN = {70,208,70}, _="ff46d046",
 		MANA = {66,168,226}, _="ff42a8e2",
 		CAST = {252,138,67}, _="fffc8a43",
 		BROWN = {121,71,56}, _="ff794738",
