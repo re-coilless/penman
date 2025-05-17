@@ -278,7 +278,7 @@ end
 function pen.get_hybrid_function( func, input )
 	if( not( pen.vld( func ))) then return end
 	if( type( func ) == "function" ) then
-		return pen.catch( func, input )
+		return pen.catch( func, input, nil, pen.t.is_unarray( input ))
 	else return func end
 end
 
@@ -601,8 +601,11 @@ function pen.hallway( func )
 	return func()
 end
 
-function pen.catch( func, input, fallback )
-	local out = { pcall( func, unpack( input or {}))}
+function pen.catch( func, input, fallback, no_unpack )
+	local out = nil
+	if( not( no_unpack )) then
+		out = { pcall( func, unpack( input or {}))}
+	else out = { pcall( func, input )} end
 	if( out[1]) then table.remove( out, 1 ); return unpack( out ) end
 	if( not( pen.c.silent_catch )) then print( out[2]) end
 	if( pen.vld( fallback )) then return unpack( fallback ) end
@@ -4305,18 +4308,19 @@ pen.PALETTE = {
 		WARNING = {252,67,85}, _="fffc4355",
 		YELLOW = {255,255,178}, _="ffffffb2",
 		DARK_SLOT = {185,220,223}, _="ffb9dcdf",
+		BRIGHT_SLOT = {255,0,0}, _="ffff0000",
 		NINE_MAIN = {180,159,129}, _="ffb49f81",
 		NINE_MAIN_DARK = {148,128,100}, _="ff948064",
 		NINE_ACCENT = {237,169,73}, _="ffeda949",
 		NINE_ACCENT_DARK = {201,137,48}, _="ffc98930",
-		ACTION_PROJECTILE = {204,20,0}, _="ffcc1400",
-		ACTION_STATIC = {204,126,0}, _="ffcc7e00",
-		ACTION_MODIFIER = {0,7,204}, _="ff0007cc",
-		ACTION_DRAW = {0,163,204}, _="ff00a3cc",
-		ACTION_MATERIAL = {0,204,24}, _="ff00cc18",
-		ACTION_UTILITY = {187,0,204}, _="ffbb00cc",
-		ACTION_PASSIVE = {0,105,0}, _="ff006900",
-		ACTION_OTHER = {204,204,204}, _="ffcccccc",
+		ACTION_PROJECTILE = {185,86,50}, _="ffb95632",
+		ACTION_STATIC = {204,128,182}, _="ffcc80b6",
+		ACTION_MODIFIER = {202,161,70}, _="ffcaa146",
+		ACTION_DRAW = {168,213,218}, _="ffa8d5da",
+		ACTION_MATERIAL = {142,195,115}, _="ff8ec373",
+		ACTION_UTILITY = {63,132,146}, _="ff3f8492",
+		ACTION_PASSIVE = {115,93,142}, _="ff735d8e",
+		ACTION_OTHER = {74,68,109}, _="ff4a446d",
 	},
 	HRMS = {
 		GOLD_1 = {205,104,61}, _="ffcd683d",
