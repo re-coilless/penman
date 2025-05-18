@@ -202,12 +202,14 @@ function pen.atimer( tid, duration, reset_now, stillborn )
 	end; return math.min( frame_num - pen.c.animation_timer[ tid ], duration or 0 )
 end
 
-function pen.estimate( eid, target, speed, min_delta, max_delta ) --make it more advanced by stealing animate funcs
+function pen.estimate( eid, target, alg, min_delta, max_delta ) --thanks Nathan
+	alg = alg or "exp"
 	pen.c.estimator_memo = pen.c.estimator_memo or {}
-	pen.c.estimator_memo[ eid ] = pen.c.estimator_memo[ eid ] or 0
-	local delta = target - pen.c.estimator_memo[ eid ]
-	pen.c.estimator_memo[ eid ] = pen.c.estimator_memo[ eid ]
-		+ pen.limiter( pen.limiter(( speed or 0.1 )*delta, min_delta or 1, true ), pen.limiter( delta, max_delta or delta ))
+
+	local value = pen.c.estimator_memo[ eid ] or target
+	local delta = pen.ESTIM_ALGS[ string.sub( alg, 1, 3 )]( target, value, tonumber( string.sub( alg, 4, -1 )))
+	pen.c.estimator_memo[ eid ] = value +
+		pen.limiter( pen.limiter( delta, min_delta or 0.001, true ), pen.limiter( delta, max_delta or delta ))
 	return pen.c.estimator_memo[ eid ]
 end
 
@@ -3445,7 +3447,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	local buffer = 1
 	local eid = sid.."_anim"
 	progress = math.min( math.max(( new_y - ( pic_y + 3 ))/bar_y, -buffer ), 1 + buffer )
-	progress = pen.estimate( eid, progress, bar_y/new_height, 0.01 )
+	progress = pen.estimate( eid, progress, bar_y/new_height, "exp100", 1 )
 
 	local is_waiting = GameGetFrameNum()%7 ~= 0
 	local is_clipped = progress > 0 and progress < 1
@@ -3683,7 +3685,8 @@ function pen.new_scrolling_text( sid, pic_x, pic_y, pic_z, dims, text, data )
 	local type_a = function()
 		local target, buffer, spacing = w - dims[1], 15, 5
 		local is_right = pen.c.scrolling_text_memo[ sid ] == 0
-		local shift = pen.estimate( sid.."_anim", is_right and ( target + buffer ) or -buffer, 0.001*speed, 0.1, 0.75 )
+		local shift = pen.estimate( sid.."_anim",
+			is_right and ( target + buffer ) or -buffer, "exp"..tostring( 1000*speed ), 0.1, 0.75 )
 		if( shift > ( target + spacing ) or shift < -spacing ) then pen.c.scrolling_text_memo[ sid ] = is_right and 1 or 0 end
 		pen.new_text( -shift, h/2, pic_z, text, data )
 	end
@@ -3802,8 +3805,8 @@ function pen.new_tooltip( text, data, func )
 		data.t = pen.c.ttips[ data.tid ].anim[3]
 		pen.c.ttips[ data.tid ].inter_state = { func( text, data )}
 	else pen.c.ttips[ data.tid ].inter_state = {} end
-
-	return data.is_active
+	
+	return data.is_active, data.dims
 end
 
 function pen.new_input( iid, pic_x, pic_y, pic_z, data )
@@ -4257,6 +4260,27 @@ pen.ANIM_INTERS = {
 		--https://uploads.gamedev.net/monthly_2019_10/code.png.2b57c8e848a842330559286e38cecd03.png
 		p = p or {}; local a, k = p[1] or -10, p[2] or -1.9
 		return delta[1] + ( delta[2] - delta[1])*math.log(( a + 1 )/( math.exp( k*math.sin( 1.5*math.pi*t )) + a ))
+	end,
+}
+pen.ESTIM_ALGS = { --huge thanks to Nathan
+	exp = function( t, v, p )
+		return ( t - v )/( p or 10 )
+	end,
+	hmd = function( t, v, p )
+		return (( p or 2 )*v*t )/( t + v ) - v
+	end,
+	gmp = function( t, v, p ) --only for t,v > 0
+		return math.pow( t*v, 1/( p or 2 )) - v
+	end,
+	wgt = function( t, v, p )
+		local w = p or 1.5
+		return ( v + w*t )/( 1 + w ) - v
+	end,
+	lsm = function( t, v, p )
+		return ( p or 0.1 )*v*( 1 - v/t )
+	end,
+	srt = function( t, v, p )
+		return pen.get_sign( t - v )*math.pow( math.abs( t - v ), 1/( p or 2 ))
 	end,
 }
 

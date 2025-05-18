@@ -19,7 +19,6 @@ end
 --make sure this has an inherent compatibility with multiplayer (4 players max)
 --(dpad/left_stick/keyborad_arrows to switch between, x/keypad_0 to select (dragger should work), triangle/keypad_. for rmb)
 
--- pen.estimate
 -- pen.animate
 -- pen.get_creature_dimensions
 -- pen.FONT_MODS
