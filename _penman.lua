@@ -204,12 +204,16 @@ end
 
 function pen.estimate( eid, target, alg, min_delta, max_delta ) --thanks Nathan
 	alg = alg or "exp"
+	target = pen.get_hybrid_table( target )
+	min_delta = math.max( min_delta or 0.01, 0.0001 )
 	pen.c.estimator_memo = pen.c.estimator_memo or {}
-
-	local value = pen.c.estimator_memo[ eid ] or target
-	local delta = pen.ESTIM_ALGS[ string.sub( alg, 1, 3 )]( target, value, tonumber( string.sub( alg, 4, -1 )))
-	pen.c.estimator_memo[ eid ] = value +
-		pen.limiter( pen.limiter( delta, min_delta or 0.001, true ), pen.limiter( delta, max_delta or delta ))
+	if( target[3]) then pen.c.estimator_memo[ eid ] = nil end
+	pen.c.estimator_memo[ eid ] = pen.c.estimator_memo[ eid ] or target[2] or target[1]
+	
+	local value = pen.c.estimator_memo[ eid ]
+	if( pen.compare_float( value, target[1], min_delta )) then return target[1] end
+	local delta = pen.ESTIM_ALGS[ string.sub( alg, 1, 3 )]( target[1], value, tonumber( string.sub( alg, 4, -1 )))
+	pen.c.estimator_memo[ eid ] = value + pen.limiter( pen.limiter( delta, max_delta or delta ), min_delta, true )
 	return pen.c.estimator_memo[ eid ]
 end
 
@@ -3447,8 +3451,8 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	local buffer = 1
 	local eid = sid.."_anim"
 	progress = math.min( math.max(( new_y - ( pic_y + 3 ))/bar_y, -buffer ), 1 + buffer )
-	progress = pen.estimate( eid, progress, bar_y/new_height, "exp100", 1 )
-
+	progress = pen.estimate( eid, progress, "wgt0.75", 0.001, 0.01 )
+	
 	local is_waiting = GameGetFrameNum()%7 ~= 0
 	local is_clipped = progress > 0 and progress < 1
 	local is_static = out[1][2] ~= 2 or pen.compare_float( new_y, bar_pos )
@@ -4276,11 +4280,12 @@ pen.ESTIM_ALGS = { --huge thanks to Nathan
 		local w = p or 1.5
 		return ( v + w*t )/( 1 + w ) - v
 	end,
-	lsm = function( t, v, p )
-		return ( p or 0.1 )*v*( 1 - v/t )
+	lsm = function( t, v, p ) --only for relatively similar values
+		v = math.max( v, 0.001 )
+		return ( p or 0.1 )*v*( 1 - v/math.max( t, 0.001 ))
 	end,
 	srt = function( t, v, p )
-		return pen.get_sign( t - v )*math.pow( math.abs( t - v ), 1/( p or 2 ))
+		return pen.get_sign( t - v )*math.pow( math.abs( t - v ), 1/( p or 1.5 ))
 	end,
 }
 
