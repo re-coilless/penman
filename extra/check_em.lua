@@ -12,8 +12,6 @@ if( pen.c.testing_done ) then
     if( pen.c.testing_done == 1 ) then
         return
     else
-        pen.c.testing_done = 1
-        
         -- misc_tests()
         -- buttons()
         -- coloring()
@@ -28,6 +26,7 @@ if( pen.c.testing_done ) then
         -- cloner()
         -- text2func()
 
+        pen.c.testing_done = 1--0
         return
     end
 end
@@ -44,6 +43,7 @@ local test_input = {
 
 function misc_tests()
 
+--[[
 pen.new_pixel( 50 - 0.5, 100 - 0.5, 4, {255,0,0})
 pen.new_image( 50, 100, 5, pen.FILE_PIC_NUL, {
     alpha = 0.5, s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 0 )})
@@ -57,7 +57,6 @@ pen.new_pixel( 100 - 0.5, 200 - 0.5, 4, {255,0,0})
 pen.new_image( 100, 200, 5, pen.FILE_PIC_NUL, {
     alpha = 0.5, s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 5 )})
 
---[[
 local gui = GuiCreate()
 local balls = {}; balls[ gui ] = 1
 print( balls[ gui ], tostring( gui ))
