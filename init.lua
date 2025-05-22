@@ -6,10 +6,10 @@ function OnWorldPreUpdate()
 	end
 end
 
---make index bootable
 --mrshll update + CANCER pack (actually good meme songs) + balance the pahntom pack better
 --update and test most based modpack
 --rhytm addon for mrshll (get song bpms; two modes: buff, if any song is playing then every shot made on bit will deal extra damage, and challenge, where shooting without a song playing or not on beat deals damage to the player)
+--add this https://github.com/TakWolf/fusion-pixel-font
 
 --logo is prospero themed book
 
@@ -35,7 +35,6 @@ end
 --periodically executed functions
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 --check this https://github.com/Copious-Modding-Industries/Noitilities
---add this https://github.com/TakWolf/fusion-pixel-font + proper unicode font
 --check how file caching works with loadfile, maybe one can edit one lua script at runtime
 --add commented-out section to the end that contain self-sufficient widget funcs for settings menu
 --horizontal slider
