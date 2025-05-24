@@ -2,6 +2,7 @@
 pen = pen or {} -- replace this line with "local pen = {}"
 pen.t = pen.t or {} -- table funcs
 pen.c = pen.c or {} -- cache table
+pen.c.ttips = pen.c.ttips or {} --tip data
 if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "PROSPERO_IS_REAL", "1" )
 end
@@ -357,7 +358,7 @@ end
 
 function pen.t.depth( tbl, d )
 	d = d or 0
-	if( type( tbl ) ~= "table" ) then
+	if( type( tbl ) == "table" ) then
 		for k,v in pairs( tbl ) do
 			d = pen.t.depth( v, d + 1 )
 			break
@@ -407,7 +408,7 @@ end
 
 function pen.t.get( tbl, id, custom_key, will_nuke, default )
 	local default = default or ( type(( tbl or {})[1]) == "table" and {} or 0 )
-	if( not( pen.vld( tbl ))) then return default end
+	if( not( pen.vld( tbl ) and pen.vld( id ))) then return default end
 
 	local out, tbl_id = {}, nil
 	local key = custom_key or "id"
@@ -1514,6 +1515,7 @@ function pen.reset_active_item( entity_id )
 	if( pen.vld( inv_comp, true )) then
 		ComponentSetValue2( inv_comp, "mActiveItem", 0 )
 		ComponentSetValue2( inv_comp, "mActualActiveItem", 0 )
+		ComponentSetValue2( inv_comp, "mSavedActiveItemIndex", 0 )
 		ComponentSetValue2( inv_comp, "mInitialized", false )
 	end
 	return inv_comp
@@ -1837,6 +1839,9 @@ function pen.get_spell_data( spell_id )
 		local spell_data = pen.t.clone( pen.t.get( actions, spell_id, nil, nil, {}), nil )
 		if( spell_data.action == nil ) then return spell_data end
 		
+		local real_GetUpdatedEntityID = GetUpdatedEntityID
+		GetUpdatedEntityID = function() return -1 end
+
 		draw_actions_old = draw_actions
 		draw_actions = function( draw_count ) c.draw_many = c.draw_many + draw_count end
 		add_projectile_old = add_projectile
@@ -2010,12 +2015,13 @@ function pen.get_spell_data( spell_id )
 				total_dmg = total_dmg + ( metadata.state_proj.lightning.damage or 0 ) end
 			metadata.state_proj.damage[ "total" ] = total_dmg
 		end)
-
+		
 		ACTION_DRAW_RELOAD_TIME_INCREASE, c = 0, nil
 		draw_actions, add_projectile = draw_actions_old, add_projectile_old
 		add_projectile_trigger_timer = add_projectile_trigger_timer_old
 		add_projectile_trigger_hit_world = add_projectile_trigger_hit_world_old
 		add_projectile_trigger_death = add_projectile_trigger_death_old
+		GetUpdatedEntityID = real_GetUpdatedEntityID
 		clean_my_gun()
 
 		spell_data.meta = pen.t.clone( metadata )
@@ -3296,7 +3302,7 @@ function pen.new_dragger( did, pic_x, pic_y, s_x, s_y, pic_z, data )
 		clicked, state = true, 1
 		pen.c.dragger_data[ did ].is_going = true
 		pen.c.dragger_data[ did ].old_state = true
-		pen.c.dragger_data[ did ].off = { pic_x - m_x, pic_y - m_y }
+		pen.c.dragger_data[ did ].off = not( data.no_offs ) and { pic_x - m_x, pic_y - m_y } or { 0, 0 }
 	else pen.c.dragger_data[ did ].old_state = mouse_state end
 	
 	if( state > 0 ) then
@@ -3726,6 +3732,16 @@ function pen.new_tooltip( text, data, func )
 	data.allow_hover = data.allow_hover or false
 	data.do_corrections = data.do_corrections or not( pen.vld( data.pos ))
 	
+	local function default_prefunc( text, data )
+		text = pen.get_hybrid_table( text )
+		
+		local extra = 0
+		if( pen.vld( text[2])) then
+			extra = 2
+			text[1] = text[1].."\n{>indent>{{>color>{{-}|VNL|GREY|{-}"..string.lower( text[2]).."}<color<}}<indent<}" end
+		return text[1], extra, 0
+	end
+
 	local gui = pen.gui_builder()
 	local frame_num = GameGetFrameNum()
 	pen.c.ttips = pen.c.ttips or {}
@@ -3745,7 +3761,8 @@ function pen.new_tooltip( text, data, func )
 		tip_anim[2], tip_anim[3] = frame_num, math.min( frame_num - tip_anim[1], data.frames )
 
 		local off_x, off_y = 0, 0
-		if( pen.vld( data.text_prefunc )) then text, off_x, off_y = data.text_prefunc( text, data ) end
+		if( pen.vld( text ) or pen.vld( data.text_prefunc )) then
+			text, off_x, off_y = ( data.text_prefunc or default_prefunc )( text, data ) end
 
 		local w, h = GuiGetScreenDimensions( gui )
 		if( not( pen.vld( data.dims ))) then
