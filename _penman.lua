@@ -911,7 +911,7 @@ function pen.font_cancer( font, is_huge )
 		elseif( is_huge == false ) then
 			default, is_huge = "data/fonts/font_small_numbers.xml", 2
 		else is_huge = 1 end
-		font = ( pen.FONT_MAP[ GameTextGetTranslatedOrNot( "$current_language" )] or {})[ is_huge ] or default
+		font = ( pen.FONT_MAP[ GameTextGet( "$current_language" )] or {})[ is_huge ] or default
 		font = ( pen.t.unarray( pen.t.pack( GlobalsGetValue( pen.GLOBAL_FONT_REMAP, "" ))) or {})[ font ] or font
 	end
 	return font, string.find( font, "%.bin$", 1 ) == nil, pen.FONT_SPACING[ font ] or 0
@@ -1200,9 +1200,14 @@ function pen.get_hooman( is_dynamic ) --stolen from eba 😋
 	else return ( EntityGetWithTag( "player_unit" ) or EntityGetWithTag( "polymorphed_player" ) or {})[1] end
 end
 
-function pen.child_play( entity_id, func )
+function pen.child_play( entity_id, func, sort_func )
 	if( not( pen.vld( entity_id, true ))) then return end
-	return pen.t.loop( EntityGetAllChildren( entity_id ), function( i, child )
+	local children = EntityGetAllChildren( entity_id )
+	if( not( pen.vld( children ))) then return end
+
+	if( pen.vld( sort_func )) then
+		table.sort( children, sort_func ) end
+	return pen.t.loop( children, function( i, child )
 		return func( entity_id, child, i )
 	end)
 end
@@ -2015,7 +2020,7 @@ function pen.get_spell_data( spell_id )
 				total_dmg = total_dmg + ( metadata.state_proj.lightning.damage or 0 ) end
 			metadata.state_proj.damage[ "total" ] = total_dmg
 		end)
-		
+
 		ACTION_DRAW_RELOAD_TIME_INCREASE, c = 0, nil
 		draw_actions, add_projectile = draw_actions_old, add_projectile_old
 		add_projectile_trigger_timer = add_projectile_trigger_timer_old
