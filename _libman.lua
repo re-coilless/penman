@@ -6,6 +6,8 @@ do_mod_appends = function( filename, ... ) --stolen from https://github.com/alex
     do_mod_appends( filename, ... )
 end
 
+-- jit.util.funcinfo(setfenv(1, getfenv())) --thanks to ImmortalDamned
+
 dofile_once( LOCAL_PATH.."_penman.lua" )
 pen.lib = pen.lib or {}; pen.LOCAL_PATH = LOCAL_PATH
 for i,v in ipairs({ "nxml", "csv", "base64", "matrix", "complex", "EZWand" }) do
@@ -119,7 +121,7 @@ pen.t2f = pen.t2f or function( name, text )
 	return pen[ name ]
 end
 
-function pen.lib.font_builder( font, chars, atlas, data )
+function pen.lib.font_builder( font, chars, atlas, data ) --search the id at https://symbl.cc/
 	chars, data = chars or {}, data or {}
 
 	local xml = pen.lib.nxml.parse( ModDoesFileExist( font ) and pen.magic_read( font ) or pen.FILE_XML_FONT )

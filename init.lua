@@ -6,12 +6,12 @@ function OnWorldPreUpdate()
 	end
 end
 
+--check if globals in settings are accessible across all files (and if so make penman autoinject the lib)
+--make mrshll be actually compatible with index (ui position + right applet with implant)
+--test performance of key penman funcs
 --mrshll update + CANCER pack (actually good meme songs) + balance the pahntom pack better
---update and test most based modpack
 --rhytm addon for mrshll (get song bpms; two modes: buff, if any song is playing then every shot made on bit will deal extra damage, and challenge, where shooting without a song playing or not on beat deals damage to the player)
 --add this https://github.com/TakWolf/fusion-pixel-font
-
---logo is prospero themed book
 
 --jpading for buttons (can_jpad param)
 --Store 4 closest widgets for the left, right, up, down to the currently focused one + store the widget closest to 0 to pick as focusable when the time comes, allow one to force focus through code
