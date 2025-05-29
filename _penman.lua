@@ -3355,7 +3355,7 @@ function pen.uncutter( func )
 	if( orig_gui ) then pen.gui_builder( orig_gui ) end
 	return unpack( out )
 end
-function pen.new_cutout( pic_x, pic_y, size_x, size_y, func, scroll_pos ) --credit goes to aarvlo
+function pen.new_cutout( pic_x, pic_y, size_x, size_y, func, data ) --credit goes to aarvlo
 	local margin = 0
 	local gui, uid = pen.gui_builder()
 
@@ -3372,7 +3372,7 @@ function pen.new_cutout( pic_x, pic_y, size_x, size_y, func, scroll_pos ) --cred
 	if( got_some ) then table.insert( pen.c.cutter_dims_memo, pen.t.clone( pen.c.cutter_dims )) end
 	pen.c.cutter_dims = { xy = { pic_x, pic_y }, wh = { size_x, size_y }}
 	
-	local height = func( scroll_pos )
+	local height = func( data )
 	
 	if( got_some ) then
 		pen.c.cutter_dims = table.remove( pen.c.cutter_dims_memo, #pen.c.cutter_dims_memo )
