@@ -3467,7 +3467,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	local step = bar_y*( data.scroll_step or 11 )/( new_height - size_y )
 	local out = func[2]( pic_x + size_x, pic_y, pic_z - 0.01, bar_size, bar_pos, data )
 	local new_y = out[1][1]
-
+	
 	local discrete_target = pen.c.scroll_memo[ sid ].t
 	if( discrete_target ~= nil ) then
 		if( discrete_target == new_y ) then
@@ -3492,7 +3492,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	local buffer = 1
 	local eid = sid.."_anim"
 	progress = math.min( math.max(( new_y - ( pic_y + 3 ))/bar_y, -buffer ), 1 + buffer )
-	progress = pen.estimate( eid, progress, "wgt0.75", 0.001, 0.01 )
+	progress = pen.estimate( eid, progress, "wgt0.75", 0.001, 0.02*step )
 	
 	local is_waiting = GameGetFrameNum()%7 ~= 0
 	local is_clipped = progress > 0 and progress < 1

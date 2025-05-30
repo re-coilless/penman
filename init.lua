@@ -6,7 +6,7 @@ function OnWorldPreUpdate()
 	end
 end
 
---mrshll update + CANCER pack (actually good meme songs) + balance the pahntom pack better
+--mrshll update + CANCER pack (actually good meme songs) + balance the phantom pack better
 
 --test performance of key penman funcs
 --rhytm addon for mrshll (get song bpms; two modes: buff, if any song is playing then every shot made on bit will deal extra damage, and challenge, where shooting without a song playing or not on beat deals damage to the player)
@@ -30,6 +30,7 @@ end
 -- pen.rate_creature
 
 --[TODO]
+--entity-based play sound loop to that only uses a single tag (should support multiple sources but no more than 10)
 --check if globals in settings are accessible across all files (and if so make penman autoinject the lib)
 --investigate gui shaders
 --periodically executed functions
