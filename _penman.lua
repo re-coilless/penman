@@ -2297,7 +2297,7 @@ function pen.gunshot()
 	if( not( pen.vld( action ))) then return end
 
 	local frame_num = GameGetFrameNum()
-	local gun_id = EntityGetParent( card_id )
+	local gun_id = gunshot_parent_id or EntityGetParent( card_id )
 	
 	--play trigger click only once per empty mag, make player rack the bolt after that
 
@@ -2311,7 +2311,6 @@ function pen.gunshot()
 	local shot_x, shot_y = pen.get_hotspot_pos( gun_id, "shoot_pos" )
 	pen.play_sound({ action.sfx[1], action.sfx[2].."/shoot" }, shot_x, shot_y )
 
-	--degrate firerate at high heat and lower accuracy
 	local bolt_delay = pen.magic_storage( gun_id, "cycling", "value_int" ) or 0
 	pen.magic_storage( gun_id, "cycling_frame", "value_int", frame_num + bolt_delay )
 
@@ -2487,6 +2486,12 @@ function pen.add_perk( hooman, perk_id ) --bad
 		icon_sprite_file = perk_data.ui_icon
 	})
 	EntityAddChild( hooman, ui )
+end
+
+function pen.strip_player( hooman, leave_barren )
+	--remove all comps, leave_barren removes everything to the point of crashing the game
+	-- AudioComponent
+	-- AudioLoopComponent
 end
 
 function pen.rate_projectile( proj_id, hooman, data )--sparkbolt at 20m is ~1

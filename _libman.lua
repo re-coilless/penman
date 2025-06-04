@@ -13,8 +13,7 @@ pen.lib = pen.lib or {}; pen.LOCAL_PATH = LOCAL_PATH
 for i,v in ipairs({ "nxml", "csv", "base64", "matrix", "complex", "EZWand" }) do
 	pen.lib[ v ] = dofile_once( table.concat({ pen.LOCAL_PATH, "lib/", v, ".lua" }))
 end
---dialog (modify to be more generalized)
---gusgui
+--dialog (modify to be more generalized + transition to penman)
 --parallax
 
 if( GameHasFlagRun( pen.FLAG_UPDATE_UTF )) then
@@ -119,6 +118,21 @@ pen.t2f = pen.t2f or function( name, text )
 	end
     
 	return pen[ name ]
+end
+
+function pen.lib.sprite_builder( path )
+	local xml = pen.lib.nxml.parse( pen.magic_read( path ))
+	pen.t.loop( xml:all_of( "RectAnimation" ), function( i,v )
+		if( v.attr.parent == nil ) then return end
+		local p = pen.t.loop( xml:all_of( "RectAnimation" ), function( e,p )
+			if( p.attr.name == v.attr.parent ) then return p end
+		end)
+
+		v.children = p.children
+		pen.t.loop( p.attr, function( k,a ) v.attr[k] = v.attr[k] or a end)
+		v.attr.parent = nil
+	end)
+	pen.magic_write( path, tostring( xml ))
 end
 
 function pen.lib.font_builder( font, chars, atlas, data ) --search the id at https://symbl.cc/
