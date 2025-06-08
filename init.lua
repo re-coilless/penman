@@ -42,10 +42,8 @@ end
 --basic window container func (Hermes styled by default)
 --a system that converts images into a pixel table to be drawn in settings.lua or assembled in real time
 --some kind of message system (check how MQTT works)
---notification system (gameprintimportant-like but unified and with more capabilities)
 --add pen.animate debugging that plots/demos motion/scaling in self-aligning grid
 --coroutine-based sequencer that accepts a table of events (use varstorage to preserve the state between restarts)
---raytrace_entities
 --sule-based lua context independent gateway (and steal ModMagicNumbersFileAdd from init.lua via it)
 --in-gui particle system
 --extract hybrid gui from 19a and make it better
@@ -53,12 +51,10 @@ end
 --cached get_terrain via raymarched GetSurfaceNormal (https://youtu.be/BNZtUB7yhX4?t=92)
 --tinker with GamePlaySound and GameEntityPlaySound (thanks to lamia)
 --tinker with copi's spriteemitter image concept
---add sfxes (separate banks for prospero, hermes, trigger) + pics
---make heres ferrei be compatible with controller and upload it to steam
---testing environment that has full in-world function simulation and supports autotesting
+--add sfxes (separate banks for prospero, hermes, trigger)
+--testing environment that has full in-world function simulation
 --things.lua which has a baseline collection of props 19a-style + lists of every single vanilla thing
 --https://link.springer.com/content/pdf/10.1023/A:1007670802811.pdf for AI? (an environemnt where the data is being collected by dev roleplaying as enemy; https://vk.com/away.php?to=https%3A%2F%2Fmachinelearningmastery.com%2Fa-tour-of-machine-learning-algorithms%2F&utf=1)
---actually test all the stuff
 
 penman_d = penman_d or ModImageMakeEditable
 penman_r = penman_r or ModTextFileGetContent

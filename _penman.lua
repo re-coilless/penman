@@ -1287,6 +1287,12 @@ function pen.magic_comp( id, data, func ) end
 function pen.magic_comp( id, data, func )
 	if( not( pen.vld( id, true ))) then return end
 
+	local function get_comp( id, name, tag )
+		if( pen.vld( tag )) then 
+			return EntityGetComponentIncludingDisabled( id, name, tag ) end
+		return EntityGetComponentIncludingDisabled( id, name )
+	end
+
 	data = pen.get_hybrid_table( data, true )
 	if( pen.t.is_unarray( data )) then
 		for field,value in pairs( data ) do
@@ -1301,7 +1307,8 @@ function pen.magic_comp( id, data, func )
 	elseif( type( func or 0 ) ~= "function" ) then
 		local will_get = func == nil
 		local is_object = data[2] ~= nil
-		local method = table.concat({ "Component", is_object and "Object" or "", will_get and "Get" or "Set", "Value2" })
+		local method = table.concat({
+			"Component", is_object and "Object" or "", will_get and "Get" or "Set", "Value2" })
 
 		local field = ""
 		func = pen.get_hybrid_table( func )
@@ -1313,14 +1320,15 @@ function pen.magic_comp( id, data, func )
 		end
 		table.insert( func, 1, id )
 		
-		local out = { pen.catch_comp( ComponentGetTypeName( id ), field, will_get and "get" or "set", _G[ method ], func, true )}
+		local out = { pen.catch_comp(
+			ComponentGetTypeName( id ), field, will_get and "get" or "set", _G[ method ], func, true )}
 		table.remove( out, 1 )
 		return unpack( out )
 	else
-		return pen.t.loop( EntityGetComponentIncludingDisabled( unpack({ id, data[1], data[2]})), function( i, comp )
+		return pen.t.loop( get_comp( id, data[1], data[2]), function( i, comp )
 			local edit_tbl = {}
 			local done = func( comp, edit_tbl, ComponentGetIsEnabled( comp ))
-			for field,value in pairs( edit_tbl ) do pen.magic_comp( comp, field, value ) end
+			pen.t.loop( edit_tbl, function( field, value ) pen.magic_comp( comp, field, value ) end)
 			if( done ) then return comp end
 		end)
 	end
@@ -1520,7 +1528,7 @@ end
 function pen.get_active_item( entity_id )
 	if( not( pen.vld( entity_id, true ))) then return end
 	local inv_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "Inventory2Component" )
-	if( pen.vld( inv_comp, true )) then return tonumber( ComponentGetValue2( inv_comp, "mActiveItem" ) or 0 ) end
+	if( pen.vld( inv_comp, true )) then return ComponentGetValue2( inv_comp, "mActiveItem" ) end
 end
 
 function pen.reset_active_item( entity_id, saved_index, will_log )
@@ -2500,12 +2508,6 @@ function pen.add_perk( hooman, perk_id ) --bad
 		icon_sprite_file = perk_data.ui_icon
 	})
 	EntityAddChild( hooman, ui )
-end
-
-function pen.strip_player( hooman, leave_barren )
-	--remove all comps, leave_barren removes everything to the point of crashing the game
-	-- AudioComponent
-	-- AudioLoopComponent
 end
 
 function pen.rate_projectile( proj_id, hooman, data )--sparkbolt at 20m is ~1
