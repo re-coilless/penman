@@ -6,6 +6,7 @@ function OnWorldPreUpdate()
 	end
 end
 
+--test magic_comp performance and rewrite all the CompGet/Set to it if it's fine
 --test performance of key penman funcs
 --rhytm addon for mrshll (get song bpms; two modes: buff, if any song is playing then every shot made on bit will deal extra damage, and challenge, where shooting without a song playing or not on beat deals damage to the player)
 --add this https://github.com/TakWolf/fusion-pixel-font
@@ -59,6 +60,11 @@ end
 penman_d = penman_d or ModImageMakeEditable
 penman_r = penman_r or ModTextFileGetContent
 penman_w = penman_w or ModTextFileSetContent
+function OnModInit()
+	dofile_once( "mods/penman/_libman.lua" )
+	pen.lib.sprite_builder( "mods/penman/extra/pics/player.xml" )
+end
+
 function OnWorldPostUpdate()
 	dofile_once( "mods/penman/_libman.lua" )
 	

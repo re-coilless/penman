@@ -120,16 +120,24 @@ pen.t2f = pen.t2f or function( name, text )
 	return pen[ name ]
 end
 
-function pen.lib.sprite_builder( path )
-	local start_pos = -1
+function pen.lib.sprite_builder( path, print_me )
+	local pos_x, pos_y, dims, l = -1, -1, { 0, 0 }, 0
 	local xml = pen.lib.nxml.parse( pen.magic_read( path ))
 	pen.t.loop( xml:all_of( "RectAnimation" ), function( i,v )
 		local is_child = v.attr.parent ~= nil
 		if( xml.attr.default_animation == v.attr.name ) then
-			start_pos = tonumber( v.attr.pos_y )
-		elseif( not( is_child ) and start_pos ~= -1 ) then
-			start_pos = start_pos + 80
-			v.attr.pos_y = start_pos
+			pos_x = tonumber( v.attr.pos_x )
+			pos_y = tonumber( v.attr.pos_y )
+			l = tonumber( v.attr.frames_per_row )
+			dims[1] = tonumber( v.attr.frame_width )
+			dims[2] = tonumber( v.attr.frame_height )
+		elseif( not( is_child ) and pos_x ~= -1 ) then
+			pos_y = pos_y + 80
+			v.attr.pos_x = pos_x
+			v.attr.pos_y = pos_y
+			v.attr.frames_per_row = l
+			v.attr.frame_width = dims[1]
+			v.attr.frame_height = dims[2]
 		end
 
 		if( not( is_child )) then return end
@@ -141,6 +149,7 @@ function pen.lib.sprite_builder( path )
 		pen.t.loop( p.attr, function( k,a ) v.attr[k] = v.attr[k] or a end)
 		v.attr.parent = nil
 	end)
+	if( print_me ) then print( tostring( xml )) end
 	pen.magic_write( path, tostring( xml ))
 end
 
@@ -220,7 +229,7 @@ function pen.lib.player_builder( hooman, func )
 			ground_stickyness = 0,
 			liquid_velocity_coeff = 0,
 
-			collision_aabb_max_x = 1, --set this from sprite
+			collision_aabb_max_x = 1,
 			collision_aabb_max_y = 1,
 			collision_aabb_min_x = -1,
 			collision_aabb_min_y = -1,
@@ -234,7 +243,7 @@ function pen.lib.player_builder( hooman, func )
 			eff_hg_offset_y = 1.5,
 			eff_hg_position_x = 0,
 			eff_hg_position_y = 5,
-			eff_hg_size_x = 5, --set this from sprite
+			eff_hg_size_x = 5,
 			eff_hg_size_y = 5,
 			eff_hg_damage_max = 0,
 			eff_hg_damage_min = 0,
@@ -325,7 +334,7 @@ function pen.lib.player_builder( hooman, func )
 			blood_sprite_large = "",
 			
 			create_ragdoll = true,
-			ragdoll_offset_x = 0, --set this from sprite
+			ragdoll_offset_x = 0,
 			ragdoll_offset_y = 0,
 			ragdoll_filenames_file = "",
 			ragdoll_fx_forced = "NONE",
@@ -381,7 +390,7 @@ function pen.lib.player_builder( hooman, func )
 		},
 
 		LiquidDisplacerComponent = {
-			radius = 5, --set this from sprite
+			radius = 5,
 			velocity_x = 50,
 			velocity_y = 50,
 		},
@@ -438,8 +447,10 @@ function pen.lib.player_builder( hooman, func )
 		end)
 	end)
 
-	local data = {}
+	local data = { hooman = hooman }
 	data.arm_id = pen.get_child( hooman, "arm_r" )
+	local inh_comp = EntityGetFirstComponentIncludingDisabled( data.arm_id, "InheritTransformComponent" )
+	ComponentSetValue2( inh_comp, "parent_hotspot_tag", "arm_r" )
 	local hot_comp = EntityGetFirstComponentIncludingDisabled( data.arm_id, "HotspotComponent" )
 	ComponentSetValue2( hot_comp, "sprite_hotspot_name", "" )
 	ComponentSetValue2( hot_comp, "offset", 0, 0 )
@@ -458,7 +469,7 @@ function pen.lib.player_builder( hooman, func )
 	data.pic_char = EntityAddComponent2( hooman, "SpriteComponent", {
 		_tags = "character",
 		rect_animation = "stand", z_index = 0.6,
-		image_file = "mods/penman/extar/pics/player.xml" })
+		image_file = "mods/penman/extra/pics/player.xml" })
 	data.pic_aim = EntityAddComponent2( hooman, "SpriteComponent", {
 		_tags = "aiming_reticle",
 		image_file = "data/ui_gfx/mouse_cursor.png",
@@ -466,17 +477,89 @@ function pen.lib.player_builder( hooman, func )
 		offset_x = -42.5, offset_y = -25, z_index = -10000 })
 	if( pen.vld( func )) then func( hooman, data ) end
 	
-	-- apply sprite offsets EntityRefreshSprite( hooman, data.pic_char )
-	-- HotspotComponent (kick_pos at the bottom left of hitbox with 1/3 of the height up, crouch_sensor at the center top of hitbox, add hotspots from sprite procedurally)
-	-- HitboxComponent (+ crouched, procedurally from sprite)
-	-- aabb_max_x = 3,
-    -- aabb_max_y = 4,
-    -- aabb_min_x = -3,
-    -- aabb_min_y = -12,
-    -- damage_multiplier = 1,
-    -- is_enemy = 0,
-    -- is_item = 0,
-    -- is_player = 1,
+
+	local pic_xml = pen.lib.nxml.parse( pen.magic_read( ComponentGetValue2( data.pic_char, "image_file" )))
+	ComponentSetValue2( data.pic_char, "offset_x", tonumber( pic_xml.attr.offset_x or 0 ))
+	ComponentSetValue2( data.pic_char, "offset_y", tonumber( pic_xml.attr.offset_y or 0 ))
+	EntityRefreshSprite( hooman, data.pic_char )
+	
+	local is_player = pic_xml.attr.is_player ~= nil
+	
+	local char_w, char_h = 0, 0
+	local frame_w, frame_h = 0, 0
+	local collider, hitboxes = {}, {}
+	pen.t.loop( pic_xml:all_of( "RectAnimation" ), function( i,v )
+		if( pic_xml.attr.default_animation == v.attr.name ) then
+			frame_w = tonumber( v.attr.frame_width or 0 )
+			frame_h = tonumber( v.attr.frame_height or 0 )
+		elseif( v.attr.name == "icon" ) then
+			char_w = tonumber( v.attr.frame_width or 0 )
+			char_h = tonumber( v.attr.frame_height or 0 )
+		elseif( v.attr.name == "collider" ) then
+			collider.w = tonumber( v.attr.frame_width or 0 )
+			collider.h = tonumber( v.attr.frame_height or 0 ) + 0.1
+			collider.x = tonumber( v.attr.offset_x or 0 )
+			collider.y = tonumber( v.attr.offset_y or 0 )
+		elseif( string.find( v.attr.name, "$hitbox" ) ~= nil ) then
+			local tag = ""
+			if( v.attr.name ~= "hitbox" ) then
+				tag = string.gsub( v.attr.name, "$hitbox_", "" )
+			end
+			table.insert( hitboxes, {
+				tag = tag,
+				state = v.attr.state == "true",
+				dmg = tonumber( v.attr.dmg or 1 ),
+				w = tonumber( v.attr.frame_width or 0 ),
+				h = tonumber( v.attr.frame_height or 0 ) + 0.1,
+				x = tonumber( v.attr.offset_x or 0 ),
+				y = tonumber( v.attr.offset_y or 0 ),
+			})
+		end
+	end)
+
+	data.char_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterDataComponent" )
+	ComponentSetValue2( data.char_comp, "buoyancy_check_offset_y", tonumber( pic_xml.attr.center_y or 0 ))
+	ComponentSetValue2( data.char_comp, "collision_aabb_max_x", collider.w + collider.x )
+	ComponentSetValue2( data.char_comp, "collision_aabb_max_y", collider.h + collider.y )
+	ComponentSetValue2( data.char_comp, "collision_aabb_min_x", collider.x )
+	ComponentSetValue2( data.char_comp, "collision_aabb_min_y", collider.y )
+	ComponentSetValue2( data.char_comp, "eff_hg_size_x", char_w/2 )
+	data.dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
+	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_x", -frame_w/2 )
+	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_y", -frame_h/2 )
+	local bubble_comp = EntityGetFirstComponentIncludingDisabled( hooman, "LiquidDisplacerComponent" )
+	ComponentSetValue2( bubble_comp, "radius", char_w )
+
+	pen.t.loop( hitboxes, function( i,v )
+		EntityAddComponent2( hooman, "HitboxComponent", {
+			_tags = v.tag,
+			_enabled = v.state,
+
+			is_item = false,
+			is_player = is_player,
+			is_enemy = not( is_player ),
+
+			damage_multiplier = v.dmg,
+			aabb_max_x = v.w + v.x, aabb_min_x = v.x,
+			aabb_max_y = v.h + v.y, aabb_min_y = v.y,
+		})
+	end)
+
+	pen.t.loop( pic_xml:all_of( "Hotspot" ), function( i,v )
+		EntityAddComponent2( hooman, "HotspotComponent", {
+			_tags = v.attr.name,
+			sprite_hotspot_name = v.attr.name,
+			transform_with_scale = true,
+		})
+	end)
+	ComponentSetValue2( EntityAddComponent2( hooman, "HotspotComponent", {
+		_tags = "kick_pos",
+		transform_with_scale = true,
+	}), "offset", char_w/2, collider.h + collider.y )
+	ComponentSetValue2( EntityAddComponent2( hooman, "HotspotComponent", {
+		_tags = "crouch_sensor",
+		transform_with_scale = true,
+	}), "offset", 0, -char_h + ( collider.h + collider.y ))
 	
 	-- procedurally write materials_that_damage
 	
