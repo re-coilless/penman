@@ -121,7 +121,10 @@ pen.t2f = pen.t2f or function( name, text )
 end
 
 function pen.lib.sprite_builder( path, print_me )
-	local pos_x, pos_y, dims, l = -1, -1, { 0, 0 }, 0
+	-- https://colab.research.google.com/drive/1s1b7Kr97Q5aUpzJrom12YszZQyWGRgsi?usp=sharing
+
+	local pos_x, pos_y = -1, -1
+	local step, dims, l = 0, { 0, 0 }, 0
 	local xml = pen.lib.nxml.parse( pen.magic_read( path ))
 	pen.t.loop( xml:all_of( "RectAnimation" ), function( i,v )
 		local is_child = v.attr.parent ~= nil
@@ -132,7 +135,8 @@ function pen.lib.sprite_builder( path, print_me )
 			dims[1] = tonumber( v.attr.frame_width )
 			dims[2] = tonumber( v.attr.frame_height )
 		elseif( not( is_child ) and pos_x ~= -1 ) then
-			pos_y = pos_y + 80
+			if( step == 0 ) then step = v.attr.pos_y - pos_y end
+			pos_y = pos_y + step
 			v.attr.pos_x = pos_x
 			v.attr.pos_y = pos_y
 			v.attr.frames_per_row = l
@@ -263,12 +267,12 @@ function pen.lib.player_builder( hooman, func )
 		},
 
 		CharacterPlatformingComponent = {
-			accel_x = 0.5,
-			accel_x_air = 0.1,
+			accel_x = 0.15,
+			accel_x_air = 0.05,
 			run_velocity = 100,
 			pixel_gravity = 500,
 			jump_velocity_x = 50,
-			jump_velocity_y = -50,
+			jump_velocity_y = -100,
 
 			velocity_max_x = 500,
 			velocity_max_y = 500,
@@ -281,17 +285,17 @@ function pen.lib.player_builder( hooman, func )
 			turning_buffer = 0,
 
 			fly_smooth_y = false,
-			fly_speed_change_spd = 1,
-			fly_speed_max_down = -100,
+			fly_speed_change_spd = 0.2,
+			fly_speed_max_down = 50,
 			fly_speed_max_up = 100,
-			fly_speed_mult = 1,
+			fly_speed_mult = 20,
 			fly_velocity_x = 50,
 
 			swim_drag = 0.95,
 			swim_extra_horizontal_drag = 0.9,
-			swim_up_buoyancy_coeff = 0.25,
+			swim_up_buoyancy_coeff = 1,
 			swim_idle_buoyancy_coeff = 1.25,
-			swim_down_buoyancy_coeff = 0.75,
+			swim_down_buoyancy_coeff = 0.25,
 		},
 
 		DamageModelComponent = {
@@ -299,7 +303,7 @@ function pen.lib.player_builder( hooman, func )
 			max_hp = 1,
 			ui_report_damage = false,
 			ui_force_report_damage = false,
-			minimum_knockback_force = 5,
+			minimum_knockback_force = 0,
 			critical_damage_resistance = 0,
 			
 			falling_damages = false,
@@ -308,7 +312,7 @@ function pen.lib.player_builder( hooman, func )
 			falling_damage_height_max = 0,
 			falling_damage_height_min = 0,
 
-			fire_damage_amount = 0.1,
+			fire_damage_amount = 0.2,
 			fire_damage_ignited_amount = 0.0005,
 			fire_how_much_fire_generates = 5,
 			fire_probability_of_ignition = 0.5,
@@ -466,6 +470,8 @@ function pen.lib.player_builder( hooman, func )
 		end)
 	end
 
+	data.dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
+	data.sfx_comp = EntityGetFirstComponentIncludingDisabled( hooman, "AudioComponent" )
 	data.pic_char = EntityAddComponent2( hooman, "SpriteComponent", {
 		_tags = "character",
 		rect_animation = "stand", z_index = 0.6,
@@ -477,7 +483,6 @@ function pen.lib.player_builder( hooman, func )
 		offset_x = -42.5, offset_y = -25, z_index = -10000 })
 	if( pen.vld( func )) then func( hooman, data ) end
 	
-
 	local pic_xml = pen.lib.nxml.parse( pen.magic_read( ComponentGetValue2( data.pic_char, "image_file" )))
 	ComponentSetValue2( data.pic_char, "offset_x", tonumber( pic_xml.attr.offset_x or 0 ))
 	ComponentSetValue2( data.pic_char, "offset_y", tonumber( pic_xml.attr.offset_y or 0 ))
@@ -499,11 +504,11 @@ function pen.lib.player_builder( hooman, func )
 			collider.w = tonumber( v.attr.frame_width or 0 )
 			collider.h = tonumber( v.attr.frame_height or 0 ) + 0.1
 			collider.x = tonumber( v.attr.offset_x or 0 )
-			collider.y = tonumber( v.attr.offset_y or 0 )
-		elseif( string.find( v.attr.name, "$hitbox" ) ~= nil ) then
+			collider.y = tonumber( v.attr.offset_y or 0 ) - 1
+		elseif( string.find( v.attr.name, "^hitbox" ) ~= nil ) then
 			local tag = ""
 			if( v.attr.name ~= "hitbox" ) then
-				tag = string.gsub( v.attr.name, "$hitbox_", "" )
+				tag = string.gsub( v.attr.name, "^hitbox_", "" )
 			end
 			table.insert( hitboxes, {
 				tag = tag,
@@ -517,6 +522,8 @@ function pen.lib.player_builder( hooman, func )
 		end
 	end)
 
+	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_x", -frame_w/2 )
+	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_y", -frame_h/2 )
 	data.char_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterDataComponent" )
 	ComponentSetValue2( data.char_comp, "buoyancy_check_offset_y", tonumber( pic_xml.attr.center_y or 0 ))
 	ComponentSetValue2( data.char_comp, "collision_aabb_max_x", collider.w + collider.x )
@@ -524,9 +531,6 @@ function pen.lib.player_builder( hooman, func )
 	ComponentSetValue2( data.char_comp, "collision_aabb_min_x", collider.x )
 	ComponentSetValue2( data.char_comp, "collision_aabb_min_y", collider.y )
 	ComponentSetValue2( data.char_comp, "eff_hg_size_x", char_w/2 )
-	data.dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
-	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_x", -frame_w/2 )
-	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_y", -frame_h/2 )
 	local bubble_comp = EntityGetFirstComponentIncludingDisabled( hooman, "LiquidDisplacerComponent" )
 	ComponentSetValue2( bubble_comp, "radius", char_w )
 

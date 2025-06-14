@@ -1,7 +1,7 @@
 <Sprite
 	filename="mods/penman/extra/pics/player.png"
 	hotspots_filename="mods/penman/extra/pics/player_hotspots.png"
-	default_animation="stand" offset_x="33" offset_y="43" center_y="-7" is_player="1" >
+	default_animation="stand" offset_x="33" offset_y="44" center_y="-7" is_player="1" >
 
 	<!--[METADATA]-->
 	<RectAnimation
@@ -44,6 +44,7 @@
 	
 	<RectAnimation
 		name="stand_crouched"
+		pos_y="97"
 		frame_count="6"
 		frame_wait="0.2"
 	></RectAnimation>

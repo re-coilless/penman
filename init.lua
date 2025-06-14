@@ -6,6 +6,7 @@ function OnWorldPreUpdate()
 	end
 end
 
+--mrshll errors on player death
 --test magic_comp performance and rewrite all the CompGet/Set to it if it's fine
 --test performance of key penman funcs
 --rhytm addon for mrshll (get song bpms; two modes: buff, if any song is playing then every shot made on bit will deal extra damage, and challenge, where shooting without a song playing or not on beat deals damage to the player)

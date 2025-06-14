@@ -2343,9 +2343,8 @@ function pen.gunshot()
 
 	local max_heat = pen.magic_storage( gun_id, "heat_max", "value_float" ) or -1
 	if( max_heat > 0 ) then
-		local killer = "mods/Noita40K/files/misc/premature_detonation.xml,"
 		local total_heat = pen.magic_storage( gun_id, "heat", "value_float", nil, true ) + heat
-		if( total_heat > max_heat ) then c.extra_entities, ammo = c.extra_entities..killer, math.min( ammo, 1 ) end
+		if( total_heat > max_heat ) then ammo = math.min( ammo, 1 ) end
 		pen.magic_storage( gun_id, "heat", "value_float", total_heat )
 	end
 
@@ -3577,7 +3576,7 @@ function pen.unscroller() --huge thanks to Lamia for inspiration
 	GuiAnimateEnd( gui )
 	GuiEndScrollContainer( gui )
 end
-function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data )
+function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data ) --if char ctrl_comp is disabled, don't do the unscroller
 	func = pen.get_hybrid_table( func )
 	func[2] = func[2] or function( pic_x, pic_y, pic_z, bar_size, bar_pos, data )
 		local out = {}
