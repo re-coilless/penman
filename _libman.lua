@@ -226,12 +226,14 @@ function pen.lib.font_builder( font, chars, atlas, data ) --search the id at htt
 end
 
 function pen.lib.player_builder( hooman, func )
+	local is_vectored = ModIsEnabled( "vector_core" )
+
 	local overrides = {
 		CharacterDataComponent = {
 			mass = 1,
 			gravity = 0,
 			ground_stickyness = 0,
-			liquid_velocity_coeff = 0,
+			liquid_velocity_coeff = 10,
 
 			collision_aabb_max_x = 1,
 			collision_aabb_max_y = 1,
@@ -267,9 +269,9 @@ function pen.lib.player_builder( hooman, func )
 		},
 
 		CharacterPlatformingComponent = {
-			accel_x = 0.15,
-			accel_x_air = 0.05,
-			run_velocity = 100,
+			accel_x = is_vectored and 0.001 or 0.15,
+			accel_x_air = is_vectored and 0.001 or 0.05,
+			run_velocity = is_vectored and 0 or 100,
 			pixel_gravity = 500,
 			jump_velocity_x = 50,
 			jump_velocity_y = -100,
@@ -285,13 +287,13 @@ function pen.lib.player_builder( hooman, func )
 			turning_buffer = 0,
 
 			fly_smooth_y = false,
-			fly_speed_change_spd = 0.2,
+			fly_speed_change_spd = 0.5,
 			fly_speed_max_down = 50,
 			fly_speed_max_up = 100,
 			fly_speed_mult = 20,
-			fly_velocity_x = 50,
+			fly_velocity_x = 100,
 
-			swim_drag = 0.95,
+			swim_drag = 0.99,
 			swim_extra_horizontal_drag = 0.9,
 			swim_up_buoyancy_coeff = 1,
 			swim_idle_buoyancy_coeff = 1.25,
@@ -417,11 +419,11 @@ function pen.lib.player_builder( hooman, func )
 			blood_worm_drunken_speed = 0.1,
 			stoned_speed = 0.1,
 
-			eating_area_max = { 0, 0 },
-			eating_area_min = { 0, 0 },
-			eating_cells_per_frame = 0,
-			eating_delay_frames = 20,
-			eating_probability = 0,
+			eating_area_max = { 5, 5 },
+			eating_area_min = { -5, -5 },
+			eating_cells_per_frame = 1,
+			eating_delay_frames = 30,
+			eating_probability = 5,
 		},
 
 		PlayerCollisionComponent = {
@@ -470,8 +472,19 @@ function pen.lib.player_builder( hooman, func )
 		end)
 	end
 
-	data.dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
 	data.sfx_comp = EntityGetFirstComponentIncludingDisabled( hooman, "AudioComponent" )
+	data.char_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterDataComponent" )
+	data.plat_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterPlatformingComponent" )
+	data.dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
+	data.ing_comp = EntityGetFirstComponentIncludingDisabled( hooman, "IngestionComponent" )
+	data.pick_comp = EntityGetFirstComponentIncludingDisabled( hooman, "ItemPickUpperComponent" )
+	data.kick_comp = EntityGetFirstComponentIncludingDisabled( hooman, "KickComponent" )
+	data.bubl_comp = EntityGetFirstComponentIncludingDisabled( hooman, "LiquidDisplacerComponent" )
+	data.suck_comp = EntityGetFirstComponentIncludingDisabled( hooman, "MaterialSuckerComponent" )
+	data.shot_comp = EntityGetFirstComponentIncludingDisabled( hooman, "PlatformShooterPlayerComponent" )
+	data.coll_comp = EntityGetFirstComponentIncludingDisabled( hooman, "PlayerCollisionComponent" )
+	data.inv_comp = EntityGetFirstComponentIncludingDisabled( hooman, "Inventory2Component" )
+	
 	data.pic_char = EntityAddComponent2( hooman, "SpriteComponent", {
 		_tags = "character",
 		rect_animation = "stand", z_index = 0.6,
@@ -524,15 +537,13 @@ function pen.lib.player_builder( hooman, func )
 
 	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_x", -frame_w/2 )
 	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_y", -frame_h/2 )
-	data.char_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterDataComponent" )
 	ComponentSetValue2( data.char_comp, "buoyancy_check_offset_y", tonumber( pic_xml.attr.center_y or 0 ))
 	ComponentSetValue2( data.char_comp, "collision_aabb_max_x", collider.w + collider.x )
 	ComponentSetValue2( data.char_comp, "collision_aabb_max_y", collider.h + collider.y )
 	ComponentSetValue2( data.char_comp, "collision_aabb_min_x", collider.x )
 	ComponentSetValue2( data.char_comp, "collision_aabb_min_y", collider.y )
 	ComponentSetValue2( data.char_comp, "eff_hg_size_x", char_w/2 )
-	local bubble_comp = EntityGetFirstComponentIncludingDisabled( hooman, "LiquidDisplacerComponent" )
-	ComponentSetValue2( bubble_comp, "radius", char_w )
+	ComponentSetValue2( data.bubl_comp, "radius", char_w )
 
 	pen.t.loop( hitboxes, function( i,v )
 		EntityAddComponent2( hooman, "HitboxComponent", {

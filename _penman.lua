@@ -112,6 +112,10 @@ function pen.eps_compare( a, b, eps )
 	return math.abs( a - ( b or 0 )) < ( eps or 0.00001 )
 end
 
+function pen.get_ratio( v, total )
+	return ( 1 - math.min( math.abs( v/total ), 0.99999 ))
+end
+
 function pen.rounder( num, k )
 	k = k or 1000
 	if( k > 0 ) then
@@ -2203,6 +2207,18 @@ function pen.get_mass( entity_id )
 	return mass
 end
 
+function pen.get_full_mass( hooman )
+	local mass = pen.get_mass( hooman )
+	pen.child_play( hooman, function( parent, child, i )
+		local child_name = EntityGetName( child )
+		if( string.find( child_name, "^inventory_" ) == nil ) then return end
+		pen.child_play( child, function( inv, item, k )
+			mass = mass + pen.get_mass( item )
+		end)
+	end)
+	return mass
+end
+
 function pen.get_item_num( inv_id, item_id )
 	return pen.child_play( inv_id, function( parent, child, i )
 		if( child == item_id ) then return i - 1 end
@@ -2366,6 +2382,7 @@ function pen.gunshot()
 		pen.magic_shooter( 0, v, eject_x, eject_y, v_x, v_y )
 	end
 
+	--at high diversion angles, apply pattern-based angle redictection with phantom projectile
 	local trans_comp = EntityGetFirstComponentIncludingDisabled( arm_id, "InheritTransformComponent" )
 	local rx, ry = ComponentGetValue2( trans_comp, "Transform" )
 	local abil_comp = EntityGetFirstComponentIncludingDisabled( gun_id, "AbilityComponent" )
