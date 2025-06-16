@@ -1179,7 +1179,7 @@ end
 
 function pen.add_translations( path )
 	local main = "data/translations/common.csv"
-	local file = string.gsub( string.gsub( pen.magic_read( path ), "\r", "" ), "\n\n+", "\n" )
+	local file = string.gsub( string.gsub( pen.magic_read( path ).."\n", "\r", "" ), "\n\n+", "\n" )
 	if( pen.magic_write ) then pen.magic_write( main, pen.magic_read( main )..string.gsub( file, "^[^\n]*\n", "" )) end
 end
 
