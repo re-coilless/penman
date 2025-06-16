@@ -2187,7 +2187,7 @@ end
 
 function pen.get_mass( entity_id )
 	local mass = 0
-	local shape_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "PhysicsImageShapeComponent" )
+	local shape_comp = EntityGetFirstComponent( entity_id, "PhysicsImageShapeComponent" )
 	local char_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterDataComponent" )
 	local vel_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "VelocityComponent" )
 	if( pen.vld( shape_comp, true )) then

@@ -241,7 +241,7 @@ function pen.lib.player_builder( hooman, func )
 			collision_aabb_min_y = -1,
 			buoyancy_check_offset_y = 0,
 
-			climb_over_y = 5,
+			climb_over_y = 3,
 			check_collision_max_size_x = 5,
 			check_collision_max_size_y = 5,
 			
