@@ -242,8 +242,8 @@ function pen.lib.player_builder( hooman, func )
 			buoyancy_check_offset_y = 0,
 
 			climb_over_y = 3,
-			check_collision_max_size_x = 5,
-			check_collision_max_size_y = 5,
+			check_collision_max_size_x = 3,
+			check_collision_max_size_y = 3,
 			
 			effect_hit_ground = true,
 			eff_hg_offset_y = 1.5,
@@ -534,7 +534,7 @@ function pen.lib.player_builder( hooman, func )
 			})
 		end
 	end)
-
+	
 	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_x", -frame_w/2 )
 	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_y", -frame_h/2 )
 	ComponentSetValue2( data.char_comp, "buoyancy_check_offset_y", tonumber( pic_xml.attr.center_y or 0 ))
@@ -542,6 +542,7 @@ function pen.lib.player_builder( hooman, func )
 	ComponentSetValue2( data.char_comp, "collision_aabb_max_y", collider.h + collider.y )
 	ComponentSetValue2( data.char_comp, "collision_aabb_min_x", collider.x )
 	ComponentSetValue2( data.char_comp, "collision_aabb_min_y", collider.y )
+	ComponentSetValue2( data.char_comp, "climb_over_y", math.floor( char_h/5 ))
 	ComponentSetValue2( data.char_comp, "eff_hg_size_x", char_w/2 )
 	ComponentSetValue2( data.bubl_comp, "radius", char_w )
 
