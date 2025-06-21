@@ -80,6 +80,10 @@ function OnWorldPostUpdate()
 		pen.c.matter_color_file = true
 		pen.magic_write( pen.FILE_MATTER_COLOR, pen.FILE_XML_MATTER_COLOR )
 	end
+	if( not( pen.c.magic_emitter_file )) then
+		pen.c.magic_emitter_file = true
+		pen.magic_write( pen.FILE_MAGIC_EMITTER, pen.FILE_XML_EMITTER )
+	end
 
 	dofile( "mods/penman/extra/check_em.lua" )
 end
