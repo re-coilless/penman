@@ -6,7 +6,7 @@ function OnWorldPreUpdate()
 	end
 end
 
---mrshll errors on player death
+--update all log posters to use "--message--" instead of "(message)"
 --continuous scrolling mode with no paging for mnee (make this the default one)
 --very basic mod order editor with inherent mod cat support (part of unsafe index capability; allow doing custom pause menu)
 --test magic_comp performance and rewrite all the CompGet/Set to it if it's fine
@@ -23,7 +23,8 @@ end
 --(dpad/left_stick/keyborad_arrows to switch between, x/keypad_0 to select (dragger should work), triangle/keypad_. for rmb)
 
 -- pen.animate
--- pen.get_creature_dimensions
+-- peb.get_speed
+-- pen.get_dimensions --should work for everything
 -- pen.FONT_MODS
 -- pen.new_input
 -- pen.new_plot
