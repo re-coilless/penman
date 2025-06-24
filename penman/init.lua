@@ -6,6 +6,7 @@ function OnWorldPreUpdate()
 	end
 end
 
+--insert marshall through index if it is enabled
 --update all log posters to use "--message--" instead of "(message)"
 --continuous scrolling mode with no paging for mnee (make this the default one)
 --very basic mod order editor with inherent mod cat support (part of unsafe index capability; allow doing custom pause menu)
@@ -23,7 +24,6 @@ end
 --(dpad/left_stick/keyborad_arrows to switch between, x/keypad_0 to select (dragger should work), triangle/keypad_. for rmb)
 
 -- pen.animate
--- peb.get_speed
 -- pen.get_dimensions --should work for everything
 -- pen.FONT_MODS
 -- pen.new_input
