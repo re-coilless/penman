@@ -7,7 +7,6 @@ function OnWorldPreUpdate()
 end
 
 --insert marshall through index if it is enabled
---update all log posters to use "--message--" instead of "(message)"
 --continuous scrolling mode with no paging for mnee (make this the default one)
 --very basic mod order editor with inherent mod cat support (part of unsafe index capability; allow doing custom pause menu)
 --test magic_comp performance and rewrite all the CompGet/Set to it if it's fine
