@@ -3695,7 +3695,7 @@ function pen.new_image( pic_x, pic_y, pic_z, pic, data )
 		GuiZSetForNextWidget( gui, pic_z + 0.001 )
 		GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
 		GuiImage( gui, uid, pic_x - 0.5, pic_y - 0.5, pic,
-			0.5*( data.alpha or 1 ), ss_x, ss_y, data.angle or 0, data.anim_type or 2, data.anim or "" )
+			math.max( 0.1*( data.alpha or 1 ), 0.05 ), ss_x, ss_y, data.angle or 0, data.anim_type or 2, data.anim or "" )
 	end
 
 	if( not( data.can_click )) then return end
@@ -3989,7 +3989,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 		GuiText( gui, pic_x, pic_y, txt, scale, font, is_pixel )
 		if( not( has_shadow )) then return end
 		GuiZSetForNextWidget( gui, pic_z + 0.001 )
-		pen.colourer( gui, pen.PALETTE.SHADOW, 0.5*alpha )
+		pen.colourer( gui, pen.PALETTE.SHADOW, math.max( 0.1*alpha, 0.05 ))
 		GuiText( gui, pic_x + scale/2, pic_y + scale/2, txt, scale, font, is_pixel )
 	end
 	
@@ -4782,7 +4782,7 @@ pen.ESTIM_ALGS = { --huge thanks to Nathan
 		return ( t - v )/( p or 10 )
 	end,
 	ixp = function( t, v, p )
-		return math.tanh(( p or 5 )*( t - v ))*math.pow( math.abs( t - v ), 0.5 )
+		return math.tanh(( p or 10 )*( t - v ))
 	end,
 	hmd = function( t, v, p )
 		return (( p or 2 )*v*t )/( t + v ) - v
