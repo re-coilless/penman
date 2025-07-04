@@ -109,7 +109,7 @@ function pen.get_sign( a )
 end
 
 function pen.eps_compare( a, b, eps )
-	return math.abs( a - ( b or 0 )) < ( eps or 0.00001 )
+	return math.abs( a - ( b or 0 )) < ( eps or 0.001 )
 end
 
 function pen.get_ratio( v, total )
@@ -1783,6 +1783,8 @@ end
 
 function pen.raytrace_entities( x, y, r, l, hit_action, data )
 	data = data or {}
+	--if data.uid is provided, do corrections
+	--compile a table of all baseline points, then interpolate from last memorized pos (angle interpolation should be such that the max step delta at furthest point is not higher than a res value) and add every point that has d_x or d_y to the previous k point higher than res value
 
 	local diameter = l
 	local d_x, d_y = math.cos( r )*l, math.sin( r )*l
@@ -2209,7 +2211,7 @@ end
 
 function pen.get_mass( entity_id )
 	local mass = 0
-	local shape_comp = EntityGetFirstComponent( entity_id, "PhysicsImageShapeComponent" )
+	local shape_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "PhysicsImageShapeComponent" )
 	local char_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterDataComponent" )
 	local vel_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "VelocityComponent" )
 	if( pen.vld( shape_comp, true )) then
@@ -2218,7 +2220,7 @@ function pen.get_mass( entity_id )
 		local drift_y = ComponentGetValue2( shape_comp, "offset_y" )
 		x, y = x - drift_x, y - drift_y; drift_x, drift_y = 1.5*drift_x, 1.5*drift_y
 		PhysicsApplyForceOnArea( function( entity, body_mass, body_x, body_y, body_vel_x, body_vel_y, body_vel_angular )
-			if( math.abs( x - body_x ) < 0.001 and math.abs( y - body_y ) < 0.001 ) then mass = body_mass end
+			if( pen.eps_compare( x, body_x ) and pen.eps_compare( y - body_y )) then mass = body_mass end
 			return body_x, body_y, 0, 0, 0
 		end, nil, x - drift_x, y - drift_y, x + drift_x, y + drift_y )
 	elseif( pen.vld( char_comp, true )) then
@@ -3608,7 +3610,7 @@ function pen.new_interface( pic_x, pic_y, s_x, s_y, pic_z, data )
 
 			local down_toggle = GameHasFlagRun( pen.FLAG_INTERFACE_TOGGLE )
 			if( not( down_toggle ) or is_figuring or not( is_new )) then clicked, r_clicked = false, false end
-			if( is_figuring and frame_num - update_frame > 1 and pen.eps_compare( pic_z, top_z, 0.001 )) then
+			if( is_figuring and frame_num - update_frame > 1 and pen.eps_compare( pic_z, top_z )) then
 				clicked, r_clicked = interface_memo.lc, interface_memo.rc
 				GlobalsSetValue( pen.GLOBAL_INTERFACE_Z, "nope" )
 				GameRemoveFlagRun( pen.FLAG_INTERFACE_TOGGLE )

@@ -6,10 +6,11 @@ function OnWorldPreUpdate()
 	end
 end
 
+--there should be inherent consistency with "info" (context-spesific parameters of a distinct object) and "data" (a group of parameters applicable to a function) variable names
 --insert marshall through index if it is enabled
 --continuous scrolling mode with no paging for mnee (make this the default one)
+
 --very basic mod order editor with inherent mod cat support (part of unsafe index capability; allow doing custom pause menu)
---test magic_comp performance and rewrite all the CompGet/Set to it if it's fine
 --test performance of key penman funcs
 --rhytm addon for mrshll (get song bpms; two modes: buff, if any song is playing then every shot made on bit will deal extra damage, and challenge, where shooting without a song playing or not on beat deals damage to the player)
 --mrshll ABIDING pack that features classical and 1930s music
