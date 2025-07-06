@@ -337,9 +337,18 @@ end
 
 function pen.t.loop( tbl, func, return_tbl )
 	if( not( pen.vld( tbl ))) then return end
-	if( type( tbl ) ~= "table" ) then return func( 0, tbl ) end
-
+	
+	local sorter = false
 	local is_unarray = pen.t.is_unarray( tbl )
+	if( type( tbl ) == "function" ) then
+		for i,v in tbl do
+			local value = func( i, v )
+			if( value ~= nil ) then return value end
+		end
+		
+		return
+	elseif( type( tbl ) ~= "table" ) then return func( 0, tbl ) end
+
 	for i,v in ( is_unarray and pairs or ipairs )( tbl ) do
 		local value = func( i, v )
 		if( value ~= nil ) then return value end
@@ -398,7 +407,7 @@ function pen.t.bins( tbl, value )
 end
 
 function pen.t.is_unarray( tbl )
-	return pen.t.count( tbl ) ~= #tbl
+	return type( tbl ) == "table" and pen.t.count( tbl ) ~= #tbl
 end
 
 function pen.t.unarray( tbl, dft )
@@ -3863,7 +3872,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
 			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
 			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
-			{0,0,0,0.83}
+			{ 0, 0, 0, 0.83 }
 		}
 		color[14] = color[14] or color[13]
 
