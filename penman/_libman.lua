@@ -225,6 +225,583 @@ function pen.lib.font_builder( font, chars, atlas, data ) --search the id at htt
 	pen.magic_write( font, tostring( xml ))
 end
 
+-- Exposure Types: contact, wetting, breathing, effect
+-- Default Damage Types: heal, burn, curse, poison, piercing, radiation, corrosion
+-- Extra Damage Types: heat, cold, magic, light, pollution, dissolution, purification
+-- damage values are total harm per frame per second for a fully submerged entity
+function pen.lib.set_matter_damage( hooman, data )
+	local dmg_tbl = {
+		air = { wetting = 1, breathing = 1 },
+
+		fire = { contact = 1, burn = 1, light = 0.25, dmg = 30 },
+		fire_blue = { "fire", 2 },
+		flame = "fire",
+		liquid_fire = { "fire", 3 },
+		liquid_fire_weak = { "fire", 0.5 },
+		
+		lava = { wetting = 1, burn = 1, light = 0.1, dmg = 350 },
+		gold_molten = "lava",
+		steel_static_molten = "lava",
+		steelmoss_slanted_molten = "lava",
+		steelmoss_static_molten = "lava",
+		steelsmoke_static_molten = "lava",
+		metal_sand_molten = "lava",
+		metal_molten = "lava",
+		metal_rust_molten = "lava",
+		metal_nohit_molten = "lava",
+		aluminium_molten = "lava",
+		aluminium_robot_molten = "lava",
+		metal_prop_molten = "lava",
+		steel_rust_molten = "lava",
+		aluminium_oxide_molten = "lava",
+		copper_molten = "lava",
+		brass_molten = "lava",
+		glass_molten = "lava",
+		glass_broken_molten = "lava",
+		steel_molten = "lava",
+		silver_molten = { wetting = 1, burn = 1, light = 0.1, magic = 0.1, purification = 0.1, dmg = 350 },
+
+		plasma_fading = { effect = 1, wetting = 1, burn = 0.5, light = 0.5, dmg = 350 },
+		plasma_fading_bright = "plasma_fading",
+		plasma_fading_green = "plasma_fading",
+		plasma_fading_pink = "plasma_fading",
+		rocket_particles = "plasma_fading",
+
+		spark = { effect = 1, wetting = 1, heat = 1, light = 0.25, dmg = 30 },
+		spark_green = "spark",
+		spark_green_bright = "spark",
+		spark_blue = "spark",
+		spark_blue_dark = "spark",
+		spark_red = "spark",
+		spark_red_bright = "spark",
+		spark_white = "spark",
+		spark_white_bright = "spark",
+		spark_yellow = "spark",
+		spark_purple = "spark",
+		spark_purple_bright = "spark",
+		spark_player = "spark",
+		spark_teal = "spark",
+		spark_electric = "spark",
+
+		lavasand = { contact = 1, heat = 1, dmg = 30 },
+		meat_warm = "lavasand",
+		meat_hot = "lavasand",
+		meat_done = "lavasand",
+		meat_burned = "lavasand",
+		lavarock_static = "lavasand",
+		nest_firebug_box2d = "lavasand",
+		meteorite = "lavasand",
+		meteorite_static = "lavasand",
+		meteorite_test = "lavasand",
+		meteorite_crackable = "lavasand",
+		meteorite_green = "lavasand",
+		wax_molten = { wetting = 1, heat = 1, dmg = 100 },
+
+		glowstone = { contact = 1, light = 1, dmg = 25 },
+		glowstone_altar = "glowstone",
+		glowstone_altar_hdr = "glowstone",
+		glowstone_potion = "glowstone",
+		rock_static_glow = "glowstone",
+		tubematerial = "glowstone",
+		tube_physics = "glowstone",
+		glowshroom = "glowstone",
+		fuse_bright = "glowstone",
+		crystal = "glowstone",
+		crystal_purple = "glowstone",
+		crystal_solid = "glowstone",
+		crystal_magic = "glowstone",
+		neon_tube_purple = "glowstone",
+		neon_tube_cyan = "glowstone",
+		neon_tube_blood_red = "glowstone",
+		material_rainbow = { wetting = 1, light = 1, dmg = 50 },
+
+		corruption_static = { contact = 1, curse = 1, dmg = 500 },
+		rock_static_cursed = "corruption_static",
+		rock_static_cursed_green = "corruption_static",
+		meat_cursed = { "corruption_static", 0.25 },
+		meat_cursed_dry = { "corruption_static", 0.25 },
+		meat_slime_cursed = { "corruption_static", 0.25 },
+		cursed_liquid = { wetting = 1, curse = 1, dmg = 75 },
+		material_darkness = { "cursed_liquid", 5 },
+
+		gold_radioactive = { contact = 1, radiation = 1, dmg = 25 },
+		rock_static_radioactive = "gold_radioactive",
+		gold_static_radioactive = "gold_radioactive",
+		rotten_meat_radioactive = { "gold_radioactive", 0.5 },
+		ice_radioactive_static = { contact = 1, radiation = 1, cold = 1, dmg = 30 },
+		ice_radioactive_glass = "ice_radioactive_static",
+		radioactive_liquid = { wetting = 1, radiation = 1, dissolution = 5, dmg = 5 },
+		radioactive_liquid_fading = "radioactive_liquid",
+		radioactive_liquid_yellow = { wetting = 1, radiation = 2, dissolution = 5, dmg = 5 },
+		radioactive_gas = { wetting = 0.5, breathing = 1, radiation = 1, dmg = 100 },
+		radioactive_gas_static = "radioactive_gas",
+		cloud_radioactive = "radioactive_gas",
+
+		ice_acid_static = { contact = 1, corrosion = 1, cold = 0.3, dmg = 100 },
+		ice_acid_glass = "ice_acid_static",
+		acid = { wetting = 1, corrosion = 1, dmg = 500 },
+		acid_gas = { wetting = 1, breathing = 2, corrosion = 1, dmg = 50 },
+		acid_gas_static = "acid_gas",
+
+		rock_static_poison = { contact = 1, poison = 1, dmg = 50 },
+		ice_poison_static = { contact = 1, poison = 1, cold = 0.6, dmg = 50 },
+		ice_poison_glass = "ice_poison_static",
+		poison_gas = { breathing = 1, poison = 1, dmg = 25 },
+		poison = { wetting = 1, poison = 1, dmg = 100 },
+		pus = "poison",
+
+		cactus = { contact = 1, piercing = 1, dmg = 5 },
+		glass_broken = "cactus",
+		glass_brittle = "cactus",
+
+		wizardstone = { contact = 1, magic = 1, light = 0.5, purification = 0.1, dmg = 50 },
+		static_magic_material = "wizardstone",
+		rock_magic_gate = "wizardstone",
+		rock_magic_bottom = "wizardstone",
+		meat_teleport = "wizardstone",
+		meat_fast = "wizardstone",
+		meat_polymorph = "wizardstone",
+		meat_polymorph_protection = "wizardstone",
+		meat_confusion = "wizardstone",
+		magic_crystal = "wizardstone",
+		magic_crystal_green = "wizardstone",
+		magic_liquid = { wetting = 1, magic = 4, light = 1, dissolution = 1, dmg = 25 },
+		void_liquid = "magic_liquid",
+		mimic_liquid = "magic_liquid",
+		just_death = "magic_liquid",
+		midas_precursor = "magic_liquid",
+		midas = "magic_liquid",
+		material_confusion = "magic_liquid",
+		magic_liquid_weakness = "magic_liquid",
+		magic_liquid_movement_faster = "magic_liquid",
+		magic_liquid_faster_levitation = "magic_liquid",
+		magic_liquid_faster_levitation_and_movement = "magic_liquid",
+		magic_liquid_worm_attractor = "magic_liquid",
+		magic_liquid_protection_all = "magic_liquid",
+		magic_liquid_mana_regeneration = "magic_liquid",
+		magic_liquid_unstable_teleportation = "magic_liquid",
+		magic_liquid_teleportation = "magic_liquid",
+		magic_liquid_polymorph = "magic_liquid",
+		magic_liquid_random_polymorph = "magic_liquid",
+		magic_liquid_unstable_polymorph = "magic_liquid",
+		magic_liquid_berserk = "magic_liquid",
+		magic_liquid_charm = "magic_liquid",
+		magic_liquid_invisibility = "magic_liquid",
+		smoke_magic = { contact = 0.1, breathing = 1, magic = 1, light = 0.5, dmg = 25 },
+		magic_gas_midas = "smoke_magic",
+		magic_gas_worm_blood = "smoke_magic",
+		rainbow_gas = "smoke_magic",
+		magic_gas_polymorph = "smoke_magic",
+		magic_gas_weakness = "smoke_magic",
+		magic_gas_teleport = "smoke_magic",
+		magic_gas_fungus = "smoke_magic",
+		fungal_shift_particle_fx = "smoke_magic",
+
+		magic_liquid_hp_regeneration = { wetting = 1, heal = -1, magic = 0.2, light = 1/20, dmg = 500 },
+		magic_liquid_hp_regeneration_unstable = { "magic_liquid_hp_regeneration", 2 },
+		magic_gas_hp_regeneration = { contact = 0.1, breathing = 1, heal = -1, magic = 0.2, light = 1/40, dmg = 500 },
+
+		templerock = { contact = 1, magic = 0.1, purification = 1, dmg = 50 },
+		templerock_static = "templerock",
+		templebrick_static = "templerock",
+		templebrick_static_broken = "templerock",
+		templebrick_static_soft = "templerock",
+		templebrick_noedge_static = "templerock",
+		templerock_soft = "templerock",
+		templebrick_thick_static = "templerock",
+		templebrick_thick_static_noedge = "templerock",
+		templeslab_static = "templerock",
+		templeslab_crumbling_static = "templerock",
+		templebrickdark_static = "templerock",
+		templebrick_golden_static = "templerock",
+		templebrick_static_ruined = "templerock",
+		templebrick_red = "templerock",
+		templebrick_moss_static = "templerock",
+		templebrick_box2d = "templerock",
+		templebrick_box2d_edgetiles = "templerock",
+		silver = { contact = 1, magic = 0.25, light = 0.1, purification = 1, dmg = 50 },
+		templebrick_diamond_static = "silver",
+		purifying_powder = "silver",
+		grass_holy = "silver",
+		fuse_holy = "silver",
+		gem_box2d = "silver",
+		gem_box2d_yellow_sun = "silver",
+		gem_box2d_red_float = "silver",
+		gem_box2d_yellow_sun_gravity = "silver",
+		gem_box2d_darksun = "silver",
+		gem_box2d_pink = "silver",
+		gem_box2d_red = "silver",
+		gem_box2d_turquoise = "silver",
+		gem_box2d_opal = "silver",
+		gem_box2d_white = "silver",
+		gem_box2d_green = "silver",
+		gem_box2d_orange = "silver",
+
+		snow = { contact = 1, cold = 1, dmg = 30 },
+		snow_static = "snow",
+		ice_static = "snow",
+		ice_blood_static = "snow",
+		ice_slime_static = "snow",
+		ice_meteor_static = "snow",
+		ice_glass = "snow",
+		ice_blood_glass = "snow",
+		ice_slime_glass = "snow",
+		ice_glass_b2 = "snow",
+		snowrock_static = "snow",
+		ice = "snow",
+		grass_ice = "snow",
+		ice_ceiling = "snow",
+		snow_b2 = "snow",
+		ice_melting_perf_killer = "snow",
+		ice_b2 = "snow",
+		ice_cold_static = { contact = 1, cold = 1, burn = 1, dmg = 30 },
+		ice_cold_glass = "ice_cold_static",
+		steelfrost_static = "ice_cold_static",
+		water_ice = { wetting = 1, cold = 2, dissolution = 1, dmg = 25 },
+		slush = "water_ice",
+		snow_sticky = "water_ice",
+		blood_cold = { wetting = 1, cold = 1, burn = 1, dmg = 50 },
+		blood_cold_vapour = { contact = 0.5, breathing = 1, cold = 1, burn = 1, dmg = 25 },
+		
+		waterrock = { contact = 1, dissolution = 1, dmg = 5 },
+		rock_static_wet = "waterrock",
+		wood_static_wet = "waterrock",
+		soil_lush = "waterrock",
+		soil_lush_dark = "waterrock",
+		mud = "waterrock",
+		water = { wetting = 1, dissolution = 1, dmg = 50 },
+		water_static = "water",
+		endslime_static = "water",
+		slime_static = "water",
+		water_fading = "water",
+		water_temp = "water",
+		water_swamp = "water",
+		swamp = "water",
+		blood = "water",
+		blood_fading = "water",
+		blood_fading_slow = "water",
+		blood_fungi = "water",
+		blood_worm = "water",
+		milk = "water",
+		honey = "water",
+		porridge = "water",
+		slime = "water",
+		slime_green = "water",
+		slime_yellow = "water",
+		pea_soup = "water",
+		endslime = "water",
+		endslime_blood = "water",
+		blood_thick = "water",
+		cloud = { wetting = 1, breathing = 2, dissolution = 1, dmg = 10 },
+		cloud_lighter = "cloud",
+		cloud_blood = "cloud",
+		cloud_slime = "cloud",
+		steam = { wetting = 1, breathing = 2, dissolution = 1, heat = 0.5, dmg = 50 },
+		steam_trailer = "steam",
+
+		oil = { wetting = 1, pollution = 1, dmg = 15 },
+		creepy_liquid = "oil",
+		glue = "oil",
+		poo = "oil",
+		alcohol = { wetting = 1, dissolution = 1.5, pollution = 0.4, dmg = 25 },
+		beer = "alcohol",
+		molut = "alcohol",
+		sima = "alcohol",
+		juhannussima = "alcohol",
+		water_salt = "alcohol",
+		mammi = "alcohol",
+		urine = "alcohol",
+		vomit = "alcohol",
+		smoke = { breathing = 1, pollution = 1, dmg = 25 },
+		smoke_static = "smoke",
+		smoke_explosion = "smoke",
+		poo_gas = "smoke",
+		alcohol_gas = "smoke",
+		spore = "smoke",
+		sand_herb_vapour = "smoke",
+		fungal_gas = "smoke",
+
+		rock = { contact = 1 },
+		rock_static = "rock",
+		rock_static_intro = "rock",
+		rock_static_trip_secret = "rock",
+		rock_static_trip_secret2 = "rock",
+		rock_static_purple = "rock",
+		bone_static = "rock",
+		rust_static = "rock",
+		sand_static = "rock",
+		sand_static_rainforest = "rock",
+		sand_static_rainforest_dark = "rock",
+		sand_static_bright = "rock",
+		meat_static = "rock",
+		sand_static_red = "rock",
+		nest_static = "rock",
+		bluefungi_static = "rock",
+		spore_pod_stalk = "rock",
+		rock_hard = "rock",
+		rock_static_fungal = "rock",
+		wood_tree = "rock",
+		rock_static_noedge = "rock",
+		rock_hard_border = "rock",
+		rock_eroding = "rock",
+		rock_vault = "rock",
+		coal_static = "rock",
+		rock_static_grey = "rock",
+		skullrock = "rock",
+		the_end = "rock",
+		steel_static = "rock",
+		steelmoss_static = "rock",
+		steel_rusted_no_holes = "rock",
+		steel_grey_static = "rock",
+		steelmoss_slanted = "rock",
+		steelsmoke_static = "rock",
+		steelpipe_static = "rock",
+		steel_static_strong = "rock",
+		steel_static_unmeltable = "rock",
+		rock_static_intro_breakable = "rock",
+		glass_static = "rock",
+		concrete_static = "rock",
+		wood_static = "rock",
+		cheese_static = "rock",
+		root_growth = "rock",
+		wood_burns_forever = "rock",
+		creepy_liquid_emitter = "rock",
+		gold_static = "rock",
+		gold_static_dark = "rock",
+		wood_static_vertical = "rock",
+		wood_static_gas = "rock",
+		sand = "rock",
+		cement = "rock",
+		concrete_sand = "rock",
+		sand_blue = "rock",
+		sand_surface = "rock",
+		sand_petrify = "rock",
+		bone = "rock",
+		soil = "rock",
+		soil_dead = "rock",
+		soil_dark = "rock",
+		sandstone = "rock",
+		sandstone_surface = "rock",
+		fungisoil = "rock",
+		explosion_dirt = "rock",
+		vine = "rock",
+		root = "rock",
+		rotten_meat = "rock",
+		meat_slime_sand = "rock",
+		meat_slime_green = "rock",
+		meat_slime_orange = "rock",
+		meat_worm = "rock",
+		meat_helpless = "rock",
+		meat_trippy = "rock",
+		meat_frog = "rock",
+		sand_herb = "rock",
+		wax = "rock",
+		gold = "rock",
+		steel_sand = "rock",
+		metal_sand = "rock",
+		copper = "rock",
+		brass = "rock",
+		diamond = "rock",
+		coal = "rock",
+		sulphur = "rock",
+		salt = "rock",
+		sodium = "rock",
+		burning_powder = "rock",
+		sodium_unstable = "rock",
+		gunpowder = "rock",
+		gunpowder_explosive = "rock",
+		gunpowder_tnt = "rock",
+		gunpowder_unstable = "rock",
+		gunpowder_unstable_big = "rock",
+		monster_powder_test = "rock",
+		rat_powder = "rock",
+		fungus_powder = "rock",
+		fungus_powder_bad = "rock",
+		shock_powder = "rock",
+		orb_powder = "rock",
+		gunpowder_unstable_boss_limbs = "rock",
+		plastic_red = "rock",
+		plastic_red_molten = "rock",
+		plastic_molten = "rock",
+		plastic_prop_molten = "rock",
+		grass = "rock",
+		grass_darker = "rock",
+		grass_dry = "rock",
+		fungi = "rock",
+		fungi_green = "rock",
+		fungi_yellow = "rock",
+		grass_dark = "rock",
+		fungi_creeping = "rock",
+		fungi_creeping_secret = "rock",
+		peat = "rock",
+		moss_rust = "rock",
+		moss = "rock",
+		plant_material = "rock",
+		plant_material_red = "rock",
+		plant_material_dark = "rock",
+		ceiling_plant_material = "rock",
+		mushroom_seed = "rock",
+		plant_seed = "rock",
+		mushroom = "rock",
+		mushroom_giant_red = "rock",
+		mushroom_giant_blue = "rock",
+		bush_seed = "rock",
+		wood_player = "rock",
+		wood_player_b2 = "rock",
+		wood_player_b2_vertical = "rock",
+		wood = "rock",
+		wax_b2 = "rock",
+		fuse = "rock",
+		fuse_tnt = "rock",
+		wood_trailer = "rock",
+		wood_wall = "rock",
+		grass_loose = "rock",
+		fungus_loose = "rock",
+		fungus_loose_green = "rock",
+		fungus_loose_trippy = "rock",
+		wood_prop = "rock",
+		wood_prop_noplayerhit = "rock",
+		cloth_box2d = "rock",
+		wood_prop_durable = "rock",
+		nest_box2d = "rock",
+		cocoon_box2d = "rock",
+		wood_loose = "rock",
+		rock_loose = "rock",
+		brick = "rock",
+		concrete_collapsed = "rock",
+		tnt = "rock",
+		tnt_static = "rock",
+		trailer_text = "rock",
+		sulphur_box2d = "rock",
+		steel = "rock",
+		steel_rust = "rock",
+		metal_rust_rust = "rock",
+		metal_rust_barrel_rust = "rock",
+		plastic = "rock",
+		plastic_prop = "rock",
+		aluminium = "rock",
+		aluminium_robot = "rock",
+		metal_prop = "rock",
+		metal_prop_low_restitution = "rock",
+		metal_prop_loose = "rock",
+		metal = "rock",
+		metal_hard = "rock",
+		rock_box2d = "rock",
+		rock_box2d_hard = "rock",
+		poop_box2d_hard = "rock",
+		rock_box2d_nohit = "rock",
+		rock_box2d_nohit_heavy = "rock",
+		rock_box2d_nohit_hard = "rock",
+		rock_static_box2d = "rock",
+		rock_box2d = "rock",
+		item_box2d = "rock",
+		item_box2d_glass = "rock",
+		item_box2d_meat = "rock",
+		potion_glass_box2d = "rock",
+		glass_box2d = "rock",
+		gold_box2d = "rock",
+		bloodgold_box2d = "rock",
+		metal_nohit = "rock",
+		metal_chain_nohit = "rock",
+		metal_wire_nohit = "rock",
+		metal_rust = "rock",
+		metal_rust_barrel = "rock",
+		bone_box2d = "rock",
+		gold_b2 = "rock",
+		aluminium_oxide = "rock",
+		meat = "rock",
+		meat_fruit = "rock",
+		meat_pumpkin = "rock",
+		meat_slime = "rock",
+		physics_throw_material_part2 = "rock",
+		glass_liquidcave = "rock",
+		glass = "rock",
+	}
+
+	local dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
+	if( not( pen.vld( dmg_comp, true ))) then return end
+	local char_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterDataComponent" )
+	if( not( pen.vld( char_comp, true ))) then return end
+
+	data = data or {}
+	data.matter_overrides = data.matter_overrides or {}
+	data.body_matter = data.body_matter or ComponentGetValue2( dmg_comp, "ragdoll_material" )
+	data.blood_matter = data.blood_matter or ComponentGetValue2( dmg_comp, "blood_material" )
+	data.breathing_immune = data.breathing_immune or not( ComponentGetValue2( dmg_comp, "air_needed" ))
+	data.no_burn = data.no_burn or ( ComponentGetValue2( dmg_comp, "fire_damage_amount" ) == 0 )
+
+	--immune to own blood type and body_matter
+	--check reactions with body_matter to apply damage
+
+	local matters, old_matters = ComponentGetValue2( dmg_comp, "materials_that_damage" ), {}
+	for value in string.gmatch( matters, pen.ptrn( "," )) do table.insert( old_matters, value ) end
+	local damages, old_damages = ComponentGetValue2( dmg_comp, "materials_how_much_damage" ), {}
+	for value in string.gmatch( damages, pen.ptrn( "," )) do table.insert( old_damages, tonumber( value )) end
+	matters, damages = "", ""
+
+	local c_min_x = ComponentGetValue2( char_comp, "collision_aabb_min_x" )
+	local c_max_x = ComponentGetValue2( char_comp, "collision_aabb_max_x" )
+	local c_min_y = ComponentGetValue2( char_comp, "collision_aabb_min_y" )
+	local c_max_y = ComponentGetValue2( char_comp, "collision_aabb_max_y" )
+	local k = 25*60*math.abs( c_max_x - c_min_x )*math.abs( c_max_y - c_min_y )
+
+	local function damage_compiler( name, custom, data )
+		custom = data.matter_overrides[ name ] or pen.t.unarray( pen.t.pack( custom ))
+		if( not( pen.vld( custom ))) then custom = nil end
+		local dmg_data = pen.get_hybrid_table( custom or dmg_tbl[ name ], true )
+		if( not( pen.vld( dmg_data ))) then return 0 end
+
+		local matter_mult = dmg_data[2] or 1
+		dmg_data = dmg_tbl[ dmg_data[1]] or dmg_data
+
+		local total, got_thresholded = 0, false
+		local exposures = { "contact", "wetting", "breathing" }
+		local default_types = { "heal", "burn", "curse", "poison", "piercing", "radiation", "corrosion" }
+		local extra_types = { "heat", "cold", "magic", "light", "pollution", "dissolution", "purification" }
+		pen.t.loop( exposures, function( i, exposure )
+			if( not( data.effect_affected ) and dmg_data.effect ) then return true end
+			if( data[ exposure.."_immune" ]) then return end
+			local e_mult = dmg_data[ exposure ]
+			if( e_mult == nil ) then return end
+
+			pen.t.loop( default_types, function( e, dmg_type )
+				local t_mult = dmg_data[ dmg_type ]
+				if( t_mult == nil ) then return end
+				local dmg = matter_mult*e_mult*t_mult*dmg_data.dmg
+
+				local threshold = data[ "threshold_"..dmg_type ]
+				got_thresholded, threshold = threshold ~= nil, threshold or 0
+				if( threshold < dmg ) then total = total + ( dmg - threshold ) end
+			end)
+
+			pen.t.loop( extra_types, function( e, dmg_type )
+				local t_mult = dmg_data[ dmg_type ]
+				if( t_mult == nil ) then return end
+				local dmg = matter_mult*e_mult*t_mult*dmg_data.dmg
+
+				local threshold = data[ "threshold_"..dmg_type ]
+				got_thresholded, threshold = threshold ~= nil, threshold or dmg
+				if( threshold < dmg ) then total = total + ( dmg - threshold ) end
+			end)
+		end)
+
+		local dmg = nil
+		for i,v in ipairs( old_matters ) do
+			if( v == name ) then old_dmg = old_damages[i]; break end
+		end
+		if( not( data.update_existing ) or got_thresholded ) then
+			return total/k
+		else return dmg or 0 end
+	end
+
+	local xml = pen.lib.nxml.parse( pen.magic_read( "data/materials.xml" ))
+	pen.t.loop( xml.children, function( i,v )
+		if( v.name ~= "CellData" and v.name ~= "CellDataChild" ) then return end
+		local dmg = damage_compiler( v.attr.name, v.attr.dmg_tbl, data )
+		EntitySetDamageFromMaterial( hooman, v.attr.name, dmg )
+	end)
+end
+
 function pen.lib.player_builder( hooman, func )
 	local is_vectored = ModIsEnabled( "vector_core" )
 
@@ -494,7 +1071,7 @@ function pen.lib.player_builder( hooman, func )
 		image_file = "data/ui_gfx/mouse_cursor.png",
 		emissive = true, visible = false, has_special_scale = true,
 		offset_x = -42.5, offset_y = -25, z_index = -10000 })
-	if( pen.vld( func )) then func( hooman, data ) end
+	if( pen.vld( func )) then data = func( hooman, data ) or data end
 	
 	local pic_xml = pen.lib.nxml.parse( pen.magic_read( ComponentGetValue2( data.pic_char, "image_file" )))
 	ComponentSetValue2( data.pic_char, "offset_x", tonumber( pic_xml.attr.offset_x or 0 ))
@@ -576,8 +1153,6 @@ function pen.lib.player_builder( hooman, func )
 		_tags = "crouch_sensor",
 		transform_with_scale = true,
 	}), "offset", 0, -char_h + ( collider.h + collider.y ))
-	
-	-- procedurally write materials_that_damage
 	
 	return data
 end
