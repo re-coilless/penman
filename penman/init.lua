@@ -72,6 +72,10 @@ function OnWorldPostUpdate()
 		pen.c.magic_emitter_file = true
 		pen.magic_write( pen.FILE_MAGIC_EMITTER, pen.FILE_XML_EMITTER )
 	end
+	if( not( pen.c.magic_explosion_file )) then
+		pen.c.magic_explosion_file = true
+		pen.magic_write( pen.FILE_MAGIC_EXPLOSION, pen.FILE_XML_EXPLOSION )
+	end
 
 	dofile( "mods/penman/extra/check_em.lua" )
 end
