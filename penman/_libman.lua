@@ -120,6 +120,10 @@ pen.t2f = pen.t2f or function( name, text )
 	return pen[ name ]
 end
 
+function pen.new_glowing( pic_x, pic_y, pic_z, s_x, s_y, color, alpha )
+	-- universal ui glowing function that scales a smooth cicle
+end
+
 function pen.lib.sprite_builder( path, print_me )
 	-- https://colab.research.google.com/drive/1s1b7Kr97Q5aUpzJrom12YszZQyWGRgsi?usp=sharing
 

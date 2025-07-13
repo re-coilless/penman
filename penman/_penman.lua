@@ -2362,18 +2362,21 @@ function pen.get_hotspot_pos( entity_id, tag )
 end
 
 function pen.life_support( memo, id, path, x, y, r, s_x, s_y )
+	local is_new = false
 	local entity_id = memo[ id ] or 0
 	if( not( EntityGetIsAlive( entity_id ))) then
+		is_new = true
 		entity_id = pen.vld( path ) and EntityLoad( path, x, y ) or EntityCreateNew( "dummy" ) end
 	EntitySetTransform( entity_id, x, y, r or 0, s_x or 1, s_y or 1 )
 	memo[ id ] = entity_id
 	
 	local life_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "LifetimeComponent" )
 	if( not( pen.vld( life_comp ))) then
-		life_comp = EntityAddComponent2( entity_id, "LifetimeComponent", { lifetime = 2 }) end
+		local tags = "enabled_in_world,enabled_in_hand,enabled_in_inventory"
+		life_comp = EntityAddComponent2( entity_id, "LifetimeComponent", { _tags = tags, lifetime = 2 }) end
 	ComponentSetValue2( life_comp, "kill_frame", GameGetFrameNum() + 2 )
 	
-	return entity_id
+	return entity_id, is_new
 end
 
 function pen.new_projectile( ids, action, path )
@@ -4087,7 +4090,7 @@ function pen.unscroller() --huge thanks to Lamia for inspiration
 end
 function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data ) --if char ctrl_comp is disabled, don't do the unscroller
 	func = pen.get_hybrid_table( func )
-	func[2] = func[2] or function( pic_x, pic_y, pic_z, bar_size, bar_pos, data )
+	func[2] = func[2] or function( sid, pic_x, pic_y, pic_z, size_x, size_y, bar_size, bar_pos, data )
 		local out = {}
 		local color = data.color or {
 			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
@@ -4101,25 +4104,31 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 		color[14] = color[14] or color[13]
 
 		local _,new_y,state,_,_,is_hovered = pen.new_dragger( sid.."_dragger", pic_x, bar_pos, 3, bar_size, pic_z )
-		pen.new_pixel( pic_x + 1, bar_pos, pic_z, color[ is_hovered and 14 or 13 ], 1, bar_size )
-		pen.new_pixel( pic_x, bar_pos, pic_z, color[ is_hovered and 2 or 1 ], 1, bar_size )
-		pen.new_pixel( pic_x + 2, bar_pos, pic_z, color[ is_hovered and 4 or 3 ], 1, bar_size )
+		if( data.can_scroll or not( data.hide_bar )) then
+			pen.new_pixel( pic_x + 1, bar_pos, pic_z, color[ is_hovered and 14 or 13 ], 1, bar_size )
+			pen.new_pixel( pic_x, bar_pos, pic_z, color[ is_hovered and 2 or 1 ], 1, bar_size )
+			pen.new_pixel( pic_x + 2, bar_pos, pic_z, color[ is_hovered and 4 or 3 ], 1, bar_size )
+		end
 		out[1] = { new_y, state }
 		
 		local clicked, r_clicked = false, false
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, 3, 3, pic_z )
-		pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, color[ is_hovered and 14 or 13 ])
-		pen.new_pixel( pic_x + 1, pic_y, pic_z, color[ is_hovered and 6 or 5 ])
-		pen.new_pixel( pic_x, pic_y + 1, pic_z, color[ is_hovered and 6 or 5 ])
-		pen.new_pixel( pic_x + 2, pic_y + 1, pic_z, color[ is_hovered and 8 or 7 ])
+		if( data.can_scroll or not( data.hide_bar )) then
+			pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, color[ is_hovered and 14 or 13 ])
+			pen.new_pixel( pic_x + 1, pic_y, pic_z, color[ is_hovered and 6 or 5 ])
+			pen.new_pixel( pic_x, pic_y + 1, pic_z, color[ is_hovered and 6 or 5 ])
+			pen.new_pixel( pic_x + 2, pic_y + 1, pic_z, color[ is_hovered and 8 or 7 ])
+		end
 		if( data.can_scroll and ( InputIsMouseButtonDown( 4 ) or InputIsKeyJustDown( 86 ))) then clicked = 1 end
 		out[2] = { clicked, r_clicked }
 
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y + size_y - 3, 3, 3, pic_z )
-		pen.new_pixel( pic_x + 1, pic_y + size_y - 2, pic_z, color[ is_hovered and 14 or 13 ])
-		pen.new_pixel( pic_x + 1, pic_y + size_y - 1, pic_z, color[ is_hovered and 10 or 9 ])
-		pen.new_pixel( pic_x, pic_y + size_y - 2, pic_z, color[ is_hovered and 10 or 9 ])
-		pen.new_pixel( pic_x + 2, pic_y + size_y - 2, pic_z, color[ is_hovered and 12 or 11 ])
+		if( data.can_scroll or not( data.hide_bar )) then
+			pen.new_pixel( pic_x + 1, pic_y + size_y - 2, pic_z, color[ is_hovered and 14 or 13 ])
+			pen.new_pixel( pic_x + 1, pic_y + size_y - 1, pic_z, color[ is_hovered and 10 or 9 ])
+			pen.new_pixel( pic_x, pic_y + size_y - 2, pic_z, color[ is_hovered and 10 or 9 ])
+			pen.new_pixel( pic_x + 2, pic_y + size_y - 2, pic_z, color[ is_hovered and 12 or 11 ])
+		end
 		if( data.can_scroll and ( InputIsMouseButtonDown( 5 ) or InputIsKeyJustDown( 87 ))) then clicked = 1 end
 		out[3] = { clicked, r_clicked }
 		
@@ -4137,9 +4146,9 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	pen.c.scroll_memo[ sid ] = pen.c.scroll_memo[ sid ] or {}
 	pen.c.scroll_memo[ sid ].m = pen.c.scroll_memo[ sid ].m or {}
 
-	local progress = pen.c.scroll_memo[ sid ].p or 0
-	local old_height = pen.c.scroll_memo[ sid ].h or 1
-	local scroll_pos = ( size_y - old_height )*progress
+	local old_height = pen.c.scroll_memo[ sid ].h or -1
+	local progress = pen.c.scroll_memo[ sid ].p or ( data.bottom_start and 1 or 0 )
+	local scroll_pos = old_height > size_y and ( size_y - math.abs( old_height ))*progress or 0
 	local new_height = pen.new_cutout( pic_x, pic_y, size_x, size_y, func[1], scroll_pos )
 	if( new_height > size_y ) then
 		if( data.can_scroll ) then pen.unscroller() end
@@ -4150,7 +4159,8 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	local bar_y = ( size_y - ( 6 + bar_size ))
 	local bar_pos = pic_y + bar_y*progress + 3
 	local step = bar_y*( data.scroll_step or 11 )/( new_height - size_y )
-	local out = func[2]( pic_x + size_x, pic_y, pic_z - 0.01, bar_size, bar_pos, data )
+	if( data.is_left ) then pic_x = pic_x - 5 else pic_x = pic_x + size_x end
+	local out = func[2]( sid, pic_x, pic_y, pic_z - 0.01, size_x, size_y, bar_size, bar_pos, data )
 	local new_y = out[1][1]
 	
 	local discrete_target = pen.c.scroll_memo[ sid ].t
@@ -4178,18 +4188,21 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	local eid = sid.."_anim"
 	progress = math.min( math.max(( new_y - ( pic_y + 3 ))/bar_y, -buffer ), 1 + buffer )
 	progress = pen.estimate( eid, progress, "wgt0.75", 0.001, 0.02*step )
-	
+	pen.c.scroll_memo[ sid ].p = math.min( math.max( progress, 0 ), 1 )
+
 	local is_waiting = GameGetFrameNum()%7 ~= 0
-	local is_clipped = progress > 0 and progress < 1
+	local is_clipped = progress >= 0 and progress <= 1
 	local is_static = out[1][2] ~= 2 or pen.eps_compare( new_y, bar_pos )
 	if( not( is_clipped )) then
 		pen.c.estimator_memo[ eid ] = math.min( math.max( pen.c.estimator_memo[ eid ], 0 ), 1 )
 	elseif( not( is_static or is_waiting )) then pen.play_sound( pen.TUNES.VNL.HOVER ) end
 
-	pen.c.scroll_memo[ sid ].p = math.min( math.max( progress, 0 ), 1 )
 	if( old_height ~= new_height ) then
-		local ratio = old_height/new_height
-		pen.c.scroll_memo[ sid ].p = ratio*pen.c.scroll_memo[ sid ].p
+		if( progress ~= 1 and old_height > 0 ) then
+			pen.c.scroll_memo[ sid ].p = math.min( math.max( scroll_pos/( size_y - new_height ), 0 ), 1 )
+			pen.c.estimator_memo[ eid ] = pen.c.scroll_memo[ sid ].p
+		end
+
 		pen.c.scroll_memo[ sid ].h = new_height
 	end
 end
