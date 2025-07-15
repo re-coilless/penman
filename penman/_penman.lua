@@ -4139,7 +4139,8 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	if( data.scroll_always ) then
 		data.can_scroll = true
 	elseif( data.scroll_always ~= false ) then
-		_,_,data.can_scroll = pen.new_interface( pic_x, pic_y, size_x + 5, size_y, pic_z )
+		_,_,data.can_scroll = pen.new_interface( pic_x, pic_y,
+			data.forced_zone_x or ( size_x + 5 ), data.forced_zone_y or size_y, pic_z )
 	end
 
 	pen.c.scroll_memo = pen.c.scroll_memo or {}

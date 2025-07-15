@@ -6,6 +6,7 @@ function OnWorldPreUpdate()
 	end
 end
 
+--in-line text mode commets should use "!" instead of "|"
 --add new table to penman to house all gameplay-first functionality
 --there should be inherent consistency with "info" (context-spesific parameters of a distinct object) and "data" (a group of parameters applicable to a function) variable names
 --continuous scrolling mode with no paging for mnee (make this the default one)
