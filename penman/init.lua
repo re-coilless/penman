@@ -6,11 +6,11 @@ function OnWorldPreUpdate()
 	end
 end
 
---in-line text mode commets should use "!" instead of "|"
+--in-line text mod comments should use "!" instead of "|"
 --add new table to penman to house all gameplay-first functionality
 --there should be inherent consistency with "info" (context-spesific parameters of a distinct object) and "data" (a group of parameters applicable to a function) variable names
---continuous scrolling mode with no paging for mnee (make this the default one)
 --palette png file with all the color names spelled in corresponding color
+--rebrand power words
 
 --very basic mod order editor with inherent mod cat support (part of unsafe index capability; allow doing custom pause menu)
 --test performance of key penman funcs
@@ -26,13 +26,13 @@ end
 --(dpad/left_stick/keyborad_arrows to switch between, x/keypad_0 to select (dragger should work), triangle/keypad_. for rmb)
 
 --[TODO]
+--make sure player.png in pics is up to date with latest spritesheet pipeline
 --check if globals in settings are accessible across all files (and if so make penman autoinject the lib)
 --investigate gui shaders
 --periodically executed functions (coroutine-based sequencer that accepts a table of events, use varstorage to preserve the state between restarts)
 --https://github.com/LuaLS/lua-language-server/wiki/Annotations
 --check this https://github.com/Copious-Modding-Industries/Noitilities
 --check how file caching works with loadfile, maybe one can edit one lua script at runtime
---horizontal slider
 --basic window container func (Hermes styled by default)
 --a system that converts images into a pixel table to be drawn in settings.lua or assembled in real time
 --some kind of message system (check how MQTT works)
@@ -41,13 +41,12 @@ end
 --in-gui particle system
 --extract hybrid gui from 19a and make it better
 --dropdown with search capabilities (combine input with scroller)
---cached get_terrain via raymarched GetSurfaceNormal (https://youtu.be/BNZtUB7yhX4?t=92)
+--cached get_terrain via raymarching (https://youtu.be/BNZtUB7yhX4?t=92), cahe updates are triggered by a sparse grid around every entity that calls this
 --GameEntityPlaySound might be able to ignore the sfx limit (thanks to lamia)
 --tinker with copi's spriteemitter image concept (a straightforward way of adding them to entites with animation support)
 --add sfxes (separate banks for prospero, hermes, trigger)
 --testing environment that has full in-world function simulation
---things.lua which has a baseline collection of props 19a-style + lists of every single vanilla thing + port n40 base entities there
---https://link.springer.com/content/pdf/10.1023/A:1007670802811.pdf for AI? (an environemnt where the data is being collected by dev roleplaying as enemy; https://vk.com/away.php?to=https%3A%2F%2Fmachinelearningmastery.com%2Fa-tour-of-machine-learning-algorithms%2F&utf=1)
+--https://link.springer.com/content/pdf/10.1023/A:1007670802811.pdf for AI? (an environemnt where the data is being collected by dev roleplaying as enemy; https://vk.com/away.php?to=https%3A%2F%2Fmachinelearningmastery.com%2Fa-tour-of-machine-learning-algorithms%2F&utf=1); probably just build an external python thing that interfaces with the game and exports models as lua tables
 
 penman_d = penman_d or ModImageMakeEditable
 penman_r = penman_r or ModTextFileGetContent

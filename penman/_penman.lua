@@ -1791,38 +1791,73 @@ end
 
 function pen.raytrace_entities( x, y, r, l, hit_action, data )
 	data = data or {}
-	--if data.uid is provided, do corrections
-	--compile a table of all baseline points, then interpolate from last memorized pos (angle interpolation should be such that the max step delta at furthest point is not higher than a res value) and add every point that has d_x or d_y to the previous k point higher than res value
 
 	local diameter = l
-	local d_x, d_y = math.cos( r )*l, math.sin( r )*l
+	local d_x, d_y = l*math.cos( r ), l*math.sin( r )
 	local hit, hit_x, hit_y = RaytracePlatforms( x, y, x + d_x, y + d_y )
 	if( hit ) then
 		d_x, d_y = hit_x - x, hit_y - y
 		diameter = math.sqrt(( d_x )^2 + ( d_y )^2 )
 	end
 
-	local amount = math.ceil( diameter/( data.res or 2 ))
+	local res = data.res or 2
+	local amount = math.ceil( diameter/res )
 	local out = { 0, x + d_x, y + d_y, 1, amount }
 	if( data.will_choke and diameter == 0 ) then return out end
 
-	local step_x, step_y = d_x/amount, d_y/amount
-	if( pen.vld( data.point_action )) then
-		for k = 0,amount do data.point_action( data, x + step_x*k, y + step_y*k, k, k == amount ) end
-	end
-	if( data.is_debugging ) then
+	local frame_num = GameGetFrameNum()
+	pen.c.raytrace_memo = pen.c.raytrace_memo or {}
+	local memo = pen.c.raytrace_memo[ data.uid or "" ] or {}
+	if(( memo[5] or frame_num ) < frame_num ) then pen.c.raytrace_memo[ data.uid or "" ] = nil end
+	local last_l, last_x, last_y, last_r = unpack( pen.c.raytrace_memo[ data.uid or "" ] or { diameter, x, y, r })
+	if( data.uid ) then pen.c.raytrace_memo[ data.uid ] = { diameter, x, y, r, frame_num + 1 } end
+
+	local mm = 1.75
+	local md_l = diameter - last_l
+	local md_x, md_y = x - last_x, y - last_y
+	local md_r = pen.get_angular_delta( r, last_r )
+	local ma_l = math.ceil( math.abs( md_l )/( mm*res ))
+	local ma_x = math.ceil( math.abs( md_x )/( mm*res ))
+	local ma_y = math.ceil( math.abs( md_y )/( mm*res ))
+	local ma_r = math.ceil( math.abs( md_r )/( mm*res/last_l ))
+	local ma = math.max( ma_l, ma_x, ma_y, ma_r, 1 )
+	local ms_l, ms_x, ms_y, ms_r = md_l/ma, md_x/ma, md_y/ma, md_r/ma
+	
+	local dots = {}
+	for mk = ma,1,-1 do
+		local root_l = last_l + ms_l*mk
+		local root_x = last_x + ms_x*mk
+		local root_y = last_y + ms_y*mk
+		local root_r = last_r + ms_r*mk
+		
+		local step_x = root_l*math.cos( root_r )/amount
+		local step_y = root_l*math.sin( root_r )/amount
+		local step_x_ = ( root_l - ms_l )*math.cos( root_r - ms_r )/amount
+		local step_y_ = ( root_l - ms_l )*math.sin( root_r - ms_r )/amount
+
 		for k = 0,amount do
-			local pic_x, pic_y = pen.world2gui( x + step_x*k, y + step_y*k )
-			pen.new_pixel( pic_x - 0.5, pic_y - 0.5, pen.LAYERS.WORLD_BACK )
+			local dot_x, dot_y = x + step_x*k, y + step_y*k
+			local dot_x_, dot_y_ = x + step_x_*k, y + step_y_*k
+
+			local x_valid = math.abs( dot_x - dot_x_ ) > res
+			local y_valid = math.abs( dot_y - dot_y_ ) > res
+			local will_do = ( mk == ma ) or ( x_valid or y_valid )
+
+			if( will_do ) then
+				dots[k] = dots[k] or {}
+				table.insert( dots[k], { dot_x, dot_y })
+				local do_action = data.always_action or ( pen.vld( data.point_action ) and ( mk == ma ))
+				if( do_action ) then data.point_action( data, dot_x, dot_y, k, k == amount ) end
+			end
+
+			if( data.is_debugging ) then
+				local pic_x, pic_y = pen.world2gui( dot_x, dot_y )
+				pen.new_pixel( pic_x - 0.5, pic_y - 0.5, pen.LAYERS.WORLD_BACK, pen.PALETTE.VNL[ will_do and "RUNIC" or "RED" ])
+			end
 		end
 	end
 
-	--compensate for loss of accuracy due to rotation
-	--check y delta from previous frame
-	--do this per-dot and if delta is over the res step, add missing dots to the hit checker
-	--extra dots should be on-hit only one per k by default
-
-	return pen.t.loop( pen.get_killable( x + d_x/2, y + d_y/2, diameter/2 + 32 ), function( i, deadman )
+	return pen.t.loop( pen.get_killable( x, y, diameter + 32 ), function( i, deadman )
 		if( data.shooter == deadman ) then return end
 		
 		local dmg_comp = EntityGetFirstComponentIncludingDisabled( deadman, "DamageModelComponent" )
@@ -1842,11 +1877,13 @@ function pen.raytrace_entities( x, y, r, l, hit_action, data )
 				ComponentGetValue2( hitbox, "aabb_min_y" ), ComponentGetValue2( hitbox, "aabb_max_y" ),
 			}
 
-			for k = 0,amount do
-				local point_x, point_y = x + step_x*k, y + step_y*k
-				if( pen.check_bounds({ point_x, point_y }, hitbox_pos, { e_x, e_y })) then
-					if( data.will_stop ) then return { deadman, point_x, point_y, hitbox_dmg, k } end
-					hit_action( deadman, point_x, point_y, hitbox_dmg, k )
+			for k,row in ipairs( dots ) do
+				for _,point in ipairs( row ) do
+					if( pen.check_bounds( point, hitbox_pos, { e_x, e_y })) then
+						if( data.will_stop ) then return { deadman, point[1], point[2], hitbox_dmg, k } end
+						hit_action( deadman, point[1], point[2], hitbox_dmg, k )
+						if( not( data.always_hit )) then break end
+					end
 				end
 			end
 		end)
@@ -2387,6 +2424,7 @@ function pen.new_projectile( ids, action, path )
 	data.shooter = hooman
 	data.card = card_id
 	data.gun = gun_id
+	data.uid = gun_id
 	
 	local x, y, r = EntityGetTransform( gun_id )
 	local beam_x, beam_y = pen.get_hotspot_pos( gun_id, "shoot_pos" )
@@ -2504,6 +2542,7 @@ end
 
 function pen.bladesim( sword_id, data )
 	data = data or {}
+	data.uid = sword_id
 	data.sword = sword_id
 	data.drift = data.drift or {}
 	data.shooter = data.shooter or EntityGetRootEntity( sword_id )
@@ -2565,10 +2604,12 @@ function pen.bladesim( sword_id, data )
 		local blade_x, blade_y = pen.get_hotspot_pos( sword_id, "shoot_pos" )
 		local length = pen.magic_storage( sword_id, "blade_length", "value_float" )
 		pen.raytrace_entities( blade_x, blade_y, d_r, length, function( hit_id, hit_x, hit_y, dmg_mult, k )
-			if( pen.vld( data.f )) then data.f( hit_id, hit_x, hit_y ) end
+			if( pen.vld( data.on_hit )) then data.on_hit( hit_id, hit_x, hit_y ) end
 			EntityInflictDamage( hit_id, dmg_mult*( data.dmg or 0.02 ), data.dmg_type or "DAMAGE_DRILL",
 				data.dmg_msg or "slash", data.dmg_effect or "NORMAL", 0, 0, data.shooter, hit_x, hit_y, 0 )
 		end, data )
+
+		if( pen.vld( data.on_active )) then data.on_active( hooman, blade_x, blade_y, d_r, length ) end
 	end
 
 	return anim_done
