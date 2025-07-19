@@ -3155,41 +3155,19 @@ function pen.magic_particles( x, y, r, data )
 		else return end
 	end
 
-	local emitter = EntityLoad( pen.FILE_MAGIC_EMITTER, x, y )
-	local life_comp = EntityGetFirstComponentIncludingDisabled( emitter, "LifetimeComponent" )
-	ComponentSetValue2( life_comp, "kill_frame", GameGetFrameNum() + ( data.lifetime or 1 ))
+	pen.c.magic_particle_ids = pen.c.magic_particle_ids or {}
+	local emitter, is_new = pen.vld( data.uid ) and pen.life_support(
+		pen.c.magic_particle_ids, data.uid, pen.FILE_MAGIC_EMITTER, x, y
+	) or EntityLoad( pen.FILE_MAGIC_EMITTER, x, y )
+
+	local is_continuous = is_new == nil
+	if( not( is_continuous )) then
+		local life_comp = EntityGetFirstComponentIncludingDisabled( emitter, "LifetimeComponent" )
+		ComponentSetValue2( life_comp, "kill_frame", GameGetFrameNum() + ( data.lifetime or 1 ))
+	else is_new = true end
+
 	local emit_comp = EntityGetFirstComponentIncludingDisabled( emitter, "SpriteParticleEmitterComponent" )
-	
-	ComponentSetValue2( emit_comp, "z_index", data.z_index or 1 )
-	ComponentSetValue2( emit_comp, "sprite_file", pen.FILE_PIC_NUL )
-	ComponentSetValue2( emit_comp, "additive", data.additive or false )
-	ComponentSetValue2( emit_comp, "emissive", data.emissive or false )
-	ComponentSetValue2( emit_comp, "render_back", data.render_back or false )
 
-	data.fading = ( data.fading or 12 )/60
-	data.count, data.pause = data.count or {}, data.pause or {}
-	ComponentSetValue2( emit_comp, "lifetime", data.fading )
-	ComponentSetValue2( emit_comp, "delay", ( data.delay or 0 )/60 )
-	ComponentSetValue2( emit_comp, "count_min", data.count[1] or 1 )
-	ComponentSetValue2( emit_comp, "count_max", data.count[2] or 1 )
-	ComponentSetValue2( emit_comp, "emission_interval_min_frames", data.pause[1] or 0 )
-	ComponentSetValue2( emit_comp, "emission_interval_max_frames", data.pause[2] or 0 )
-
-	data.alpha = data.alpha or 1
-	data.color = data.color or { 255, 255, 255 }
-	ComponentSetValue2( emit_comp, "color",
-		data.color[1]/255, data.color[2]/255, data.color[3]/255, data.alpha )
-	
-	data.alpha_end = data.alpha_end or data.alpha
-	data.color_end = data.color_end or data.color
-	data.color_shift = {
-		( data.color_end[1] - data.color[1])/data.fading,
-		( data.color_end[2] - data.color[2])/data.fading,
-		( data.color_end[3] - data.color[3])/data.fading,
-		( data.alpha_end - data.alpha )/data.fading }
-	ComponentSetValue2( emit_comp, "color_change",
-		data.color_shift[1]/255, data.color_shift[2]/255, data.color_shift[3]/255, data.color_shift[4])
-	
 	data.velocity = data.velocity or { 0, 0 }
 	data.global_velocity = data.global_velocity or { 0, 0 }
 	data.velocity[1], data.velocity[2] = pen.rotate_offset( data.velocity[1], data.velocity[2], r )
@@ -3216,14 +3194,48 @@ function pen.magic_particles( x, y, r, data )
 	data.p_range[3], data.p_range[4] = pen.rotate_offset( data.p_range[3] or 0.5, data.p_range[4] or 0.5, r )
 	ComponentSetValue2( emit_comp, "randomize_position", unpack( data.p_range ))
 
-	data.scale = data.scale or {}
-	ComponentSetValue2( emit_comp, "scale", data.scale[1] or 0.5, data.scale[2] or 0.5 )
+	if( is_new ) then
+		ComponentSetValue2( emit_comp, "z_index", data.z_index or 1 )
+		ComponentSetValue2( emit_comp, "sprite_file", pen.FILE_PIC_NUL )
+		ComponentSetValue2( emit_comp, "additive", data.additive or false )
+		ComponentSetValue2( emit_comp, "emissive", data.emissive or false )
+		ComponentSetValue2( emit_comp, "render_back", data.render_back or false )
 
-	-- randomize_lifetime
-	-- randomize_scale
-	-- randomize_rotation
-	-- randomize_angular_velocity
-	-- randomize_alpha
+		data.fading = ( data.fading or 12 )/60
+		data.count, data.pause = data.count or {}, data.pause or {}
+		ComponentSetValue2( emit_comp, "lifetime", data.fading )
+		ComponentSetValue2( emit_comp, "delay", ( data.delay or 0 )/60 )
+		ComponentSetValue2( emit_comp, "count_min", data.count[1] or 1 )
+		ComponentSetValue2( emit_comp, "count_max", data.count[2] or 1 )
+		ComponentSetValue2( emit_comp, "emission_interval_min_frames", data.pause[1] or 0 )
+		ComponentSetValue2( emit_comp, "emission_interval_max_frames", data.pause[2] or 0 )
+
+		data.alpha = data.alpha or 1
+		data.color = data.color or { 255, 255, 255 }
+		ComponentSetValue2( emit_comp, "color",
+			data.color[1]/255, data.color[2]/255, data.color[3]/255, data.alpha )
+	
+		data.alpha_end = data.alpha_end or data.alpha
+		data.color_end = data.color_end or data.color
+		data.color_shift = {
+			( data.color_end[1] - data.color[1])/data.fading,
+			( data.color_end[2] - data.color[2])/data.fading,
+			( data.color_end[3] - data.color[3])/data.fading,
+			( data.alpha_end - data.alpha )/data.fading }
+		ComponentSetValue2( emit_comp, "color_change",
+			data.color_shift[1]/255, data.color_shift[2]/255, data.color_shift[3]/255, data.color_shift[4])
+
+		data.scale = data.scale or {}
+		ComponentSetValue2( emit_comp, "scale", data.scale[1] or 0.5, data.scale[2] or 0.5 )
+	
+		-- randomize_lifetime
+		-- randomize_scale
+		-- randomize_rotation
+		-- randomize_angular_velocity
+		-- randomize_alpha
+	end
+
+	return emitter, is_new
 end
 
 function pen.magic_explosion( x, y, data )
