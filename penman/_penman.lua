@@ -1753,7 +1753,7 @@ function pen.get_creature_head( entity_id )
 	if( pen.vld( ai_comp, true )) then
 		y = y + ComponentGetValue2( ai_comp, "eye_offset_y" )
 	elseif( pen.vld( crouch_comp, true )) then
-		local off_x, off_y = ComponentGetValue2( crouch_comp, "offset" )
+		local off_x, off_y = ComponentGetValue2( crouch_comp, "offset" ) --eye hotspot
 		y = y + off_y + 3
 	else x, y = EntityGetFirstHitboxCenter( entity_id ) end
 	return x, y
@@ -2642,7 +2642,7 @@ end
 function pen.armorsim( entity_id, data )
 	data = data or {}
 	data.radius = data.radius or 50
-	data.buffer = data.buffer or 1.5
+	data.buffer = data.buffer or 2
 
 	local hooman = EntityGetRootEntity( entity_id )
 	data.pos = data.pos or { EntityGetTransform( entity_id )}
@@ -2653,8 +2653,8 @@ function pen.armorsim( entity_id, data )
 		local box = EntityGetFirstComponentIncludingDisabled( entity_id, "HitboxComponent" )
 		if( not( pen.vld( box, true ))) then return end
 		data.dims = {
-			ComponentGetValue2( box, "aabb_min_x" ) - 1, ComponentGetValue2( box, "aabb_max_x" ) + 1,
-			ComponentGetValue2( box, "aabb_min_y" ) - 0.5, ComponentGetValue2( box, "aabb_max_y" ) + 0.5,
+			ComponentGetValue2( box, "aabb_min_x" ) - 2, ComponentGetValue2( box, "aabb_max_x" ) + 2,
+			ComponentGetValue2( box, "aabb_min_y" ) - 1, ComponentGetValue2( box, "aabb_max_y" ) + 1,
 		}
 	end
 
@@ -2671,6 +2671,8 @@ function pen.armorsim( entity_id, data )
 		end
 
 		--speed increases the damage, compare it against data.rating
+
+		if( data.is_slow ) then return end
 
 		pen.play_sound({ "data/audio/Desktop/animals.bank", "animals/robot/damage/melee" }, x, y )
 		pen.magic_particles( x, y, math.rad( 180 ) + data.p_angle, {
@@ -2715,7 +2717,6 @@ function pen.armorsim( entity_id, data )
 
 		local x, y = EntityGetTransform( proj_id )
 		local v_x, v_y = ComponentGetValue2( vel_comp, "mVelocity" )
-		if( math.abs( v_x ) < 5 or math.abs( v_y ) < 5 ) then return end
 		-- if( not( pen.check_bounds({ x + v_x/60, y + v_y/60 }, size, data.pos ))) then return end
 		
 		local is_hor = false
@@ -2746,6 +2747,7 @@ function pen.armorsim( entity_id, data )
 		data.p_angle = math.atan2( v_y, v_x )
 		data.n_angle = math.rad( is_hor and ( is_left and -1 or -179 ) or ( is_top and 89 or -91 ))
 		data.d_angle = math.abs( math.deg( data.n_angle - data.p_angle ))%90
+		data.is_slow = math.abs( v_x ) < 5/60 and math.abs( v_y ) < 5/60
 		if( data.func( entity_id, proj_id, x, y, data )) then return end
 		
 		was_deflected = true
@@ -2760,7 +2762,7 @@ function pen.armorsim( entity_id, data )
 		if( not( pen.vld( gene_comp, true ))) then return end
 		ComponentSetValue2( proj_comp, "mShooterHerdId", ComponentGetValue2( gene_comp, "herd_id" ))
 	end)
-
+	
 	return was_deflected
 end
 
