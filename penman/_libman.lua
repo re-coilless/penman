@@ -749,6 +749,7 @@ function pen.lib.set_matter_damage( hooman, data )
 	local c_max_y = ComponentGetValue2( char_comp, "collision_aabb_max_y" )
 	local k = 25*60*math.abs( c_max_x - c_min_x )*math.abs( c_max_y - c_min_y )
 
+	--define custom damage types in xml
 	local function damage_compiler( name, custom, data )
 		custom = data.matter_overrides[ name ] or pen.t.unarray( pen.t.pack( custom ))
 		if( not( pen.vld( custom ))) then custom = nil end
