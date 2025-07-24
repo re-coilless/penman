@@ -120,10 +120,6 @@ pen.t2f = pen.t2f or function( name, text )
 	return pen[ name ]
 end
 
-function pen.new_glowing( pic_x, pic_y, pic_z, s_x, s_y, color, alpha )
-	-- universal ui glowing function that scales a smooth cicle
-end
-
 function pen.lib.sprite_builder( path, print_me )
 	-- https://colab.research.google.com/drive/1s1b7Kr97Q5aUpzJrom12YszZQyWGRgsi?usp=sharing
 
@@ -234,493 +230,7 @@ end
 -- Extra Damage Types: heat, cold, magic, light, pollution, dissolution, purification
 -- damage values are total harm per frame per second for a fully submerged entity
 function pen.lib.set_matter_damage( hooman, data )
-	local dmg_tbl = {
-		air = { wetting = 1, breathing = 1 },
-
-		fire = { contact = 1, burn = 1, light = 0.25, dmg = 30 },
-		fire_blue = { "fire", 2 },
-		flame = "fire",
-		liquid_fire = { "fire", 3 },
-		liquid_fire_weak = { "fire", 0.5 },
-		
-		lava = { wetting = 1, burn = 1, light = 0.1, dmg = 350 },
-		gold_molten = "lava",
-		steel_static_molten = "lava",
-		steelmoss_slanted_molten = "lava",
-		steelmoss_static_molten = "lava",
-		steelsmoke_static_molten = "lava",
-		metal_sand_molten = "lava",
-		metal_molten = "lava",
-		metal_rust_molten = "lava",
-		metal_nohit_molten = "lava",
-		aluminium_molten = "lava",
-		aluminium_robot_molten = "lava",
-		metal_prop_molten = "lava",
-		steel_rust_molten = "lava",
-		aluminium_oxide_molten = "lava",
-		copper_molten = "lava",
-		brass_molten = "lava",
-		glass_molten = "lava",
-		glass_broken_molten = "lava",
-		steel_molten = "lava",
-		silver_molten = { wetting = 1, burn = 1, light = 0.1, magic = 0.1, purification = 0.1, dmg = 350 },
-
-		plasma_fading = { effect = 1, wetting = 1, burn = 0.5, light = 0.5, dmg = 350 },
-		plasma_fading_bright = "plasma_fading",
-		plasma_fading_green = "plasma_fading",
-		plasma_fading_pink = "plasma_fading",
-		rocket_particles = "plasma_fading",
-
-		spark = { effect = 1, wetting = 1, heat = 1, light = 0.25, dmg = 30 },
-		spark_green = "spark",
-		spark_green_bright = "spark",
-		spark_blue = "spark",
-		spark_blue_dark = "spark",
-		spark_red = "spark",
-		spark_red_bright = "spark",
-		spark_white = "spark",
-		spark_white_bright = "spark",
-		spark_yellow = "spark",
-		spark_purple = "spark",
-		spark_purple_bright = "spark",
-		spark_player = "spark",
-		spark_teal = "spark",
-		spark_electric = "spark",
-
-		lavasand = { contact = 1, heat = 1, dmg = 30 },
-		meat_warm = "lavasand",
-		meat_hot = "lavasand",
-		meat_done = "lavasand",
-		meat_burned = "lavasand",
-		lavarock_static = "lavasand",
-		nest_firebug_box2d = "lavasand",
-		meteorite = "lavasand",
-		meteorite_static = "lavasand",
-		meteorite_test = "lavasand",
-		meteorite_crackable = "lavasand",
-		meteorite_green = "lavasand",
-		wax_molten = { wetting = 1, heat = 1, dmg = 100 },
-
-		glowstone = { contact = 1, light = 1, dmg = 25 },
-		glowstone_altar = "glowstone",
-		glowstone_altar_hdr = "glowstone",
-		glowstone_potion = "glowstone",
-		rock_static_glow = "glowstone",
-		tubematerial = "glowstone",
-		tube_physics = "glowstone",
-		glowshroom = "glowstone",
-		fuse_bright = "glowstone",
-		crystal = "glowstone",
-		crystal_purple = "glowstone",
-		crystal_solid = "glowstone",
-		crystal_magic = "glowstone",
-		neon_tube_purple = "glowstone",
-		neon_tube_cyan = "glowstone",
-		neon_tube_blood_red = "glowstone",
-		material_rainbow = { wetting = 1, light = 1, dmg = 50 },
-
-		corruption_static = { contact = 1, curse = 1, dmg = 500 },
-		rock_static_cursed = "corruption_static",
-		rock_static_cursed_green = "corruption_static",
-		meat_cursed = { "corruption_static", 0.25 },
-		meat_cursed_dry = { "corruption_static", 0.25 },
-		meat_slime_cursed = { "corruption_static", 0.25 },
-		cursed_liquid = { wetting = 1, curse = 1, dmg = 75 },
-		material_darkness = { "cursed_liquid", 5 },
-
-		gold_radioactive = { contact = 1, radiation = 1, dmg = 25 },
-		rock_static_radioactive = "gold_radioactive",
-		gold_static_radioactive = "gold_radioactive",
-		rotten_meat_radioactive = { "gold_radioactive", 0.5 },
-		ice_radioactive_static = { contact = 1, radiation = 1, cold = 1, dmg = 30 },
-		ice_radioactive_glass = "ice_radioactive_static",
-		radioactive_liquid = { wetting = 1, radiation = 1, dissolution = 5, dmg = 5 },
-		radioactive_liquid_fading = "radioactive_liquid",
-		radioactive_liquid_yellow = { wetting = 1, radiation = 2, dissolution = 5, dmg = 5 },
-		radioactive_gas = { wetting = 0.5, breathing = 1, radiation = 1, dmg = 100 },
-		radioactive_gas_static = "radioactive_gas",
-		cloud_radioactive = "radioactive_gas",
-
-		ice_acid_static = { contact = 1, corrosion = 1, cold = 0.3, dmg = 100 },
-		ice_acid_glass = "ice_acid_static",
-		acid = { wetting = 1, corrosion = 1, dmg = 500 },
-		acid_gas = { wetting = 1, breathing = 2, corrosion = 1, dmg = 50 },
-		acid_gas_static = "acid_gas",
-
-		rock_static_poison = { contact = 1, poison = 1, dmg = 50 },
-		ice_poison_static = { contact = 1, poison = 1, cold = 0.6, dmg = 50 },
-		ice_poison_glass = "ice_poison_static",
-		poison_gas = { breathing = 1, poison = 1, dmg = 25 },
-		poison = { wetting = 1, poison = 1, dmg = 100 },
-		pus = "poison",
-
-		cactus = { contact = 1, piercing = 1, dmg = 5 },
-		glass_broken = "cactus",
-		glass_brittle = "cactus",
-
-		wizardstone = { contact = 1, magic = 1, light = 0.5, purification = 0.1, dmg = 50 },
-		static_magic_material = "wizardstone",
-		rock_magic_gate = "wizardstone",
-		rock_magic_bottom = "wizardstone",
-		meat_teleport = "wizardstone",
-		meat_fast = "wizardstone",
-		meat_polymorph = "wizardstone",
-		meat_polymorph_protection = "wizardstone",
-		meat_confusion = "wizardstone",
-		magic_crystal = "wizardstone",
-		magic_crystal_green = "wizardstone",
-		magic_liquid = { wetting = 1, magic = 4, light = 1, dissolution = 1, dmg = 25 },
-		void_liquid = "magic_liquid",
-		mimic_liquid = "magic_liquid",
-		just_death = "magic_liquid",
-		midas_precursor = "magic_liquid",
-		midas = "magic_liquid",
-		material_confusion = "magic_liquid",
-		magic_liquid_weakness = "magic_liquid",
-		magic_liquid_movement_faster = "magic_liquid",
-		magic_liquid_faster_levitation = "magic_liquid",
-		magic_liquid_faster_levitation_and_movement = "magic_liquid",
-		magic_liquid_worm_attractor = "magic_liquid",
-		magic_liquid_protection_all = "magic_liquid",
-		magic_liquid_mana_regeneration = "magic_liquid",
-		magic_liquid_unstable_teleportation = "magic_liquid",
-		magic_liquid_teleportation = "magic_liquid",
-		magic_liquid_polymorph = "magic_liquid",
-		magic_liquid_random_polymorph = "magic_liquid",
-		magic_liquid_unstable_polymorph = "magic_liquid",
-		magic_liquid_berserk = "magic_liquid",
-		magic_liquid_charm = "magic_liquid",
-		magic_liquid_invisibility = "magic_liquid",
-		smoke_magic = { contact = 0.1, breathing = 1, magic = 1, light = 0.5, dmg = 25 },
-		magic_gas_midas = "smoke_magic",
-		magic_gas_worm_blood = "smoke_magic",
-		rainbow_gas = "smoke_magic",
-		magic_gas_polymorph = "smoke_magic",
-		magic_gas_weakness = "smoke_magic",
-		magic_gas_teleport = "smoke_magic",
-		magic_gas_fungus = "smoke_magic",
-		fungal_shift_particle_fx = "smoke_magic",
-
-		magic_liquid_hp_regeneration = { wetting = 1, heal = -1, magic = 0.2, light = 1/20, dmg = 500 },
-		magic_liquid_hp_regeneration_unstable = { "magic_liquid_hp_regeneration", 2 },
-		magic_gas_hp_regeneration = { contact = 0.1, breathing = 1, heal = -1, magic = 0.2, light = 1/40, dmg = 500 },
-
-		templerock = { contact = 1, magic = 0.1, purification = 1, dmg = 50 },
-		templerock_static = "templerock",
-		templebrick_static = "templerock",
-		templebrick_static_broken = "templerock",
-		templebrick_static_soft = "templerock",
-		templebrick_noedge_static = "templerock",
-		templerock_soft = "templerock",
-		templebrick_thick_static = "templerock",
-		templebrick_thick_static_noedge = "templerock",
-		templeslab_static = "templerock",
-		templeslab_crumbling_static = "templerock",
-		templebrickdark_static = "templerock",
-		templebrick_golden_static = "templerock",
-		templebrick_static_ruined = "templerock",
-		templebrick_red = "templerock",
-		templebrick_moss_static = "templerock",
-		templebrick_box2d = "templerock",
-		templebrick_box2d_edgetiles = "templerock",
-		silver = { contact = 1, magic = 0.25, light = 0.1, purification = 1, dmg = 50 },
-		templebrick_diamond_static = "silver",
-		purifying_powder = "silver",
-		grass_holy = "silver",
-		fuse_holy = "silver",
-		gem_box2d = "silver",
-		gem_box2d_yellow_sun = "silver",
-		gem_box2d_red_float = "silver",
-		gem_box2d_yellow_sun_gravity = "silver",
-		gem_box2d_darksun = "silver",
-		gem_box2d_pink = "silver",
-		gem_box2d_red = "silver",
-		gem_box2d_turquoise = "silver",
-		gem_box2d_opal = "silver",
-		gem_box2d_white = "silver",
-		gem_box2d_green = "silver",
-		gem_box2d_orange = "silver",
-
-		snow = { contact = 1, cold = 1, dmg = 30 },
-		snow_static = "snow",
-		ice_static = "snow",
-		ice_blood_static = "snow",
-		ice_slime_static = "snow",
-		ice_meteor_static = "snow",
-		ice_glass = "snow",
-		ice_blood_glass = "snow",
-		ice_slime_glass = "snow",
-		ice_glass_b2 = "snow",
-		snowrock_static = "snow",
-		ice = "snow",
-		grass_ice = "snow",
-		ice_ceiling = "snow",
-		snow_b2 = "snow",
-		ice_melting_perf_killer = "snow",
-		ice_b2 = "snow",
-		ice_cold_static = { contact = 1, cold = 1, burn = 1, dmg = 30 },
-		ice_cold_glass = "ice_cold_static",
-		steelfrost_static = "ice_cold_static",
-		water_ice = { wetting = 1, cold = 2, dissolution = 1, dmg = 25 },
-		slush = "water_ice",
-		snow_sticky = "water_ice",
-		blood_cold = { wetting = 1, cold = 1, burn = 1, dmg = 50 },
-		blood_cold_vapour = { contact = 0.5, breathing = 1, cold = 1, burn = 1, dmg = 25 },
-		
-		waterrock = { contact = 1, dissolution = 1, dmg = 5 },
-		rock_static_wet = "waterrock",
-		wood_static_wet = "waterrock",
-		soil_lush = "waterrock",
-		soil_lush_dark = "waterrock",
-		mud = "waterrock",
-		water = { wetting = 1, dissolution = 1, dmg = 50 },
-		water_static = "water",
-		endslime_static = "water",
-		slime_static = "water",
-		water_fading = "water",
-		water_temp = "water",
-		water_swamp = "water",
-		swamp = "water",
-		blood = "water",
-		blood_fading = "water",
-		blood_fading_slow = "water",
-		blood_fungi = "water",
-		blood_worm = "water",
-		milk = "water",
-		honey = "water",
-		porridge = "water",
-		slime = "water",
-		slime_green = "water",
-		slime_yellow = "water",
-		pea_soup = "water",
-		endslime = "water",
-		endslime_blood = "water",
-		blood_thick = "water",
-		cloud = { wetting = 1, breathing = 2, dissolution = 1, dmg = 10 },
-		cloud_lighter = "cloud",
-		cloud_blood = "cloud",
-		cloud_slime = "cloud",
-		steam = { wetting = 1, breathing = 2, dissolution = 1, heat = 0.5, dmg = 50 },
-		steam_trailer = "steam",
-
-		oil = { wetting = 1, pollution = 1, dmg = 15 },
-		creepy_liquid = "oil",
-		glue = "oil",
-		poo = "oil",
-		alcohol = { wetting = 1, dissolution = 1.5, pollution = 0.4, dmg = 25 },
-		beer = "alcohol",
-		molut = "alcohol",
-		sima = "alcohol",
-		juhannussima = "alcohol",
-		water_salt = "alcohol",
-		mammi = "alcohol",
-		urine = "alcohol",
-		vomit = "alcohol",
-		smoke = { breathing = 1, pollution = 1, dmg = 25 },
-		smoke_static = "smoke",
-		smoke_explosion = "smoke",
-		poo_gas = "smoke",
-		alcohol_gas = "smoke",
-		spore = "smoke",
-		sand_herb_vapour = "smoke",
-		fungal_gas = "smoke",
-
-		rock = { contact = 1 },
-		rock_static = "rock",
-		rock_static_intro = "rock",
-		rock_static_trip_secret = "rock",
-		rock_static_trip_secret2 = "rock",
-		rock_static_purple = "rock",
-		bone_static = "rock",
-		rust_static = "rock",
-		sand_static = "rock",
-		sand_static_rainforest = "rock",
-		sand_static_rainforest_dark = "rock",
-		sand_static_bright = "rock",
-		meat_static = "rock",
-		sand_static_red = "rock",
-		nest_static = "rock",
-		bluefungi_static = "rock",
-		spore_pod_stalk = "rock",
-		rock_hard = "rock",
-		rock_static_fungal = "rock",
-		wood_tree = "rock",
-		rock_static_noedge = "rock",
-		rock_hard_border = "rock",
-		rock_eroding = "rock",
-		rock_vault = "rock",
-		coal_static = "rock",
-		rock_static_grey = "rock",
-		skullrock = "rock",
-		the_end = "rock",
-		steel_static = "rock",
-		steelmoss_static = "rock",
-		steel_rusted_no_holes = "rock",
-		steel_grey_static = "rock",
-		steelmoss_slanted = "rock",
-		steelsmoke_static = "rock",
-		steelpipe_static = "rock",
-		steel_static_strong = "rock",
-		steel_static_unmeltable = "rock",
-		rock_static_intro_breakable = "rock",
-		glass_static = "rock",
-		concrete_static = "rock",
-		wood_static = "rock",
-		cheese_static = "rock",
-		root_growth = "rock",
-		wood_burns_forever = "rock",
-		creepy_liquid_emitter = "rock",
-		gold_static = "rock",
-		gold_static_dark = "rock",
-		wood_static_vertical = "rock",
-		wood_static_gas = "rock",
-		sand = "rock",
-		cement = "rock",
-		concrete_sand = "rock",
-		sand_blue = "rock",
-		sand_surface = "rock",
-		sand_petrify = "rock",
-		bone = "rock",
-		soil = "rock",
-		soil_dead = "rock",
-		soil_dark = "rock",
-		sandstone = "rock",
-		sandstone_surface = "rock",
-		fungisoil = "rock",
-		explosion_dirt = "rock",
-		vine = "rock",
-		root = "rock",
-		rotten_meat = "rock",
-		meat_slime_sand = "rock",
-		meat_slime_green = "rock",
-		meat_slime_orange = "rock",
-		meat_worm = "rock",
-		meat_helpless = "rock",
-		meat_trippy = "rock",
-		meat_frog = "rock",
-		sand_herb = "rock",
-		wax = "rock",
-		gold = "rock",
-		steel_sand = "rock",
-		metal_sand = "rock",
-		copper = "rock",
-		brass = "rock",
-		diamond = "rock",
-		coal = "rock",
-		sulphur = "rock",
-		salt = "rock",
-		sodium = "rock",
-		burning_powder = "rock",
-		sodium_unstable = "rock",
-		gunpowder = "rock",
-		gunpowder_explosive = "rock",
-		gunpowder_tnt = "rock",
-		gunpowder_unstable = "rock",
-		gunpowder_unstable_big = "rock",
-		monster_powder_test = "rock",
-		rat_powder = "rock",
-		fungus_powder = "rock",
-		fungus_powder_bad = "rock",
-		shock_powder = "rock",
-		orb_powder = "rock",
-		gunpowder_unstable_boss_limbs = "rock",
-		plastic_red = "rock",
-		plastic_red_molten = "rock",
-		plastic_molten = "rock",
-		plastic_prop_molten = "rock",
-		grass = "rock",
-		grass_darker = "rock",
-		grass_dry = "rock",
-		fungi = "rock",
-		fungi_green = "rock",
-		fungi_yellow = "rock",
-		grass_dark = "rock",
-		fungi_creeping = "rock",
-		fungi_creeping_secret = "rock",
-		peat = "rock",
-		moss_rust = "rock",
-		moss = "rock",
-		plant_material = "rock",
-		plant_material_red = "rock",
-		plant_material_dark = "rock",
-		ceiling_plant_material = "rock",
-		mushroom_seed = "rock",
-		plant_seed = "rock",
-		mushroom = "rock",
-		mushroom_giant_red = "rock",
-		mushroom_giant_blue = "rock",
-		bush_seed = "rock",
-		wood_player = "rock",
-		wood_player_b2 = "rock",
-		wood_player_b2_vertical = "rock",
-		wood = "rock",
-		wax_b2 = "rock",
-		fuse = "rock",
-		fuse_tnt = "rock",
-		wood_trailer = "rock",
-		wood_wall = "rock",
-		grass_loose = "rock",
-		fungus_loose = "rock",
-		fungus_loose_green = "rock",
-		fungus_loose_trippy = "rock",
-		wood_prop = "rock",
-		wood_prop_noplayerhit = "rock",
-		cloth_box2d = "rock",
-		wood_prop_durable = "rock",
-		nest_box2d = "rock",
-		cocoon_box2d = "rock",
-		wood_loose = "rock",
-		rock_loose = "rock",
-		brick = "rock",
-		concrete_collapsed = "rock",
-		tnt = "rock",
-		tnt_static = "rock",
-		trailer_text = "rock",
-		sulphur_box2d = "rock",
-		steel = "rock",
-		steel_rust = "rock",
-		metal_rust_rust = "rock",
-		metal_rust_barrel_rust = "rock",
-		plastic = "rock",
-		plastic_prop = "rock",
-		aluminium = "rock",
-		aluminium_robot = "rock",
-		metal_prop = "rock",
-		metal_prop_low_restitution = "rock",
-		metal_prop_loose = "rock",
-		metal = "rock",
-		metal_hard = "rock",
-		rock_box2d = "rock",
-		rock_box2d_hard = "rock",
-		poop_box2d_hard = "rock",
-		rock_box2d_nohit = "rock",
-		rock_box2d_nohit_heavy = "rock",
-		rock_box2d_nohit_hard = "rock",
-		rock_static_box2d = "rock",
-		rock_box2d = "rock",
-		item_box2d = "rock",
-		item_box2d_glass = "rock",
-		item_box2d_meat = "rock",
-		potion_glass_box2d = "rock",
-		glass_box2d = "rock",
-		gold_box2d = "rock",
-		bloodgold_box2d = "rock",
-		metal_nohit = "rock",
-		metal_chain_nohit = "rock",
-		metal_wire_nohit = "rock",
-		metal_rust = "rock",
-		metal_rust_barrel = "rock",
-		bone_box2d = "rock",
-		gold_b2 = "rock",
-		aluminium_oxide = "rock",
-		meat = "rock",
-		meat_fruit = "rock",
-		meat_pumpkin = "rock",
-		meat_slime = "rock",
-		physics_throw_material_part2 = "rock",
-		glass_liquidcave = "rock",
-		glass = "rock",
-	}
+	local dmg_tbl = pen.MATTER_EXPOSURES
 
 	local dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
 	if( not( pen.vld( dmg_comp, true ))) then return end
@@ -810,223 +320,7 @@ end
 function pen.lib.player_builder( hooman, func )
 	local is_vectored = ModIsEnabled( "vector_core" )
 
-	local overrides = {
-		CharacterDataComponent = {
-			mass = 1,
-			gravity = 0,
-			ground_stickyness = 0,
-			liquid_velocity_coeff = 10,
-
-			collision_aabb_max_x = 1,
-			collision_aabb_max_y = 1,
-			collision_aabb_min_x = -1,
-			collision_aabb_min_y = -1,
-			buoyancy_check_offset_y = 0,
-
-			climb_over_y = 3,
-			check_collision_max_size_x = 3,
-			check_collision_max_size_y = 3,
-			
-			effect_hit_ground = true,
-			eff_hg_offset_y = 1.5,
-			eff_hg_position_x = 0,
-			eff_hg_position_y = 5,
-			eff_hg_size_x = 5,
-			eff_hg_size_y = 5,
-			eff_hg_damage_max = 0,
-			eff_hg_damage_min = 0,
-			eff_hg_velocity_max_x = 20,
-			eff_hg_velocity_max_y = -10,
-			eff_hg_velocity_min_x = -20,
-			eff_hg_velocity_min_y = -30,
-			eff_hg_update_box2d = true,
-			eff_hg_b2force_multiplier = 0.00001,
-
-			flying_needs_recharge = true,
-			fly_time_max = 5,
-			fly_recharge_spd = 0.5,
-			fly_recharge_spd_ground = 5,
-			flying_in_air_wait_frames = 50,
-			flying_recharge_removal_frames = 5,
-		},
-
-		CharacterPlatformingComponent = {
-			accel_x = is_vectored and 0.001 or 0.15,
-			accel_x_air = is_vectored and 0.001 or 0.05,
-			run_velocity = is_vectored and 0 or 100,
-			pixel_gravity = 500,
-			jump_velocity_x = 50,
-			jump_velocity_y = -100,
-
-			velocity_max_x = 500,
-			velocity_max_y = 500,
-			velocity_min_x = -500,
-			velocity_min_y = -500,
-
-			run_animation_velocity_switching_enabled = false,
-			run_animation_velocity_switching_threshold = 50,
-			turn_animation_frames_between = 0,
-			turning_buffer = 0,
-
-			fly_smooth_y = false,
-			fly_speed_change_spd = 0.5,
-			fly_speed_max_down = 50,
-			fly_speed_max_up = 100,
-			fly_speed_mult = 20,
-			fly_velocity_x = 100,
-
-			swim_drag = 0.99,
-			swim_extra_horizontal_drag = 0.9,
-			swim_up_buoyancy_coeff = 1,
-			swim_idle_buoyancy_coeff = 1.25,
-			swim_down_buoyancy_coeff = 0.25,
-		},
-
-		DamageModelComponent = {
-			hp = 1,
-			max_hp = 1,
-			ui_report_damage = false,
-			ui_force_report_damage = false,
-			minimum_knockback_force = 0,
-			critical_damage_resistance = 0,
-			
-			falling_damages = false,
-			falling_damage_damage_max = 0,
-			falling_damage_damage_min = 0,
-			falling_damage_height_max = 0,
-			falling_damage_height_min = 0,
-
-			fire_damage_amount = 0.2,
-			fire_damage_ignited_amount = 0.0005,
-			fire_how_much_fire_generates = 5,
-			fire_probability_of_ignition = 0.5,
-
-			materials_create_messages = false,
-			materials_that_create_messages = "",
-			wet_status_effect_damage = 0,
-			materials_damage = true,
-			materials_damage_proportional_to_maxhp = false,
-			material_damage_min_cell_count = 5,
-			materials_how_much_damage = "",
-			materials_that_damage = "",
-			
-			air_needed = true,
-			air_in_lungs_max = 10,
-			air_lack_of_damage = 0.5,
-			
-			blood_material = blood_fading,
-			blood_multiplier = 1,
-			blood_spray_create_some_cosmetic = true,
-			blood_spray_material = blood,
-			blood_sprite_directional = "",
-			blood_sprite_large = "",
-			
-			create_ragdoll = true,
-			ragdoll_offset_x = 0,
-			ragdoll_offset_y = 0,
-			ragdoll_filenames_file = "",
-			ragdoll_fx_forced = "NONE",
-			ragdoll_material = "meat",
-			ragdoll_blood_amount_absolute = -1,
-			ragdollify_child_entity_sprites = true,
-			ragdollify_disintegrate_nonroot = false,
-			ragdollify_root_angular_damping = 0,
-
-			drop_items_on_death = false,
-			physics_objects_damage = false,
-			wait_for_kill_flag_on_death = false,
-			in_liquid_shooting_electrify_prob = 0,
-
-			[{ "damage_multipliers", "curse" }] = 1,
-			[{ "damage_multipliers", "drill" }] = 1,
-			[{ "damage_multipliers", "electricity" }] = 1,
-			[{ "damage_multipliers", "explosion" }] = 1,
-			[{ "damage_multipliers", "fire" }] = 1,
-			[{ "damage_multipliers", "healing" }] = 1,
-			[{ "damage_multipliers", "ice" }] = 1,
-			[{ "damage_multipliers", "melee" }] = 1,
-			[{ "damage_multipliers", "overeating" }] = 1,
-			[{ "damage_multipliers", "physics_hit" }] = 1,
-			[{ "damage_multipliers", "poison" }] = 1,
-			[{ "damage_multipliers", "projectile" }] = 1,
-			[{ "damage_multipliers", "radioactive" }] = 1,
-			[{ "damage_multipliers", "slice" }] = 1,
-		},
-
-		IngestionComponent = {
-			ingestion_capacity = 5000,
-			ingestion_cooldown_delay_frames = 500,
-			ingestion_reduce_every_n_frame = 5,
-			overingestion_damage = 0.001,
-			blood_healing_speed = 0.0005,
-		},
-		
-		ItemPickUpperComponent = {
-			drop_items_on_death = false,
-			is_immune_to_kicks = true,
-			is_in_npc = false,
-		},
-
-		KickComponent = {
-			can_kick = true,
-			kick_damage = 0.05,
-			kick_knockback = 1,
-			kick_radius = 5,
-			max_force = 1,
-			player_kickforce = 1,
-			telekinesis_throw_speed = 0,
-		},
-
-		LiquidDisplacerComponent = {
-			radius = 5,
-			velocity_x = 50,
-			velocity_y = 50,
-		},
-		
-		MaterialSuckerComponent = {
-			suck_gold = true,
-			suck_health = true,
-			barrel_size = 100,
-			num_cells_sucked_per_frame = 10,
-		},
-
-		PlatformShooterPlayerComponent = {
-			move_camera_with_aim = true,
-			center_camera_on_this_entity = true,
-			camera_max_distance_from_character = 50,
-			aiming_reticle_distance_from_character = 50,
-
-			alcohol_drunken_speed = 0.1,
-			blood_fungi_drunken_speed = 0.1,
-			blood_worm_drunken_speed = 0.1,
-			stoned_speed = 0.1,
-
-			eating_area_max = { 5, 5 },
-			eating_area_min = { -5, -5 },
-			eating_cells_per_frame = 1,
-			eating_delay_frames = 30,
-			eating_probability = 5,
-		},
-
-		PlayerCollisionComponent = {
-			getting_crushed_threshold = 5,
-			moving_up_before_getting_crushed_threshold = 5,
-		},
-
-		LuaComponent = true,
-		SpriteComponent = true,
-		HotspotComponent = true,
-		HitboxComponent = true,
-		VariableStorageComponent = true,
-		
-		ParticleEmitterComponent = true,
-		SpriteParticleEmitterComponent = true,
-		PhysicsPickUpComponent = true,
-		GameLogComponent = true,
-		GameStatsComponent = true,
-		LightComponent = true,
-		WalletComponent = true,
-	}
+	local overrides = pen.GENERIC_CHAR_SETUP
 	pen.t.loop( overrides, function( name, values )
 		local nuke_it = values == true
 		pen.magic_comp( hooman, name, function( comp_id, v_tbl, is_enabled )
@@ -1167,6 +461,443 @@ end
 
 function pen.lib.entity2nxml()
 end
+
+pen.hybrid = pen.hybrid or {}
+
+-- function pen.hybrid.gui_builder( init_func )
+-- 	if( EntityGetIsAlive( gui or 0 )) then
+-- 		local storage_going = get_storage( gui, "is_going" )
+-- 		if( not( ComponentGetValue2( storage_going, "value_bool" ))) then
+-- 			ComponentSetValue2( storage_going, "value_bool", true )
+-- 		end
+-- 	else
+-- 		--attach to world entity as child
+
+-- 		gui = EntityLoad( "mods/white_room/files/props/_base_hybrid_gui.xml", x, y )
+-- 		if( extra_action ~= nil ) then
+-- 			extra_action( gui )
+-- 		end
+-- 	end
+	
+-- 	return gui
+-- end
+
+-- function pen.new_hybrid_pic( core_id, uid, pic_info, pos_info, interaction, extra_action )
+-- 	uid = "pic_"..uid
+-- 	pic_info = pic_info or {}
+-- 	pos_info = pos_info or {}
+	
+-- 	local x, y = EntityGetTransform( core_id )
+	
+-- 	local pic_id = get_hooman_child( core_id, uid ) or 0
+-- 	if( pic_id ~= 0 ) then
+-- 		return
+-- 	end
+	
+-- 	pic_id = EntityLoad( "mods/white_room/files/props/_base_hybrid_gui_object.xml", x, y + 500 )
+-- 	EntitySetName( pic_id, uid )
+	
+-- 	local pic_comp = edit_component_ultimate( pic_id, "SpriteComponent", function(comp,vars)
+-- 		ComponentSetValue2( comp, "image_file", pic_info.pic )
+-- 		ComponentSetValue2( comp, "offset_x", pic_info.x or 0 )
+-- 		ComponentSetValue2( comp, "offset_y", pic_info.y or 0 )
+-- 		ComponentSetValue2( comp, "alpha", pic_info.alpha or 1 )
+-- 		ComponentSetValue2( comp, "emissive", pic_info.emissive or false )
+-- 		ComponentSetValue2( comp, "fog_of_war_hole", pic_info.fog_hole or false )
+-- 		ComponentSetValue2( comp, "additive", pic_info.additive or false )
+-- 		ComponentSetValue2( comp, "smooth_filtering", pic_info.smooth or false )
+-- 		ComponentSetValue2( comp, "visible", pic_info.visible or false )
+		
+-- 		ComponentSetValue2( comp, "z_index", pos_info.z or -100 )
+		
+-- 		if( pic_info.s_x ~= nil or pic_info.s_y ~= nil ) then
+-- 			ComponentSetValue2( comp, "has_special_scale", true )
+-- 			ComponentSetValue2( comp, "special_scale_x", pic_info.s_x or 1 )
+-- 			ComponentSetValue2( comp, "special_scale_y", pic_info.s_y or 1 )
+-- 		end
+		
+-- 		EntityRefreshSprite( pic_id, comp )
+-- 	end)
+-- 	if( pic_info.is_fogless or false ) then
+-- 		clone_comp( pic_id, pic_comp, { fog_of_war_hole = true, smooth_filtering = true, })
+-- 	end
+-- 	set_transform( pic_id, pos_info.x, pos_info.y, pos_info.s_x, pos_info.s_y, pos_info.r ~= nil and math.rad( pos_info.r ) or nil )
+	
+-- 	if( interaction or false ) then
+-- 		EntityAddComponent( pic_id, "VariableStorageComponent", 
+-- 		{
+-- 			name = "trigger_state",
+-- 			value_int = 0,
+-- 		})
+		
+-- 		EntityAddComponent( pic_id, "VariableStorageComponent", 
+-- 		{
+-- 			name = "is_hovered",
+-- 			value_bool = "0",
+-- 		})
+-- 		if( type( interaction ) == "string" ) then
+-- 			EntityAddComponent( pic_id, "VariableStorageComponent", 
+-- 			{
+-- 				name = "action_hover",
+-- 				value_string = interaction,
+-- 			})
+-- 			EntityAddComponent( pic_id, "VariableStorageComponent", 
+-- 			{
+-- 				name = "hover_delay",
+-- 				value_int = 30,
+-- 			})
+-- 		end
+-- 	end
+	
+-- 	EntityAddChild( core_id, pic_id )
+	
+-- 	if( extra_action ~= nil ) then
+-- 		extra_action( pic_id )
+-- 	end
+	
+-- 	return pic_id
+-- end
+
+-- function new_hybrid_button( core_id, uid, pic_info, pos_info, script_path, extra_action )
+-- 	uid = "button_"..uid
+-- 	script_path = script_path or ""
+-- 	if( type( script_path ) ~= "table" ) then
+-- 		script_path = { script_path }
+-- 	end
+	
+-- 	local bttn_id = new_hybrid_pic( core_id, uid, pic_info, pos_info, script_path[2] or 1, extra_action )
+-- 	if( bttn_id == nil ) then
+-- 		return
+-- 	end
+	
+-- 	if(( script_path[1] or "" ) ~= "" ) then
+-- 		EntityAddComponent( bttn_id, "VariableStorageComponent", 
+-- 		{
+-- 			name = "action",
+-- 			value_string = script_path[1],
+-- 		})
+-- 	end
+	
+-- 	return bttn_id
+-- end
+
+-- function new_hybrid_dragger( core_id, uid, sans_info, pic_info, pos_info, extra_action )
+-- 	uid = "dragger_"..uid
+-- 	sans_info = sans_info or {}
+-- 	sans_info.center = sans_info.center or {}
+-- 	sans_info.dims = sans_info.dims or {}
+	
+-- 	local dragger_id = new_hybrid_pic( core_id, uid, pic_info, pos_info, sans_info.tooltip or 1, extra_action )
+-- 	if( dragger_id == nil ) then
+-- 		return
+-- 	end
+	
+-- 	EntityAddComponent( dragger_id, "VariableStorageComponent", 
+-- 	{
+-- 		name = "drgr_center_x",
+-- 		value_float = sans_info.center[1] or 0,
+-- 	})
+-- 	EntityAddComponent( dragger_id, "VariableStorageComponent", 
+-- 	{
+-- 		name = "drgr_center_y",
+-- 		value_float = sans_info.center[2] or 0,
+-- 	})
+	
+-- 	EntityAddComponent( dragger_id, "VariableStorageComponent", 
+-- 	{
+-- 		name = "drgr_dim_a",
+-- 		value_float = sans_info.dims[1] or 0,
+-- 	})
+-- 	EntityAddComponent( dragger_id, "VariableStorageComponent", 
+-- 	{
+-- 		name = "drgr_dim_b",
+-- 		value_float = sans_info.dims[2] or 0,
+-- 	})
+	
+-- 	EntityAddComponent( dragger_id, "VariableStorageComponent", 
+-- 	{
+-- 		name = "drgr_is_active",
+-- 		value_bool = "0",
+-- 	})
+-- 	EntityAddComponent( dragger_id, "VariableStorageComponent", 
+-- 	{
+-- 		name = "drgr_drift_x",
+-- 		value_float = 0,
+-- 	})
+-- 	EntityAddComponent( dragger_id, "VariableStorageComponent", 
+-- 	{
+-- 		name = "drgr_drift_y",
+-- 		value_float = 0,
+-- 	})
+-- 	if( sans_info.is_local or false ) then
+-- 		EntityAddComponent( dragger_id, "VariableStorageComponent", 
+-- 		{
+-- 			name = "drgr_last_x",
+-- 			value_float = 0,
+-- 		})
+-- 		EntityAddComponent( dragger_id, "VariableStorageComponent", 
+-- 		{
+-- 			name = "drgr_last_y",
+-- 			value_float = 0,
+-- 		})
+-- 	end
+	
+-- 	return dragger_id
+-- end
+
+-- function new_hybrid_focus( core_id, uid, pic_info, pos_info )
+-- 	pic_info = pic_info or {}
+-- 	pic_info.is_small = pic_info.is_small or false
+-- 	local path = "mods/white_room/files/props/gui/advanced_window/button_focus_"..( pic_info.is_small and "small_" or "" )
+-- 	pic_info.pic = path.."A.png"
+	
+-- 	return add_ctrl_script( new_hybrid_button( core_id, "focus_"..uid, pic_info, pos_info, { "mods/white_room/files/props/gui/advanced_window/actions/focus_action.lua", "[FOCUS]", }, function( new_button )
+-- 		EntityAddComponent( new_button, "VariableStorageComponent", 
+-- 		{
+-- 			name = "is_going",
+-- 			value_bool = 0,
+-- 		})
+-- 		EntityAddComponent( new_button, "VariableStorageComponent", 
+-- 		{
+-- 			name = "pic_path",
+-- 			value_string = path,
+-- 		})
+-- 		EntityAddComponent( new_button, "VariableStorageComponent", 
+-- 		{
+-- 			name = "offset_x",
+-- 			value_float = pic_info.drift_x or 0,
+-- 		})
+-- 		EntityAddComponent( new_button, "VariableStorageComponent", 
+-- 		{
+-- 			name = "offset_y",
+-- 			value_float = pic_info.drift_y or 0,
+-- 		})
+-- 	end), "mods/white_room/files/props/gui/advanced_window/actions/focus_action.lua" )
+-- end
+
+-- function new_hybrid_text( core_id, uid, text_info, pos_info, extra_action )
+-- 	uid = "text_"..uid.."_"
+-- 	text_info = text_info or {}
+-- 	text_info.text = text_info.text or "[NIL]"
+-- 	text_info.font = text_info.font or 5
+-- 	pos_info = pos_info or {}
+-- 	pos_info.z = pos_info.z or -100
+	
+-- 	if( type( text_info.text ) ~= "table" ) then
+-- 		text_info.text = { text_info.text, }
+-- 	end
+	
+-- 	local x, y = EntityGetTransform( core_id )
+	
+-- 	local core_uid = uid.."core"
+-- 	local text_id = get_hooman_child( core_id, core_uid ) or 0
+-- 	if( text_id ~= 0 ) then
+-- 		return
+-- 	end
+	
+-- 	text_id = EntityLoad( "mods/white_room/files/props/_base_hybrid_gui_text.xml", x, y + 500 )
+-- 	EntitySetName( text_id, core_uid )
+	
+-- 	local colours = { "white", "black", "grey", "silver", "red", "gold", "green", }
+-- 	edit_component_ultimate( text_id, "SpriteComponent", function(comp,vars)
+-- 		if( type( text_info.font ) == "number" ) then
+-- 			text_info.font = "mods/white_room/files/pics/fonts/_default_font_"..colours[text_info.font]..".xml"
+-- 		end
+		
+-- 		ComponentSetValue2( comp, "text", text_info.text[1] )
+-- 		ComponentSetValue2( comp, "image_file", text_info.font )
+-- 		ComponentSetValue2( comp, "offset_x", text_info.x or 0 )
+-- 		ComponentSetValue2( comp, "offset_y", text_info.y or 0 )
+-- 		ComponentSetValue2( comp, "alpha", text_info.alpha or 1 )
+-- 		ComponentSetValue2( comp, "emissive", text_info.emissive or false )
+-- 		ComponentSetValue2( comp, "fog_of_war_hole", text_info.fog_hole or false )
+-- 		ComponentSetValue2( comp, "additive", text_info.additive or false )
+-- 		ComponentSetValue2( comp, "smooth_filtering", text_info.smooth or false )
+-- 		ComponentSetValue2( comp, "visible", text_info.visible or false )
+		
+-- 		ComponentSetValue2( comp, "z_index", pos_info.z )
+		
+-- 		if( text_info.s_x ~= nil or text_info.s_y ~= nil ) then
+-- 			ComponentSetValue2( comp, "has_special_scale", true )
+-- 			ComponentSetValue2( comp, "special_scale_x", text_info.s_x or 1 )
+-- 			ComponentSetValue2( comp, "special_scale_y", text_info.s_y or 1 )
+-- 		end
+		
+-- 		EntityRefreshSprite( text_id, comp )
+-- 	end)
+-- 	set_transform( text_id, pos_info.x, pos_info.y, pos_info.s_x, pos_info.s_y, pos_info.r ~= nil and math.rad( pos_info.r ) or nil )
+-- 	EntityAddChild( core_id, text_id )
+	
+-- 	local txt = magic_copy( text_info.text )
+-- 	if( #txt > 1 ) then
+-- 		local offset_y = 0
+-- 		for k,line in ipairs( txt ) do
+-- 			if( k > 1 ) then
+-- 				text_info.text = { line, }
+-- 				offset_y = offset_y + 9
+-- 				new_hybrid_text( text_id, uid..k, text_info, { y = offset_y, z = pos_info.z, i = k, }, extra_action )
+-- 			end
+-- 		end
+-- 	end
+	
+-- 	if( extra_action ~= nil ) then
+-- 		extra_action( text_id, pos_info.i or 1 )
+-- 	end
+	
+-- 	return text_id
+-- end
+
+-- function new_hybrid_interface( gui, uid, pic_x, pic_y, pic_z, s_x, s_y, debugged ) --fucking shit is being symmetrically scaled by x even though it appears to be proper
+-- 	s_x = s_x or 1
+-- 	s_y = s_y or 1
+-- 	s_x, s_y = math.abs( s_x ), math.abs( s_y )
+	
+-- 	local is_vertical = s_x < s_y
+-- 	local width = is_vertical and s_x or s_y
+-- 	local clicked, r_clicked, hovered = false, false, false
+	
+-- 	local function do_interface( p_x, p_y )
+-- 		uid = new_image( gui, uid, p_x, p_y, pic_z or 0, "mods/white_room/files/pics/debug_"..( debugged and "purple" or "null" )..".png", width, width, 1, true )
+-- 		local c, r_c, h = GuiGetPreviousWidgetInfo( gui )
+-- 		clicked, r_clicked, hovered = clicked or c, r_clicked or r_c, hovered or h
+-- 	end
+	
+-- 	if( s_x ~= 0 and s_y ~= 0 ) then
+-- 		local count = math.floor( is_vertical and s_y/s_x or s_x/s_y )
+-- 		for i = 1,count do
+-- 			do_interface( pic_x, pic_y )
+-- 			if( is_vertical ) then
+-- 				pic_y = pic_y + width
+-- 			else
+-- 				pic_x = pic_x + width
+-- 			end
+-- 		end
+-- 		local leftover = ( is_vertical and s_y or s_x ) - count*width
+-- 		if( leftover > 0 ) then
+-- 			local drift = width - leftover
+-- 			if( is_vertical ) then
+-- 				pic_y = pic_y - drift
+-- 			else
+-- 				pic_x = pic_x - drift
+-- 			end
+-- 			do_interface( pic_x, pic_y )
+-- 		end
+-- 	end
+	
+-- 	return uid+1, clicked, r_clicked, hovered
+-- end
+
+-- function new_scroller( core_id, uid, s_info, pos_info )	
+-- 	uid = "childfree_scrllr_"..uid.."_"
+-- 	s_info = s_info or {}
+-- 	s_info.edge = s_info.edge or { -5, 5, }
+-- 	s_info.extra_drift = s_info.extra_drift or { 0, 0, }
+-- 	pos_info = pos_info or {}
+-- 	pos_info.z = pos_info.z or -100
+	
+-- 	local gui_core = s_info.pic or "mods/white_room/files/props/gui/scroller/"
+	
+-- 	core_id = new_hybrid_pic( core_id, uid.."rail_top", {
+-- 		pic = gui_core.."rail_end.png",
+-- 	}, {
+-- 		x = pos_info.x,
+-- 		y = pos_info.y,
+-- 		r = pos_info.r,
+-- 		s_x = pos_info.s_x,
+-- 		s_y = pos_info.s_y,
+-- 		z = pos_info.z,
+-- 	})
+	
+-- 	if( core_id ~= nil ) then
+-- 		local function marker( dude_id )
+-- 			EntityAddTag( dude_id, "main_structure" )
+-- 			return dude_id
+-- 		end
+	
+-- 		marker( new_hybrid_pic( core_id, uid.."rail_body", {
+-- 			pic = gui_core.."rail_body.png",
+-- 		}, {
+-- 			y = 0.5,
+-- 			s_y = s_info.length + 1,
+-- 			z = pos_info.z + 0.0001,
+-- 		}))
+-- 		marker( new_hybrid_pic( core_id, uid.."rail_bottom", {
+-- 			pic = gui_core.."rail_end.png",
+-- 		}, {
+-- 			y = s_info.length + 1,
+-- 			z = pos_info.z,
+-- 		}))
+		
+-- 		EntitySetName( add_ctrl_script( marker( new_hybrid_dragger( core_id, "", {
+-- 			center = { 0, 0, },
+-- 			dims = { 4, 6, },
+-- 			is_local = true,
+-- 		}, {
+-- 			pic = gui_core.."dragger_body.png",
+-- 			x = 5,
+-- 			y = 6.5,
+-- 		}, {
+-- 			x = 2,
+-- 			y = 7.5,
+-- 			z = pos_info.z - 0.00015,
+-- 		}, function( dude_id )
+-- 			EntityAddComponent( dude_id, "VariableStorageComponent", 
+-- 			{
+-- 				name = "scroller_offset",
+-- 				value_float = 0,
+-- 			})
+-- 			EntityAddComponent( dude_id, "VariableStorageComponent", 
+-- 			{
+-- 				name = "scroller_ratio",
+-- 				value_float = -1,
+-- 			})
+-- 			EntityAddComponent( dude_id, "VariableStorageComponent", 
+-- 			{
+-- 				name = "scroller_limit",
+-- 				value_float = s_info.length,
+-- 			})
+-- 			EntityAddComponent( dude_id, "VariableStorageComponent", 
+-- 			{
+-- 				name = "scroller_extra_drift",
+-- 				value_string = magic_packer( s_info.extra_drift ),
+-- 			})
+-- 			EntityAddComponent( dude_id, "VariableStorageComponent", 
+-- 			{
+-- 				name = "step",
+-- 				value_float = s_info.step or 2,
+-- 			})
+-- 			EntityAddComponent( dude_id, "VariableStorageComponent", 
+-- 			{
+-- 				name = "edge_a",
+-- 				value_float = s_info.edge[1],
+-- 			})
+-- 			EntityAddComponent( dude_id, "VariableStorageComponent", 
+-- 			{
+-- 				name = "edge_b",
+-- 				value_float = s_info.edge[2],
+-- 			})
+-- 		end)), gui_core.."controller.lua" ), "dragger_entity" )
+		
+-- 		for i = 1,2 do
+-- 			marker( new_hybrid_button( core_id, uid.."dragger_btn_"..i, {
+-- 				pic = gui_core.."dragger_button.png",
+-- 			}, {
+-- 				x = -1,
+-- 				y = ( i == 1 and 0 or s_info.length + 2 ),
+-- 				z = pos_info.z - 0.0001,
+-- 				s_y = ( i == 1 and 1 or -1 ),
+-- 			}, gui_core.."button.lua" ))
+-- 		end
+-- 	end
+	
+-- 	return core_id
+-- end
+
+-- function pen.new_glowing( pic_x, pic_y, pic_z, s_x, s_y, color, alpha )
+-- 	pen.new_image( pic_x, pic_y, pic_z, "mods/penman/extra/pics/glow.png", {
+-- 		is_centered = true, s_x = ( s_x or 1 )/150, s_y = ( s_y or 1 )/150, color = color, alpha = alpha })
+-- 	-- do procedurally assembled rectangle is s_x or s_y is less than 0
+-- end
 
 --[SAFE] ^^^^^^^^^^^^
 if( io == nil ) then return end

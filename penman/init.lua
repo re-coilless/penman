@@ -7,7 +7,7 @@ function OnWorldPreUpdate()
 end
 
 --matter file builder that allows for matter types (molten_metal or poison_liquid); make sure one can apply several at once (so stuff like "molten" and "metal" assemble into a proper molten metal thing)
---in-line text mod comments should use "!" instead of "|"
+--in-line text mod comments should use "!" instead of "|", just use ansi standard
 --add new table to penman to house all gameplay-first functionality
 --there should be inherent consistency with "info" (context-spesific parameters of a distinct object) and "data" (a group of parameters applicable to a function) variable names
 --palette png file with all the color names spelled in corresponding color

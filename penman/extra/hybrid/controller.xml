@@ -1,0 +1,41 @@
+<Entity>
+	<LuaComponent
+		script_source_file="mods/white_room/files/props/gui/hybrid_gui_controller.lua"
+		execute_every_n_frame="1"
+	></LuaComponent>
+	
+	<VariableStorageComponent
+		name="is_loaded"
+		value_bool="0"
+	></VariableStorageComponent>
+	
+	<VariableStorageComponent
+		name="is_going"
+		value_bool="1"
+	></VariableStorageComponent>
+	
+	<VariableStorageComponent
+		name="anim_state"
+		value_int="0"
+	></VariableStorageComponent>
+	
+	<VariableStorageComponent
+		name="anim_count"
+		value_int="30"
+	></VariableStorageComponent>
+	
+	<Entity serialize="0" name="shell" >
+		<InheritTransformComponent>
+		</InheritTransformComponent>
+	</Entity>
+	
+	<Entity serialize="0" name="contents" >
+		<InheritTransformComponent>
+		</InheritTransformComponent>
+		
+		<VariableStorageComponent
+			name="is_alphaed"
+			value_bool="0"
+		></VariableStorageComponent>
+	</Entity>
+</Entity>
