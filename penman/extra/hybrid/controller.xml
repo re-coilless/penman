@@ -1,7 +1,8 @@
 <Entity>
 	<LuaComponent
-		script_source_file="mods/white_room/files/props/gui/hybrid_gui_controller.lua"
+		script_source_file="mods/penman/extra/hybrid/controller.lua"
 		execute_every_n_frame="1"
+		execute_on_added="1"
 	></LuaComponent>
 	
 	<VariableStorageComponent
@@ -14,28 +15,15 @@
 		value_bool="1"
 	></VariableStorageComponent>
 	
-	<VariableStorageComponent
-		name="anim_state"
-		value_int="0"
-	></VariableStorageComponent>
-	
-	<VariableStorageComponent
-		name="anim_count"
-		value_int="30"
-	></VariableStorageComponent>
-	
-	<Entity serialize="0" name="shell" >
-		<InheritTransformComponent>
-		</InheritTransformComponent>
+	<Entity name="physical" >
+		<InheritTransformComponent/>
 	</Entity>
 	
-	<Entity serialize="0" name="contents" >
-		<InheritTransformComponent>
-		</InheritTransformComponent>
-		
-		<VariableStorageComponent
-			name="is_alphaed"
-			value_bool="0"
-		></VariableStorageComponent>
+	<Entity name="virtual" >
+		<InheritTransformComponent/>
+	</Entity>
+
+	<Entity name="data" >
+		<InheritTransformComponent/>
 	</Entity>
 </Entity>

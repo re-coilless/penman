@@ -1,0 +1,14 @@
+<Entity>
+	<InheritTransformComponent
+		only_position="0"
+	></InheritTransformComponent>
+	
+	<SpriteComponent 
+		visible="0"
+		offset_x="0"
+		offset_y="0"
+		z_index="-100"
+		alpha="0"
+		image_file="data/ui_gfx/empty_white.png"
+	></SpriteComponent>
+</Entity>

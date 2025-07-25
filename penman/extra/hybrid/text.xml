@@ -1,0 +1,16 @@
+<Entity>
+	<InheritTransformComponent
+		only_position="0"
+	></InheritTransformComponent>
+	
+	<SpriteComponent 
+		visible="0"
+		offset_x="0"
+		offset_y="0"
+		z_index="-100"
+		alpha="0"
+		image_file="data/fonts/font_pixel.xml" 
+		is_text_sprite="1" 
+		text="0"
+	></SpriteComponent>
+</Entity>

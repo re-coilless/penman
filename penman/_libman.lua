@@ -462,103 +462,98 @@ end
 function pen.lib.entity2nxml()
 end
 
-pen.hybrid = pen.hybrid or {}
+pen.h = pen.h or {}
 
--- function pen.hybrid.gui_builder( init_func )
--- 	if( EntityGetIsAlive( gui or 0 )) then
--- 		local storage_going = get_storage( gui, "is_going" )
--- 		if( not( ComponentGetValue2( storage_going, "value_bool" ))) then
--- 			ComponentSetValue2( storage_going, "value_bool", true )
--- 		end
--- 	else
--- 		--attach to world entity as child
+function pen.h.set_transform( entity_id, x, y, s_x, s_y, r )
+	local trans_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "InheritTransformComponent" )
+	local _x, _y, _s_x, _s_y, _r = ComponentGetValue2( trans_comp, "Transform" )
+	x, y, s_x, s_y, r = x or _x, y or _y, s_x or _s_x, s_y or _s_y, r or _r
+	ComponentSetValue2( trans_comp, "Transform", x, y, s_x, s_y, r )
+	return x, y, s_x, s_y, r
+end
 
--- 		gui = EntityLoad( "mods/white_room/files/props/_base_hybrid_gui.xml", x, y )
--- 		if( extra_action ~= nil ) then
--- 			extra_action( gui )
--- 		end
--- 	end
-	
--- 	return gui
--- end
+function pen.h.gui_builder( guid, init_func )
+	guid = "hybrid_gui_"..( guid or "dft" )
 
--- function pen.new_hybrid_pic( core_id, uid, pic_info, pos_info, interaction, extra_action )
--- 	uid = "pic_"..uid
--- 	pic_info = pic_info or {}
--- 	pos_info = pos_info or {}
-	
--- 	local x, y = EntityGetTransform( core_id )
-	
--- 	local pic_id = get_hooman_child( core_id, uid ) or 0
--- 	if( pic_id ~= 0 ) then
--- 		return
--- 	end
-	
--- 	pic_id = EntityLoad( "mods/white_room/files/props/_base_hybrid_gui_object.xml", x, y + 500 )
--- 	EntitySetName( pic_id, uid )
-	
--- 	local pic_comp = edit_component_ultimate( pic_id, "SpriteComponent", function(comp,vars)
--- 		ComponentSetValue2( comp, "image_file", pic_info.pic )
--- 		ComponentSetValue2( comp, "offset_x", pic_info.x or 0 )
--- 		ComponentSetValue2( comp, "offset_y", pic_info.y or 0 )
--- 		ComponentSetValue2( comp, "alpha", pic_info.alpha or 1 )
--- 		ComponentSetValue2( comp, "emissive", pic_info.emissive or false )
--- 		ComponentSetValue2( comp, "fog_of_war_hole", pic_info.fog_hole or false )
--- 		ComponentSetValue2( comp, "additive", pic_info.additive or false )
--- 		ComponentSetValue2( comp, "smooth_filtering", pic_info.smooth or false )
--- 		ComponentSetValue2( comp, "visible", pic_info.visible or false )
-		
--- 		ComponentSetValue2( comp, "z_index", pos_info.z or -100 )
-		
--- 		if( pic_info.s_x ~= nil or pic_info.s_y ~= nil ) then
--- 			ComponentSetValue2( comp, "has_special_scale", true )
--- 			ComponentSetValue2( comp, "special_scale_x", pic_info.s_x or 1 )
--- 			ComponentSetValue2( comp, "special_scale_y", pic_info.s_y or 1 )
--- 		end
-		
--- 		EntityRefreshSprite( pic_id, comp )
--- 	end)
--- 	if( pic_info.is_fogless or false ) then
--- 		clone_comp( pic_id, pic_comp, { fog_of_war_hole = true, smooth_filtering = true, })
--- 	end
--- 	set_transform( pic_id, pos_info.x, pos_info.y, pos_info.s_x, pos_info.s_y, pos_info.r ~= nil and math.rad( pos_info.r ) or nil )
-	
--- 	if( interaction or false ) then
--- 		EntityAddComponent( pic_id, "VariableStorageComponent", 
--- 		{
--- 			name = "trigger_state",
--- 			value_int = 0,
--- 		})
-		
--- 		EntityAddComponent( pic_id, "VariableStorageComponent", 
--- 		{
--- 			name = "is_hovered",
--- 			value_bool = "0",
--- 		})
--- 		if( type( interaction ) == "string" ) then
--- 			EntityAddComponent( pic_id, "VariableStorageComponent", 
--- 			{
--- 				name = "action_hover",
--- 				value_string = interaction,
--- 			})
--- 			EntityAddComponent( pic_id, "VariableStorageComponent", 
--- 			{
--- 				name = "hover_delay",
--- 				value_int = 30,
--- 			})
--- 		end
--- 	end
-	
--- 	EntityAddChild( core_id, pic_id )
-	
--- 	if( extra_action ~= nil ) then
--- 		extra_action( pic_id )
--- 	end
-	
--- 	return pic_id
--- end
+	local gui_id = EntityGetWithName( guid ) or 0
+	if( not( pen.vld( gui_id, true ) and EntityGetIsAlive( gui_id ))) then
+		gui_id = EntityLoad( "mods/penman/extra/hybrid/controller.xml", 0, 0 )
+		EntityAddChild( GameGetWorldStateEntity(), gui_id )
+		EntitySetName( gui_id, guid )
 
--- function new_hybrid_button( core_id, uid, pic_info, pos_info, script_path, extra_action )
+		if( pen.vld( init_func )) then init_func( gui_id ) end
+	end
+
+	pen.magic_storage( gui_id, "is_going", "value_bool", true )
+	
+	return gui_id
+end
+
+--all gui objects must be on life support, only controller persists
+--transition to sprite emitter if data.color is specified (thanks Copi)
+function pen.h.new_image( uid, x, y, z, pic, data, init_func )
+	if( not( pen.vld( pic ))) then return end
+
+	uid = "pic_"..uid
+	data = data or {}
+
+	--if no guid is set, consider coords as in-world and remove transform comp
+	--if data.in_gui, then remove trans comp and consider coords as on-screen
+	
+	local gui_id = pen.h.gui_builder( data.guid )
+	local pic_id = pen.get_child( gui_id, uid ) or 0
+	if( pen.vld( pic_id, true )) then return pic_id end
+	
+	local x, y = EntityGetTransform( gui_id )
+	pic_id = EntityLoad( "mods/penman/extra/hybrid/image.xml", x, y )
+	EntityAddChild( gui_id, pic_id )
+	EntitySetName( pic_id, uid )
+	
+	-- local pic_comp = edit_component_ultimate( pic_id, "SpriteComponent", function(comp,vars)
+	-- 	ComponentSetValue2( comp, "image_file", pic_info.pic )
+	-- 	ComponentSetValue2( comp, "offset_x", pic_info.x or 0 )
+	-- 	ComponentSetValue2( comp, "offset_y", pic_info.y or 0 )
+	-- 	ComponentSetValue2( comp, "alpha", pic_info.alpha or 1 )
+	-- 	ComponentSetValue2( comp, "emissive", pic_info.emissive or false )
+	-- 	ComponentSetValue2( comp, "fog_of_war_hole", pic_info.fog_hole or false )
+	-- 	ComponentSetValue2( comp, "additive", pic_info.additive or false )
+	-- 	ComponentSetValue2( comp, "smooth_filtering", pic_info.smooth or false )
+	-- 	ComponentSetValue2( comp, "visible", pic_info.visible or false )
+		
+	-- 	ComponentSetValue2( comp, "z_index", pos_info.z or -100 )
+		
+	-- 	if( pic_info.s_x ~= nil or pic_info.s_y ~= nil ) then
+	-- 		ComponentSetValue2( comp, "has_special_scale", true )
+	-- 		ComponentSetValue2( comp, "special_scale_x", pic_info.s_x or 1 )
+	-- 		ComponentSetValue2( comp, "special_scale_y", pic_info.s_y or 1 )
+	-- 	end
+	-- end)
+	if( data.is_fogless ) then
+		pen.clone_comp( pic_id, pic_comp, { fog_of_war_hole = true, smooth_filtering = true })
+	end
+	pen.h.set_transform( pic_id, x, y, data.s_x, data.s_y, math.rad( data.r or 0 ))
+	
+	if( data.can_click ) then
+		local action = type( data.can_click ) == "string"
+			and data.can_click or "mods/penman/extra/hybrid/button.lua"
+		EntityAddComponent2( pic_id, "VariableStorageComponent", {
+			name = "action", value_string = action,
+		})
+		EntityAddComponent2( pic_id, "VariableStorageComponent", {
+			name = "is_triggered", value_int = 0,
+		})
+		EntityAddComponent2( pic_id, "VariableStorageComponent", {
+			name = "is_hovered", value_bool = false,
+		})
+	end
+	
+	if( pen.vld( init_func )) then init_func( pic_id, pic_comp ) end
+	EntityRefreshSprite( pic_id, pic_comp )
+
+	return pic_id
+end
+
+-- function pen.h.new_button( core_id, uid, pic_info, pos_info, script_path, extra_action )
 -- 	uid = "button_"..uid
 -- 	script_path = script_path or ""
 -- 	if( type( script_path ) ~= "table" ) then
@@ -581,7 +576,7 @@ pen.hybrid = pen.hybrid or {}
 -- 	return bttn_id
 -- end
 
--- function new_hybrid_dragger( core_id, uid, sans_info, pic_info, pos_info, extra_action )
+-- function pen.h.new_dragger( core_id, uid, sans_info, pic_info, pos_info, extra_action )
 -- 	uid = "dragger_"..uid
 -- 	sans_info = sans_info or {}
 -- 	sans_info.center = sans_info.center or {}
@@ -645,7 +640,7 @@ pen.hybrid = pen.hybrid or {}
 -- 	return dragger_id
 -- end
 
--- function new_hybrid_focus( core_id, uid, pic_info, pos_info )
+-- function pen.h.new_focus( core_id, uid, pic_info, pos_info )
 -- 	pic_info = pic_info or {}
 -- 	pic_info.is_small = pic_info.is_small or false
 -- 	local path = "mods/white_room/files/props/gui/advanced_window/button_focus_"..( pic_info.is_small and "small_" or "" )
@@ -675,7 +670,7 @@ pen.hybrid = pen.hybrid or {}
 -- 	end), "mods/white_room/files/props/gui/advanced_window/actions/focus_action.lua" )
 -- end
 
--- function new_hybrid_text( core_id, uid, text_info, pos_info, extra_action )
+-- function pen.h.new_text( core_id, uid, text_info, pos_info, extra_action )
 -- 	uid = "text_"..uid.."_"
 -- 	text_info = text_info or {}
 -- 	text_info.text = text_info.text or "[NIL]"
@@ -747,47 +742,7 @@ pen.hybrid = pen.hybrid or {}
 -- 	return text_id
 -- end
 
--- function new_hybrid_interface( gui, uid, pic_x, pic_y, pic_z, s_x, s_y, debugged ) --fucking shit is being symmetrically scaled by x even though it appears to be proper
--- 	s_x = s_x or 1
--- 	s_y = s_y or 1
--- 	s_x, s_y = math.abs( s_x ), math.abs( s_y )
-	
--- 	local is_vertical = s_x < s_y
--- 	local width = is_vertical and s_x or s_y
--- 	local clicked, r_clicked, hovered = false, false, false
-	
--- 	local function do_interface( p_x, p_y )
--- 		uid = new_image( gui, uid, p_x, p_y, pic_z or 0, "mods/white_room/files/pics/debug_"..( debugged and "purple" or "null" )..".png", width, width, 1, true )
--- 		local c, r_c, h = GuiGetPreviousWidgetInfo( gui )
--- 		clicked, r_clicked, hovered = clicked or c, r_clicked or r_c, hovered or h
--- 	end
-	
--- 	if( s_x ~= 0 and s_y ~= 0 ) then
--- 		local count = math.floor( is_vertical and s_y/s_x or s_x/s_y )
--- 		for i = 1,count do
--- 			do_interface( pic_x, pic_y )
--- 			if( is_vertical ) then
--- 				pic_y = pic_y + width
--- 			else
--- 				pic_x = pic_x + width
--- 			end
--- 		end
--- 		local leftover = ( is_vertical and s_y or s_x ) - count*width
--- 		if( leftover > 0 ) then
--- 			local drift = width - leftover
--- 			if( is_vertical ) then
--- 				pic_y = pic_y - drift
--- 			else
--- 				pic_x = pic_x - drift
--- 			end
--- 			do_interface( pic_x, pic_y )
--- 		end
--- 	end
-	
--- 	return uid+1, clicked, r_clicked, hovered
--- end
-
--- function new_scroller( core_id, uid, s_info, pos_info )	
+-- function pen.h.new_scroller( core_id, uid, s_info, pos_info )	
 -- 	uid = "childfree_scrllr_"..uid.."_"
 -- 	s_info = s_info or {}
 -- 	s_info.edge = s_info.edge or { -5, 5, }
@@ -893,7 +848,7 @@ pen.hybrid = pen.hybrid or {}
 -- 	return core_id
 -- end
 
--- function pen.new_glowing( pic_x, pic_y, pic_z, s_x, s_y, color, alpha )
+-- function pen.h.new_glowing( pic_x, pic_y, pic_z, s_x, s_y, color, alpha )
 -- 	pen.new_image( pic_x, pic_y, pic_z, "mods/penman/extra/pics/glow.png", {
 -- 		is_centered = true, s_x = ( s_x or 1 )/150, s_y = ( s_y or 1 )/150, color = color, alpha = alpha })
 -- 	-- do procedurally assembled rectangle is s_x or s_y is less than 0
