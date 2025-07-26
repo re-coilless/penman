@@ -10,5 +10,6 @@
 		z_index="-100"
 		alpha="0"
 		image_file="data/ui_gfx/empty_white.png"
+		never_ragdollify_on_death="1"
 	></SpriteComponent>
 </Entity>

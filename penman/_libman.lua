@@ -318,7 +318,11 @@ function pen.lib.set_matter_damage( hooman, data )
 end
 
 function pen.lib.player_builder( hooman, func )
-	local is_vectored = ModIsEnabled( "vector_core" )
+	if( ModIsEnabled( "vector_core" )) then
+		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.accel_x = 0.001
+		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.accel_x_air = 0.001
+		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.run_velocity = 0
+	end
 
 	local overrides = pen.GENERIC_CHAR_SETUP
 	pen.t.loop( overrides, function( name, values )
@@ -475,6 +479,8 @@ end
 function pen.h.gui_builder( guid, init_func )
 	guid = "hybrid_gui_"..( guid or "dft" )
 
+	pen.c.hybrid_objects = pen.c.hybrid_objects or {}
+
 	local gui_id = EntityGetWithName( guid ) or 0
 	if( not( pen.vld( gui_id, true ) and EntityGetIsAlive( gui_id ))) then
 		gui_id = EntityLoad( "mods/penman/extra/hybrid/controller.xml", 0, 0 )
@@ -483,98 +489,114 @@ function pen.h.gui_builder( guid, init_func )
 
 		if( pen.vld( init_func )) then init_func( gui_id ) end
 	end
-
-	pen.magic_storage( gui_id, "is_going", "value_bool", true )
 	
 	return gui_id
 end
 
---all gui objects must be on life support, only controller persists
---transition to sprite emitter if data.color is specified (thanks Copi)
+--check ui_is_parent
+--pen.h.new_button should have button.lua by default, setting can_click to true on image just makes it block inputs
 function pen.h.new_image( uid, x, y, z, pic, data, init_func )
 	if( not( pen.vld( pic ))) then return end
 
 	uid = "pic_"..uid
 	data = data or {}
-
-	--if no guid is set, consider coords as in-world and remove transform comp
-	--if data.in_gui, then remove trans comp and consider coords as on-screen
 	
 	local gui_id = pen.h.gui_builder( data.guid )
-	local pic_id = pen.get_child( gui_id, uid ) or 0
-	if( pen.vld( pic_id, true )) then return pic_id end
-	
 	local x, y = EntityGetTransform( gui_id )
-	pic_id = EntityLoad( "mods/penman/extra/hybrid/image.xml", x, y )
-	EntityAddChild( gui_id, pic_id )
-	EntitySetName( pic_id, uid )
 	
-	-- local pic_comp = edit_component_ultimate( pic_id, "SpriteComponent", function(comp,vars)
-	-- 	ComponentSetValue2( comp, "image_file", pic_info.pic )
-	-- 	ComponentSetValue2( comp, "offset_x", pic_info.x or 0 )
-	-- 	ComponentSetValue2( comp, "offset_y", pic_info.y or 0 )
-	-- 	ComponentSetValue2( comp, "alpha", pic_info.alpha or 1 )
-	-- 	ComponentSetValue2( comp, "emissive", pic_info.emissive or false )
-	-- 	ComponentSetValue2( comp, "fog_of_war_hole", pic_info.fog_hole or false )
-	-- 	ComponentSetValue2( comp, "additive", pic_info.additive or false )
-	-- 	ComponentSetValue2( comp, "smooth_filtering", pic_info.smooth or false )
-	-- 	ComponentSetValue2( comp, "visible", pic_info.visible or false )
-		
-	-- 	ComponentSetValue2( comp, "z_index", pos_info.z or -100 )
-		
-	-- 	if( pic_info.s_x ~= nil or pic_info.s_y ~= nil ) then
-	-- 		ComponentSetValue2( comp, "has_special_scale", true )
-	-- 		ComponentSetValue2( comp, "special_scale_x", pic_info.s_x or 1 )
-	-- 		ComponentSetValue2( comp, "special_scale_y", pic_info.s_y or 1 )
-	-- 	end
-	-- end)
-	if( data.is_fogless ) then
-		pen.clone_comp( pic_id, pic_comp, { fog_of_war_hole = true, smooth_filtering = true })
+	pen.c.hybrid_objects.images = pen.c.hybrid_objects.images or {}
+
+	local pic_id, is_new = pen.life_support(
+		pen.c.hybrid_objects.images, uid, "mods/penman/extra/hybrid/image.xml" )
+	if( not( is_new )) then return pic_id, false end
+	EntityAddChild( pen.get_child( gui_id, "root" ), pic_id )
+	EntitySetName( pic_id, uid )
+
+	local pic_comp = 0
+	local w, h, xml_offs = pen.get_pic_dims({ pic, data.anim }, data.update_xml )
+	xml_offs = xml_offs or { 0, 0 }
+	
+	if( pen.vld( data.color )) then --thanks Copi
+		z = z or pen.LAYERS.WORLD
+		pic_comp = EntityAddComponent2( pic_id, "SpriteParticleEmitterComponent", {
+			sprite_file = pic,
+			sprite_centered = data.is_centered,
+			z_index = z, delay = 0, lifetime = 0,
+			render_back = not( data.emissive ) and z > 0,
+			additive = data.additive or false,
+			emissive = data.emissive or false,
+			use_rotation_from_entity = true,
+			camera_bound = true, camera_distance = 500,
+			is_emitting = true, count_min = 1, count_max = 1,
+			emission_interval_min_frames = 0,
+			emission_interval_max_frames = 0,
+		}) --set offset through randomize_position
+		ComponentSetValue2( pic_comp, "color",
+			data.color[1]/255, data.color[2]/255, data.color[3]/255, data.alpha or 1 )
+		ComponentSetValue2( pic_comp, "scale", data.s_x or 1, data.s_y or 1 )
+	else
+		if( data.is_centered ) then data.off_x, data.off_y = w/2 - xml_offs[1], h/2 - xml_offs[1] end
+		pic_comp = pen.magic_comp( pic_id, "SpriteComponent", function( comp_id, v, is_enabled )
+			ComponentSetValue2( comp_id, "z_index", z or pen.LAYERS.WORLD )
+			
+			ComponentSetValue2( comp_id, "image_file", pic )
+			ComponentSetValue2( comp_id, "alpha", data.alpha or 1 )
+			ComponentSetValue2( comp_id, "offset_x", data.off_x or 0 )
+			ComponentSetValue2( comp_id, "offset_y", data.off_y or 0 )
+			ComponentSetValue2( comp_id, "emissive", data.emissive or false )
+			ComponentSetValue2( comp_id, "additive", data.additive or false )
+			ComponentSetValue2( comp_id, "smooth_filtering", data.smooth or false )
+			ComponentSetValue2( comp_id, "fog_of_war_hole", data.fog_hole or false )
+			
+			if( data.pic_s_x ~= nil or data.pic_s_y ~= nil ) then
+				ComponentSetValue2( comp_id, "has_special_scale", true )
+				ComponentSetValue2( comp_id, "special_scale_x", data.pic_s_x or 1 )
+				ComponentSetValue2( comp_id, "special_scale_y", data.pic_s_y or 1 )
+			end
+	
+			return true
+		end)
+		if( data.is_fogless ) then
+			pen.clone_comp( pic_id, pic_comp, { fog_of_war_hole = true, smooth_filtering = true })
+		end
 	end
-	pen.h.set_transform( pic_id, x, y, data.s_x, data.s_y, math.rad( data.r or 0 ))
+	
+	if( data.guid == nil or data.in_gui ) then
+		if( data.in_gui ) then
+			pen.magic_storage( pic_id, "is_gui", "value_bool", true )
+			pen.magic_storage( pic_id, "gui_x", "value_float", x )
+			pen.magic_storage( pic_id, "gui_y", "value_float", y )
+			x, y = pen.gui2world( x, y )
+		end
+		
+		EntitySetTransform( pic_id, x, y, math.rad( data.r or 0 ), data.s_x or 1, data.s_y or 1 )
+		local trans_comp = EntityGetFirstComponentIncludingDisabled( pic_id, "InheritTransformComponent" )
+		EntityRemoveComponent( pic_id, trans_comp )
+	else pen.h.set_transform( pic_id, x, y, data.s_x, data.s_y, math.rad( data.r or 0 )) end
 	
 	if( data.can_click ) then
 		local action = type( data.can_click ) == "string"
 			and data.can_click or "mods/penman/extra/hybrid/button.lua"
-		EntityAddComponent2( pic_id, "VariableStorageComponent", {
-			name = "action", value_string = action,
-		})
-		EntityAddComponent2( pic_id, "VariableStorageComponent", {
-			name = "is_triggered", value_int = 0,
-		})
-		EntityAddComponent2( pic_id, "VariableStorageComponent", {
-			name = "is_hovered", value_bool = false,
-		})
+		pen.magic_storage( pic_id, "is_triggered", "value_int", 0 )
+		pen.magic_storage( pic_id, "is_touched", "value_bool", false )
+		pen.magic_storage( pic_id, "on_action", "value_string", action )
+	end
+	if( pen.vld( data.ctrl_script )) then
+		pen.magic_storage( pic_id, "on_ctrl", "value_string", data.ctrl_script )
 	end
 	
 	if( pen.vld( init_func )) then init_func( pic_id, pic_comp ) end
-	EntityRefreshSprite( pic_id, pic_comp )
+	if( not( pen.vld( data.color ))) then EntityRefreshSprite( pic_id, pic_comp ) end
 
-	return pic_id
+	return pic_id, true
 end
 
--- function pen.h.new_button( core_id, uid, pic_info, pos_info, script_path, extra_action )
--- 	uid = "button_"..uid
--- 	script_path = script_path or ""
--- 	if( type( script_path ) ~= "table" ) then
--- 		script_path = { script_path }
--- 	end
-	
--- 	local bttn_id = new_hybrid_pic( core_id, uid, pic_info, pos_info, script_path[2] or 1, extra_action )
--- 	if( bttn_id == nil ) then
--- 		return
--- 	end
-	
--- 	if(( script_path[1] or "" ) ~= "" ) then
--- 		EntityAddComponent( bttn_id, "VariableStorageComponent", 
--- 		{
--- 			name = "action",
--- 			value_string = script_path[1],
--- 		})
--- 	end
-	
--- 	return bttn_id
--- end
+function pen.h.new_glowing( uid, pic_x, pic_y, pic_z, s_x, s_y, color, alpha )
+	return pen.h.new_image( "glowing_"..uid, pic_x, pic_y, z, "mods/penman/extra/pics/glow.png", {
+		in_gui = true, is_centered = true, s_x = ( s_x or 1 )/256, s_y = ( s_y or 1 )/256, color = color,
+		alpha = alpha, additive = true, smooth = true, emissive = true })
+	-- do procedurally assembled rectangle is s_x or s_y is less than 0
+end
 
 -- function pen.h.new_dragger( core_id, uid, sans_info, pic_info, pos_info, extra_action )
 -- 	uid = "dragger_"..uid
@@ -846,12 +868,6 @@ end
 -- 	end
 	
 -- 	return core_id
--- end
-
--- function pen.h.new_glowing( pic_x, pic_y, pic_z, s_x, s_y, color, alpha )
--- 	pen.new_image( pic_x, pic_y, pic_z, "mods/penman/extra/pics/glow.png", {
--- 		is_centered = true, s_x = ( s_x or 1 )/150, s_y = ( s_y or 1 )/150, color = color, alpha = alpha })
--- 	-- do procedurally assembled rectangle is s_x or s_y is less than 0
 -- end
 
 --[SAFE] ^^^^^^^^^^^^

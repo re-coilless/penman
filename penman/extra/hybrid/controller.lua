@@ -1,62 +1,72 @@
-dofile_once( "mods/white_room/files/lib/generic_lib.lua" )
-dofile_once( "mods/white_room/files/lib/gui_lib.lua" )
+dofile_once( "mods/penman/_libman.lua" )
 
-local entity_id = GetUpdatedEntityID()
-local x, y = EntityGetTransform( entity_id )
+local gui_id = GetUpdatedEntityID()
+local gui_x, gui_y = EntityGetTransform( gui_id )
 
-local is_going = ComponentGetValue2( get_storage( entity_id, "is_going" ), "value_bool" )
-local storage_state = get_storage( entity_id, "anim_state" )
-local anim_state = ComponentGetValue2( storage_state, "value_int" )
+local no_gui = pen.magic_storage( gui_id, "no_gui", "value_bool" )
+local is_going = pen.magic_storage( gui_id, "is_going", "value_bool" )
+local will_unload = pen.magic_storage( gui_id, "will_unload", "value_bool" )
+local is_debugging = pen.magic_storage( gui_id, "is_debugging", "value_bool" )
 
-local extra_radius = ComponentGetValue2( get_storage( entity_id, "extra_radius" ), "value_int" )
-local anim_frames = ComponentGetValue2( get_storage( entity_id, "anim_count" ), "value_int" )
-local content_frames = 10
+local root_id = pen.get_child( gui_id, "root" )
+local data_id = pen.get_child( gui_id, "data" ) --turn this into a table
 
-local uid = 0
+pen.c.hybrid_data = pen.c.hybrid_data or {}
 
-local shell_id = get_hooman_child( entity_id, "shell" )
-local content_id = get_hooman_child( entity_id, "contents" )
+--generic hybrid gui must be processed on worldperupdate, so remove lua comp from it
+--check for anim state var and tick it up until equals
+--when is_going is set to false, tick it back down and delete when is done
+--if anim state is less than 0, don't delete when is done
+--do unloading when player gets too far
 
-gui = gui or {}
-ctrl_data = ctrl_data or {}
-ctrl_data[entity_id] = ctrl_data[entity_id] or {}
-ctrl_data[entity_id].tooltip_data = ctrl_data[entity_id].tooltip_data or {}
+pen.child_play_full( root_id, function( child )
+	local x, y, r, s_x, s_y = EntityGetTransform( child )
 
-local function segment_toggler( entity_id, mode, d_alpha )
-	local ignore_kids = ( string.find( EntityGetName( entity_id ), "childfree", 1, true ) ~= nil ) and is_going
-	child_play( entity_id, function( parent, child )
-		if( ignore_kids and not( EntityHasTag( child, "main_structure" ))) then
-			return
-		end
-		
-		local pics = EntityGetComponentIncludingDisabled( child, "SpriteComponent" ) or {}
-		if( #pics > 0 ) then
-			for k,pic in ipairs( pics ) do
-				if( d_alpha ~= nil ) then
-					ComponentSetValue2( pic, "alpha", d_alpha*ComponentGetValue2( pic, "alpha" ))
-				end
-				if( mode ~= nil ) then
-					ComponentSetValue2( pic, "visible", mode )
-				end
-				EntityRefreshSprite( child, pic )
-			end
-		end
-		
-		segment_toggler( child, mode, d_alpha )
-	end)
-end
+	local is_triggered, is_touched = 0, false
+	local is_gui = pen.magic_storage( child, "is_gui", "value_bool" )
+	local on_ctrl = pen.magic_storage( child, "on_ctrl", "value_string" )
+	local on_action = pen.magic_storage( child, "on_action", "value_string" )
 
-local gonna_update = false
-if( is_going ) then
-	if( anim_state < anim_frames + content_frames ) then
-		gonna_update = true
-		anim_state = anim_state + 1
+	if( pen.vld( on_ctrl )) then on_ctrl() end
+	if( is_gui ) then
+		x, y = pen.gui2world(
+			pen.magic_storage( child, "gui_x", "value_float" ),
+			pen.magic_storage( child, "gui_y", "value_float" ))
+		EntitySetTransform( child, x, y, r, s_x, s_y )
 	end
-elseif( anim_state > 0 ) then
-	gonna_update = true
-	anim_state = anim_state - 1
-end
 
+	local pic_comp = EntityGetFirstComponentIncludingDisabled( child, "SpriteComponent" )
+	if( pen.vld( pic_comp, true )) then ComponentSetValue2( pic_comp, "visible", true ) else return end
+	
+	if( not( no_gui ) and on_action ~= nil ) then
+		local off_x = ComponentGetValue2( pic_comp, "offset_x" )
+		local off_y = ComponentGetValue2( pic_comp, "offset_y" )
+		local z = ComponentGetValue2( pic_comp, "z_index" )
+
+		if( is_gui ) then
+			x = pen.magic_storage( child, "gui_x", "value_float" )
+			y = pen.magic_storage( child, "gui_y", "value_float" )
+			off_x, off_y = pen.world2gui( off_x, off_y, true, true )
+			x, y = x - off_x, y - off_y
+		else x, y = pen.world2gui( x - off_x, y - off_y ) end
+
+		if( ComponentGetValue2( pic_comp, "has_special_scale" )) then
+			s_x = ComponentGetValue2( pic_comp, "special_scale_x" )
+			s_y = ComponentGetValue2( pic_comp, "special_scale_y" )
+		end
+
+		s_x, s_y = pen.world2gui( s_x, s_y, true, true )
+		local clicked, r_clicked, is_hovered = pen.new_interface(
+			x, y, s_x, s_y, z, { angle = r, is_debugging = is_debugging })
+		if( pen.vld( on_action ) and ( clicked or r_clicked or is_hovered )) then on_action() end
+	end
+end)
+
+--update data structure
+
+pen.gui_builder( true )
+
+--[[
 local function do_ctrl( dude_id )
 	child_play( dude_id, function( parent, child )
 		local storage_ctrl = get_storage( child, "controller" )
@@ -81,59 +91,6 @@ local function do_ctrl( dude_id )
 end
 do_ctrl( entity_id )
 
-if( gonna_update ) then
-	ComponentSetValue2( storage_state, "value_int", anim_state )
-	
-	local alpha_drift = ( content_frames^( 1/content_frames ))^( is_going and 1 or -1 )
-	if( anim_state > anim_frames ) then
-		segment_toggler( content_id, nil, alpha_drift )
-	else
-		local function anim_handler( dude_id )
-			child_play( dude_id, function( parent, child )
-				local storage_anim = get_storage( child, "action_anim" )
-				if( storage_anim ~= nil ) then
-					shared_block = {
-						main_id = entity_id,
-						this_id = child,
-						is_active = is_going,
-						is_done = not( gonna_update ),
-						state = anim_state + ( is_going and 0 or 1 ),
-						final_state = anim_frames,
-					}
-					dofile( ComponentGetValue2( storage_anim, "value_string" ))
-					shared_block = nil
-				end
-				
-				anim_handler( child )
-			end)
-		end
-		anim_handler( shell_id )
-	end
-	
-	if( anim_state == 0 and not( is_going )) then
-		if( not( EntityHasTag( entity_id, "immortal" ))) then
-			ctrl_data[entity_id] = nil
-			EntityKill( entity_id )
-			return
-		end
-	elseif( anim_state == 1 and is_going ) then
-		segment_toggler( shell_id, true )
-		segment_toggler( content_id, false )
-	end
-	
-	if( anim_state == anim_frames - 1 and not( is_going )) then
-		segment_toggler( content_id, false )
-	elseif( anim_state > anim_frames and is_going ) then
-		local storage_alphaed = get_storage( content_id, "is_alphaed" )
-		local alphaless = not( ComponentGetValue2( storage_alphaed, "value_bool" ))
-		segment_toggler( content_id, true, alphaless and 0.1 or nil )
-		if( alphaless ) then
-			ComponentSetValue2( storage_alphaed, "value_bool", true )
-		end
-	end
-end
-
-local fuck_gui = true
 if( anim_state >= anim_frames and not( EntityHasTag( entity_id, "no_gui" ))) then
 	local hoomans = EntityGetInRadiusWithTag( x, y, MagicNumbersGetValue( "VIRTUAL_RESOLUTION_X" ) + extra_radius, "player_unit" ) or {}
 	if( #hoomans > 0 ) then --and not( GameIsInventoryOpen())) then
@@ -198,7 +155,7 @@ if( anim_state >= anim_frames and not( EntityHasTag( entity_id, "no_gui" ))) the
 					local dim_a, dim_b = ComponentGetValue2( get_storage( button[1], "drgr_dim_a" ), "value_float" )*math.abs( s_x ), ComponentGetValue2( get_storage( button[1], "drgr_dim_b" ), "value_float" )*math.abs( s_y )
 					
 					local new_x, new_y, stopped, is_drgg = 0, 0, true, ( ctrl_data[entity_id].is_dragging or button[1] ) == button[1]
-					if(( drift_x <= dim_a and drift_y <= dim_b ) or ( ctrl_data[entity_id][button[1]] or false )) then
+					if(( drift_x <= dim_a and drift_y <= dim_b ) or ( ctrl_data[entity_id][button[1] ] or false )) then
 						if( is_drgg ) then
 							new_x, new_y, stopped, clicked, r_clicked, hovered = new_dragger( this_gui, 1023, new_x, new_y, pic_z, "mods/white_room/files/pics/debug_null_fullhd.png" )
 							
@@ -211,7 +168,7 @@ if( anim_state >= anim_frames and not( EntityHasTag( entity_id, "no_gui" ))) the
 									new_x, new_y = new_x - last_x, new_y - last_y
 								end
 							end
-							ctrl_data[entity_id][button[1]] = hovered and not( stopped )
+							ctrl_data[entity_id][button[1] ] = hovered and not( stopped )
 						end
 					elseif( is_drgg ) then
 						ctrl_data[entity_id].is_dragging = nil
@@ -301,6 +258,4 @@ if( anim_state >= anim_frames and not( EntityHasTag( entity_id, "no_gui" ))) the
 		end
 	end
 end
-if( fuck_gui ) then
-	gui[entity_id] = gui_killer( gui[entity_id])
-end
+]]

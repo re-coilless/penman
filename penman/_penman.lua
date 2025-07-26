@@ -2452,8 +2452,8 @@ function pen.life_support( memo, id, path, x, y, r, s_x, s_y )
 	local entity_id = memo[ id ] or 0
 	if( not( EntityGetIsAlive( entity_id ))) then
 		is_new = true
-		entity_id = pen.vld( path ) and EntityLoad( path, x, y ) or EntityCreateNew( "dummy" ) end
-	EntitySetTransform( entity_id, x, y, r or 0, s_x or 1, s_y or 1 )
+		entity_id = pen.vld( path ) and EntityLoad( path, x or 0, y or 0 ) or EntityCreateNew( "dummy" ) end
+	if( x ~= nil ) then EntitySetTransform( entity_id, x, y, r or 0, s_x or 1, s_y or 1 ) end
 	memo[ id ] = entity_id
 	
 	local life_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "LifetimeComponent" )
@@ -3999,30 +3999,30 @@ function pen.new_image( pic_x, pic_y, pic_z, pic, data )
 		if( not( pen.check_bounds({ real_x, real_y }, pen.c.cutter_dims.wh, pen.c.cutter_dims.xy ))) then return end
 	end
 	
-	local uid = data.auid
-	local gui = pen.c.anim_guis[ uid ]
-	local will_anim = is_anim and uid
+	local auid = data.auid
+	local gui = pen.c.anim_guis[ auid ]
+	local will_anim = is_anim and auid
 	if( not( will_anim ) and gui ) then
-		GuiDestroy( gui ); pen.c.anim_guis[ uid ] = nil
+		GuiDestroy( gui ); pen.c.anim_guis[ auid ] = nil
 	end
 
 	if( will_anim ) then
 		gui = gui or GuiCreate()
-		pen.c.anim_guis[ uid ] = gui
-		GuiStartFrame( gui ); uid = 1
-	else gui, uid = pen.gui_builder() end
+		pen.c.anim_guis[ auid ] = gui
+		GuiStartFrame( gui ); auid = 1
+	else gui, auid = pen.gui_builder() end
 	
 	pen.colourer( gui, data.color )
 	GuiZSetForNextWidget( gui, pic_z )
 	GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
-	GuiImage( gui, uid, pic_x + s_x*off_x, pic_y + s_y*off_y, pic,
+	GuiImage( gui, auid, pic_x + s_x*off_x, pic_y + s_y*off_y, pic,
 		data.alpha or 1, s_x, s_y, angle, data.anim_type or 2, data.anim or "" )
 	if( data.has_shadow ) then
 		local ss_x, ss_y = 1/w + 1, 1/h + 1
 		pen.colourer( gui, pen.PALETTE.SHADOW )
 		GuiZSetForNextWidget( gui, pic_z + 0.001 )
 		GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
-		GuiImage( gui, uid, pic_x - 0.5, pic_y - 0.5, pic,
+		GuiImage( gui, auid, pic_x - 0.5, pic_y - 0.5, pic,
 			math.max( 0.1*( data.alpha or 1 ), 0.05 ), ss_x, ss_y, data.angle or 0, data.anim_type or 2, data.anim or "" )
 	end
 
@@ -5876,9 +5876,9 @@ pen.GENERIC_CHAR_SETUP = {
 	},
 
 	CharacterPlatformingComponent = {
-		accel_x = is_vectored and 0.001 or 0.15,
-		accel_x_air = is_vectored and 0.001 or 0.05,
-		run_velocity = is_vectored and 0 or 100,
+		accel_x = 0.15,
+		accel_x_air = 0.05,
+		run_velocity = 100,
 		pixel_gravity = 500,
 		jump_velocity_x = 50,
 		jump_velocity_y = -100,
@@ -5939,10 +5939,10 @@ pen.GENERIC_CHAR_SETUP = {
 		air_in_lungs_max = 10,
 		air_lack_of_damage = 0.5,
 		
-		blood_material = blood_fading,
+		blood_material = "blood_fading",
 		blood_multiplier = 1,
 		blood_spray_create_some_cosmetic = true,
-		blood_spray_material = blood,
+		blood_spray_material = "blood",
 		blood_sprite_directional = "",
 		blood_sprite_large = "",
 		

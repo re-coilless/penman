@@ -6,24 +6,22 @@
 	></LuaComponent>
 	
 	<VariableStorageComponent
-		name="is_loaded"
+		name="no_gui"
 		value_bool="0"
 	></VariableStorageComponent>
-	
 	<VariableStorageComponent
 		name="is_going"
 		value_bool="1"
 	></VariableStorageComponent>
-	
-	<Entity name="physical" >
-		<InheritTransformComponent/>
-	</Entity>
-	
-	<Entity name="virtual" >
-		<InheritTransformComponent/>
-	</Entity>
+	<VariableStorageComponent
+		name="will_unload"
+		value_bool="1"
+	></VariableStorageComponent>
+	<VariableStorageComponent
+		name="is_debugging"
+		value_bool="0"
+	></VariableStorageComponent>
 
-	<Entity name="data" >
-		<InheritTransformComponent/>
-	</Entity>
+	<Entity name="root" > <InheritTransformComponent/> </Entity>
+	<Entity name="data" />
 </Entity>

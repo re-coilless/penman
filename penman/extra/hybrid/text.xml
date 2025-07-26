@@ -12,5 +12,6 @@
 		image_file="data/fonts/font_pixel.xml" 
 		is_text_sprite="1" 
 		text="0"
+		never_ragdollify_on_death="1"
 	></SpriteComponent>
 </Entity>
