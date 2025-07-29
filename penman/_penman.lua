@@ -2426,6 +2426,12 @@ function pen.debug_print( text, x, y, color )
 	end
 end
 
+function pen.get_line_num( _, log )
+	local _,_,num = string.find( log, ":(%d-):" )
+	pen.debug_print( "Logging from Line #"..num )
+	--use "pen.get_line_num( pcall( function( x ) return x + nil end, 69 ))"
+end
+
 function pen.lag_me( frame_time )
 	local current_time = GameGetRealWorldTimeSinceStarted()*1000
 	local prev_time = current_time
@@ -2568,9 +2574,7 @@ function pen.gunshot( shot_func, eject_func )
 
 	if( eject_func ~= true and pen.vld( eject_func )) then
 		eject_func( eject_x, eject_y, eject_angle, s_x, s_y, gun_id, card_id, action ) end
-	if( pen.vld( shot_func )) then
-		local muzzle_x, muzzle_y = pen.get_hotspot_pos( gun_id, "shoot_pos" )
-		shot_func( muzzle_x, muzzle_y, r, s_x, s_y, gun_id, card_id, action ) end	
+	if( pen.vld( shot_func )) then shot_func( shot_x, shot_y, r, s_x, s_y, gun_id, card_id, action ) end	
 	return gun_id, card_id, action
 end
 
@@ -4301,23 +4305,20 @@ end
 function pen.new_text( pic_x, pic_y, pic_z, text, data )
 	data = data or {}
 	data.alpha = data.alpha or 1
-	data.scale, data.font_mods = 1, data.font_mods or {}
+	data.scale = data.scale or 1
+	data.font_mods = data.font_mods or {}
 	local dims, is_pixel_font, new_line = {}, false, 9
 	data.font, is_pixel_font = pen.font_cancer( data.font, data.is_huge )
 	
 	if( pen.vld( data.dims )) then
-		data.dims = pen.get_hybrid_table( data.dims ); data.dims[2] = data.dims[2] or -1
-		text, dims, new_line = pen.liner( text, data.dims[1]/data.scale, data.dims[2]/data.scale, data.font, {
-			nil_val = data.nil_val,
-			aggressive = data.aggressive,
-			line_offset = data.line_offset,
+		dims = pen.get_hybrid_table( data.dims ); dims[2] = dims[2] or -1
+		text, dims, new_line = pen.liner( text, dims[1]/data.scale, dims[2]/data.scale, data.font, {
+			nil_val = data.nil_val, aggressive = data.aggressive, line_offset = data.line_offset,
 		})
 	else
 		text, dims, new_line = pen.liner( text, nil, nil, data.font, {
-			nil_val = data.nil_val,
-			line_offset = data.line_offset,
+			nil_val = data.nil_val, line_offset = data.line_offset,
 		})
-		data.dims = dims
 	end
 	
 	local gui = pen.gui_builder()
@@ -4328,12 +4329,12 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 		GuiText( gui, pic_x, pic_y, txt, scale, font, is_pixel )
 		if( not( has_shadow )) then return end
 		GuiZSetForNextWidget( gui, pic_z + 0.001 )
-		pen.colourer( gui, pen.PALETTE.SHADOW, math.max( 0.1*alpha, 0.05 ))
+		pen.colourer( gui, data.color_shadow or pen.PALETTE.SHADOW, math.max( 0.1*alpha, 0.05 ))
 		GuiText( gui, pic_x + scale/2, pic_y + scale/2, txt, scale, font, is_pixel )
 	end
 	
-	local off_x = 0 --( data.is_centered_x or false ) and -math.abs( data.dims[1])/2 or 0
-	local off_y = ( data.is_centered_y or false ) and -math.max( data.dims[2], dims[2])/2 or 0
+	local off_x = 0 --( data.is_centered_x or false ) and -math.abs( dims[1])/2 or 0
+	local off_y = ( data.is_centered_y or false ) and -math.max( dims[2], dims[2])/2 or 0
 	if( not( data.fully_featured )) then
 		if( data.is_centered_x or data.is_right_x ) then pic_x = pic_x - dims[1]/( data.is_right_x and 1 or 2 ) end
 		for i,t in ipairs( text ) do
@@ -4345,7 +4346,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 	
 	local structure = pen.cache({ "metafont",
 		pen.b2n( data.is_centered_x ), pen.b2n( data.is_right_x ),
-		data.dims[1], data.dims[2], table.concat( text, "|" ), data.font,
+		dims[1], dims[2], table.concat( text, "|" ), data.font,
 	}, function()
 		local out = {}
 		
@@ -4489,11 +4490,20 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 end
 
 function pen.new_shadowed_text( pic_x, pic_y, pic_z, text, data )
+	data = data or {}
 	local _,is_pixel = pen.font_cancer()
-	data = data or {}; data.has_shadow = not( is_pixel )
+	data.has_shadow = not( is_pixel or pen.vld( data.color_shadow ))
 	if( is_pixel ) then
-		data.font = "data/fonts/font_pixel.xml"
-		data.font = ( pen.t.unarray( pen.t.pack( GlobalsGetValue( pen.GLOBAL_FONT_REMAP, "" ))) or {})[ data.font ] or data.font
+		if( pen.vld( data.color_shadow )) then
+			local color = data.color
+			data.color = data.color_shadow
+			pen.new_text( pic_x, pic_y + 1, pic_z + 0.01, text, data )
+			data.color = color
+		else
+			data.font = "data/fonts/font_pixel.xml"
+			data.font = ( pen.t.unarray( pen.t.pack(
+				GlobalsGetValue( pen.GLOBAL_FONT_REMAP, "" ))) or {})[ data.font ] or data.font
+		end
 	end
 	return pen.new_text( pic_x, pic_y, pic_z, text, data )
 end
@@ -5232,9 +5242,12 @@ pen.PALETTE = {
 		PURPLE = {179,141,232}, _="ffb38de8",
 	},
 	N40 = { --ammo types, classes, misc colors
-		HOLO_1 = {82,213,60}, _="ffb6d53c",
-		HOLO_2 = {113,170,52}, _="ff71aa34",
-		HOLO_3 = {57,123,68}, _="ff397b44",
+		HOLO_1 = {182,213,60}, _="ffb6d53c",
+		HOLO_2 = {144,168,49}, _="ff90a831",
+		HOLO_3 = {121,140,42}, _="ff798c2a",
+		HOLO_RED_1 = {195,3,3}, _="ffc30303",
+		HOLO_RED_2 = {136,0,21}, _="ff880015",
+		HOLO_RED_3 = {62,0,10}, _="ff3e000a",
 	},
 	NCRS = {
 		GREY_1 = {21,29,40}, _="ff151d28",
