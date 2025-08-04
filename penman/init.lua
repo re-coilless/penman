@@ -6,6 +6,7 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --there should be inherent consistency with "info" (context-spesific parameters of a distinct object) and "data" (a group of parameters applicable to a function) variable names
 --palette png file with all the color names spelled in corresponding color
 --rebrand power words
+--play around with running everything (mnee + vector + index) from within penman's init (still should work if is installed independently)
 
 --setup automatic versioning by putting version from commit message and adding commit hash (https://github.com/logankilpatrick/TODO-List-Updater)
 --very basic mod order editor with inherent mod cat support (part of unsafe index capability; allow doing custom pause menu)
