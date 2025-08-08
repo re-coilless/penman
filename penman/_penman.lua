@@ -4403,7 +4403,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 		for i,line in ipairs( text ) do
 			local temp = line
 			local l_pos, r_pos = {0,0,0}, {0,0,0}
-			local new_element = { x = 0, y = height_counter }
+			local new_element = { x = 0, y = height_counter, new_line = true }
 			if( data.is_centered_x or data.is_right_x ) then
 				local _,off = pen.liner( line, nil, nil, data.font )
 				new_element.x = -off[1]/( data.is_right_x and 1 or 2 )
@@ -4465,11 +4465,12 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 	
 	pen.c.font_ram = pen.c.font_ram or {}
 
-	local c_gbl, c_lcl = 1, {}
+	local c_lin, c_gbl, c_lcl = 0, 1, {}
 	local is_inside = pen.vld( pen.c.cutter_dims )
 	pen.t.loop( structure, function( i, element )
 		if( not( pen.vld( element.text ))) then return end
-		
+		if( element.new_line ) then c_lin = c_lin + 1 end
+
 		local pos_x = pic_x + data.scale*( off_x + element.x )
 		local pos_y = pic_y + data.scale*( off_y + element.y )
 		if( is_inside ) then
@@ -4494,7 +4495,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 		local orig_x, orig_y = pos_x, pos_y
 		pen.w2c( element.text, function( char_id, letter_id )
 			pos_x, pos_y = orig_x, orig_y
-			
+
 			local extra_list, n = {}, 1
 			pen.t.loop( element.extra, function( k, v )
 				if( v[1] == letter_id ) then extra_list[n] = v[2] end
@@ -4513,7 +4514,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 					new_x, new_y, new_clr, new_font, new_char = font_mod(
 						{ l = pos_x, g = orig_x }, { l = pos_y, g = orig_y }, pic_z,
 						{ char = char, dims = off, font = font, extra = extra_list, ram = pen.c.font_ram },
-						{ clr[1], clr[2], clr[3], clr[4] or data.alpha }, { gbl = c_gbl, lcl = c_lcl[ func ], chr = letter_id }
+						{ clr[1], clr[2], clr[3], clr[4] or data.alpha }, { gbl = c_gbl, lcl = c_lcl[ func ], chr = letter_id, lin = c_lin }
 					)
 				end
 
@@ -4648,13 +4649,12 @@ function pen.new_tooltip( text, data, func )
 
 		local w, h = GuiGetScreenDimensions( gui )
 		if( not( pen.vld( data.dims ))) then
-			data.dims = pen.get_tip_dims( text, { data.min_width or 121, data.max_width or 0.9*w }, h, data.line_offset or -2 )
+			data.dims = pen.get_tip_dims( text,
+				{ data.min_width or 121, data.max_width or 0.9*w }, h, data.line_offset or -2 )
+			data.dims = { data.dims[1] - 1, data.dims[2] - 1 }
 		end
-		data.dims = {
-			data.dims[1] + ( off_x or 0 ),
-			data.dims[2] + ( off_y or 0 )}
-		data.dims[1] = data.dims[1] + 2*data.edging - 1
-		data.dims[2] = data.dims[2] + 2*data.edging - 1
+		data.dims = { data.dims[1] + ( off_x or 0 ), data.dims[2] + ( off_y or 0 )}
+		data.dims[1], data.dims[2] = data.dims[1] + 2*data.edging, data.dims[2] + 2*data.edging
 
 		local z_resolver = 0
 		local mouse_drift = 5
@@ -4707,7 +4707,10 @@ function pen.new_tooltip( text, data, func )
 			local gui, uid = pen.gui_builder()
 			GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
 			GuiZSetForNextWidget( gui, pic_z + 0.01 )
-			GuiImageNinePiece( gui, uid, pic_x, pic_y, size_x, size_y, 1.15*math.max( 1 - inter_alpha/6, 0.1 ))
+			GuiImageNinePiece( gui, uid,
+				pic_x, pic_y, size_x, size_y,
+				1.15*math.max( 1 - inter_alpha/6, 0.1 ),
+				"data/ui_gfx/decorations/9piece0"..(( d.is_special or false ) and "" or "_gray" )..".png" )
 			return clicked, r_clicked, is_hovered
 		end
 		
@@ -4716,32 +4719,6 @@ function pen.new_tooltip( text, data, func )
 	else pen.c.ttips[ data.tid ].inter_state = {} end
 	
 	return data.is_active, data.dims, is_pinned
-end
-
-function pen.new_input( iid, pic_x, pic_y, pic_z, data )
-	data = data or {}
-	local _,default_dims = pen.liner( "T__________T", nil, nil, nil, { line_offset = data.line_offset or -2, })
-	data.dims = data.dims or default_dims
-	
-	local text = ""
-
-	--put input state to global var (comes with frame num, and if frame num there is higher than current frame num – nuke it)
-	--right click to disable vanilla input
-	--enter/rmb to confirm
-	--legit full keyboard that is stolen from mnee
-	--copypaste support (through global var)
-	--multiline cursor with arrow control
-	
-	pen.new_tooltip( text, {
-		is_active = true,
-		tid = iid, pic_z = pic_z, pos = {pic_x,pic_y},
-		dims = data.dims or default_dims,
-		edging = data.edging, line_offset = data.line_offset
-	}, data.tip_func )
-
-	print( tostring( pen.c.ttips[iid].inter_state[1]))
-	
-	return
 end
 
 ---Paging framework.
@@ -4829,6 +4806,8 @@ pen.FLAG_INTERFACE_TOGGLE = "PENMAN_INTERFACE_DOWN"
 
 pen.GLOBAL_SCREEN_X = "PENMAN_SCREEN_X"
 pen.GLOBAL_SCREEN_Y = "PENMAN_SCREEN_Y"
+pen.GLOBAL_INPUT_STATE = "PENMAN_INPUT_STATE"
+pen.GLOBAL_INPUT_FRAME = "PENMAN_INPUT_FRAME"
 pen.GLOBAL_VIRTUAL_ID = "PENMAN_VIRTUAL_INDEX"
 pen.GLOBAL_INTERFACE_Z = "PENMAN_INTERFACE_Z"
 pen.GLOBAL_TIPZ_RESOLVER = "PENMAN_TIPZ_RESOLVER"
@@ -5046,7 +5025,46 @@ pen.FONT_MODS = {
 		
 		return pen.FONT_MODS.button( pic_x, pic_y, pic_z, char_data, color, index, link_id )
 	end,
-	_dialogue = function( pic_x, pic_y, pic_z, char_data, color, index )
+	cursor = function( pic_x, pic_y, pic_z, char_data, color, index )		
+		pen.c.input_data = pen.c.input_data or {}
+		pen.c.input_data.pos = pen.c.input_data.pos or { 0, 1 }
+		pen.c.input_data.safety = pen.c.input_data.safety or 0
+		pen.c.input_data.memo = pen.c.input_data.memo or { 0, 0 }
+		
+		local data = pen.c.input_data
+		local frame_num = GameGetFrameNum()
+		if( data.safety < frame_num ) then
+			data.safety = frame_num
+			
+			local move_right = InputIsKeyJustDown( 79 --[[Arrow Right]] )
+			local move_left = InputIsKeyJustDown( 80 --[[Arrow Left]] )
+			local move_down = InputIsKeyJustDown( 81 --[[Arrow Down]] )
+			local move_up = InputIsKeyJustDown( 82 --[[Arrow Up]] )
+			if( move_right or move_left ) then
+				data.pos = { data.pos[1] + ( move_right and 1 or -1 ), data.pos[2]}
+			elseif( move_down or move_up ) then
+				data.pos = { data.pos[1], data.pos[2] + ( move_down and 1 or -1 )}
+			end
+			
+			--if the line number matches but the char number is higher than anything else, add iterate line number and set char number to 1 or the amount of last line
+			--0 pos means that the shit is at the start of the line (should be capable of deleting new lines)
+		end
+
+		-- pen.c.input_data.memo[1] = pen.c.input_data.memo[2]
+		-- pen.c.input_data.memo[2] = index.chr
+
+		local is_here = index.chr == data[1] and index.lin == data[2]
+		if( GameGetFrameNum()%30 < 15 and is_here ) then
+			pen.new_pixel( pic_x.g + char_data.dims[1] - 1, pic_y.g, pic_z, {
+				data[3] or pen.PALETTE.VNL.YELLOW[1],
+				data[4] or pen.PALETTE.VNL.YELLOW[2],
+				data[5] or pen.PALETTE.VNL.YELLOW[3],
+			}, 1, char_data.dims[2], data[6])
+		end
+
+		return nil, nil, nil, nil, ""
+	end,
+	_typing = function( pic_x, pic_y, pic_z, char_data, color, index )
 		--char_data.extra for modifications (compare the index num with index.chr)
 		--letters appear through alpha sin interpolating top down
 	end,

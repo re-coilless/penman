@@ -18,7 +18,7 @@ if( pen.c.testing_done ) then
         -- world2gui()
         -- filing()
         -- raters()
-        -- input()
+        input()
         -- scrolling()
         -- tipping()
         -- texting()
@@ -26,7 +26,7 @@ if( pen.c.testing_done ) then
         -- cloner()
         -- text2func()
 
-        pen.c.testing_done = 1--0
+        pen.c.testing_done = 10
         return
     end
 end
@@ -308,9 +308,11 @@ end
 -- *************************************************************************
 
 function input()
+if( not( ModIsEnabled( "mnee" ))) then return end
+dofile_once( "mods/mnee/lib.lua" )
 
-pen.new_input( "balls", 100, 100, 5, {
-
+mnee.new_input( "balls", 100, 100, 5, "checking", {
+    dims = { 200, 150 },
 })
 
 end
