@@ -819,10 +819,12 @@ function pen.get_short_num( num, no_subzero, force_sign )
 end
 
 function pen.w2c( word, on_char, do_pre, on_iter )
-	local num, letter_id = 0, 0
+	local num = 0
+	local letter_id, string_id = 0, 0
 	for c in string.gmatch( word, "." ) do
+		string_id = string_id + 1
 		if( do_pre ~= false and on_iter ~= nil ) then
-			on_iter()
+			on_iter( string_id )
 		end
 
 		if( on_char ~= nil ) then
@@ -831,14 +833,14 @@ function pen.w2c( word, on_char, do_pre, on_iter )
 			local char_id = pen.BYTE_TO_ID[ num ]
 			if( char_id ) then
 				num, letter_id = 0, letter_id + 1
-				if( on_char( char_id, letter_id )) then
+				if( on_char( char_id, letter_id, string_id )) then
 					break
 				end
 			end
 		end
 
 		if( do_pre ~= true and on_iter ~= nil ) then
-			on_iter()
+			on_iter( string_id )
 		end
 	end
 end
@@ -2414,9 +2416,11 @@ end
 
 function pen.debug_print( text, x, y, color )
 	if( pen.vld( x ) and pen.vld( y )) then
-		local pic_x, pic_y = pen.world2gui( x, y )
+		local pic_x, pic_y = x, y
+		if( color ~= true ) then
+			pic_x, pic_y = pen.world2gui( x, y ) else color = nil end
 		pen.new_shadowed_text( pic_x, pic_y, -pen.LAYERS.DEBUG, text, {
-			alpha = 0.5, is_centered_x = true, is_centered_y = true, color = color })
+			alpha = 0.5, is_centered_x = true, is_centered_y = true, color = color or pen.PALETTE.VNL.WARNING })
 	else --stolen from fairmod + thanks Nathan
 		color = color or pen.PALETTE.VNL.WARNING
 		if( ModIsEnabled( "index_core" )) then
@@ -4493,7 +4497,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 		c_lcl = new_lcl
 
 		local orig_x, orig_y = pos_x, pos_y
-		pen.w2c( element.text, function( char_id, letter_id )
+		pen.w2c( element.text, function( char_id, letter_id, string_id )
 			pos_x, pos_y = orig_x, orig_y
 
 			local extra_list, n = {}, 1
@@ -5027,41 +5031,60 @@ pen.FONT_MODS = {
 	end,
 	cursor = function( pic_x, pic_y, pic_z, char_data, color, index )		
 		pen.c.input_data = pen.c.input_data or {}
-		pen.c.input_data.pos = pen.c.input_data.pos or { 0, 1 }
 		pen.c.input_data.safety = pen.c.input_data.safety or 0
-		pen.c.input_data.memo = pen.c.input_data.memo or { 0, 0 }
+		pen.c.input_data.pos = pen.c.input_data.pos or { l = 1, c = 0 }
+
+		pen.c.input_data.drift = pen.c.input_data.drift or {}
+		pen.c.input_data.last_chr = pen.c.input_data.last_chr or 0
+		pen.c.input_data.last_lin = pen.c.input_data.last_lin or 1
+		pen.c.input_data.last_last_lin = pen.c.input_data.last_last_lin or 1
 		
 		local data = pen.c.input_data
 		local frame_num = GameGetFrameNum()
 		if( data.safety < frame_num ) then
-			data.safety = frame_num
-			
-			local move_right = InputIsKeyJustDown( 79 --[[Arrow Right]] )
-			local move_left = InputIsKeyJustDown( 80 --[[Arrow Left]] )
-			local move_down = InputIsKeyJustDown( 81 --[[Arrow Down]] )
-			local move_up = InputIsKeyJustDown( 82 --[[Arrow Up]] )
-			if( move_right or move_left ) then
-				data.pos = { data.pos[1] + ( move_right and 1 or -1 ), data.pos[2]}
-			elseif( move_down or move_up ) then
-				data.pos = { data.pos[1], data.pos[2] + ( move_down and 1 or -1 )}
+			data.safety, data.drift = frame_num, {
+				r = InputIsKeyJustDown( 79 --[[Arrow Right]]), l = InputIsKeyJustDown( 80 --[[Arrow Left]]),
+				d = InputIsKeyJustDown( 81 --[[Arrow Down]]), u = InputIsKeyJustDown( 82 --[[Arrow Up]])}
+			data.drift.l = data.drift.l or InputIsKeyJustDown( 42 --[[Return]])
+		end
+
+		if( data.last_lin ~= index.lin ) then
+			local prev_lin = math.abs( data.last_lin )
+			if( data.drift.l and data.pos.l == index.lin ) then
+				data.drift.l = false
+				local will_jump = data.pos.c < 1
+				data.pos.c = will_jump and data.last_chr or ( data.pos.c - 1 )
+				if( will_jump ) then data.pos.l = prev_lin end
+			elseif( data.drift.u and data.pos.l == index.lin ) then
+				data.drift.u = false
+				data.pos.l = prev_lin
+				data.pos.c = math.min( data.pos.c, data.last_chr )
+			elseif( data.drift.r and data.pos.l == prev_lin ) then
+				data.drift.r = false
+				local will_jump = data.pos.c == data.last_chr
+				data.pos.c = will_jump and 0 or ( data.pos.c + 1 )
+				if( will_jump ) then data.pos.l = index.lin end
+			elseif( data.drift.d and data.pos.l == data.last_last_lin ) then
+				data.drift.d = false
+				data.pos.l = prev_lin
+				data.pos.c = math.min( data.pos.c, data.last_chr )
 			end
-			
-			--if the line number matches but the char number is higher than anything else, add iterate line number and set char number to 1 or the amount of last line
-			--0 pos means that the shit is at the start of the line (should be capable of deleting new lines)
+
+			data.last_last_lin = math.abs( data.last_lin )
 		end
 
-		-- pen.c.input_data.memo[1] = pen.c.input_data.memo[2]
-		-- pen.c.input_data.memo[2] = index.chr
-
-		local is_here = index.chr == data[1] and index.lin == data[2]
+		local is_here = data.pos.l == index.lin and
+			( data.pos.c == index.chr or ( data.pos.c == 0 and index.chr == 1 ))
+		if( is_here ) then
+			data.index = index.gbl + ( data.pos.c == 0 and -1 or 0 ) end
 		if( GameGetFrameNum()%30 < 15 and is_here ) then
-			pen.new_pixel( pic_x.g + char_data.dims[1] - 1, pic_y.g, pic_z, {
-				data[3] or pen.PALETTE.VNL.YELLOW[1],
-				data[4] or pen.PALETTE.VNL.YELLOW[2],
-				data[5] or pen.PALETTE.VNL.YELLOW[3],
-			}, 1, char_data.dims[2], data[6])
+			local step = data.pos.c == 0 and 0 or char_data.dims[1]
+			pen.new_pixel( pic_x.g + step - 1,
+				pic_y.g, pic_z, pen.PALETTE.VNL.YELLOW, 1, char_data.dims[2])
 		end
 
+		data.last_chr = index.chr
+		data.last_lin = index.lin
 		return nil, nil, nil, nil, ""
 	end,
 	_typing = function( pic_x, pic_y, pic_z, char_data, color, index )
@@ -6545,8 +6568,8 @@ pen.CANCER_COMPS = {
 }
 
 pen.BYTE_TO_ID = {
-	[0] = 0,
-
+	[0]=0,	[9]=9,	[10]=10,
+	
 	[32]=32,	[33]=33,	[34]=34,	[35]=35,	[36]=36,	[37]=37,	[38]=38,	[39]=39,	[40]=40,	[41]=41,	[42]=42,
 	[43]=43,	[44]=44,	[45]=45,	[46]=46,	[47]=47,	[48]=48,	[49]=49,	[50]=50,	[51]=51,	[52]=52,	[53]=53,
 	[54]=54,	[55]=55,	[56]=56,	[57]=57,	[58]=58,	[59]=59,	[60]=60,	[61]=61,	[62]=62,	[63]=63,	[64]=64,

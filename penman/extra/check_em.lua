@@ -311,7 +311,7 @@ function input()
 if( not( ModIsEnabled( "mnee" ))) then return end
 dofile_once( "mods/mnee/lib.lua" )
 
-mnee.new_input( "balls", 100, 100, 5, "checking", {
+mnee.new_input( "balls", 100, 100, 5, "me when fuckign the cфх цg aÃÉтш", {
     dims = { 200, 150 },
 })
 
