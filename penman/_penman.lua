@@ -819,12 +819,12 @@ function pen.get_short_num( num, no_subzero, force_sign )
 end
 
 function pen.w2c( word, on_char, do_pre, on_iter )
-	local num = 0
-	local letter_id, string_id = 0, 0
+	local num, letter_id = 0, 0
+	local start_id, end_id = 1, 0
 	for c in string.gmatch( word, "." ) do
-		string_id = string_id + 1
+		end_id = end_id + 1
 		if( do_pre ~= false and on_iter ~= nil ) then
-			on_iter( string_id )
+			on_iter( end_id )
 		end
 
 		if( on_char ~= nil ) then
@@ -833,14 +833,13 @@ function pen.w2c( word, on_char, do_pre, on_iter )
 			local char_id = pen.BYTE_TO_ID[ num ]
 			if( char_id ) then
 				num, letter_id = 0, letter_id + 1
-				if( on_char( char_id, letter_id, string_id )) then
-					break
-				end
+				if( on_char( char_id, letter_id, start_id, end_id )) then break end
+				start_id = end_id + 1
 			end
 		end
 
 		if( do_pre ~= true and on_iter ~= nil ) then
-			on_iter( string_id )
+			on_iter( end_id )
 		end
 	end
 end
@@ -4497,7 +4496,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 		c_lcl = new_lcl
 
 		local orig_x, orig_y = pos_x, pos_y
-		pen.w2c( element.text, function( char_id, letter_id, string_id )
+		pen.w2c( element.text, function( char_id, letter_id, start_id, end_id )
 			pos_x, pos_y = orig_x, orig_y
 
 			local extra_list, n = {}, 1
@@ -5029,23 +5028,15 @@ pen.FONT_MODS = {
 		
 		return pen.FONT_MODS.button( pic_x, pic_y, pic_z, char_data, color, index, link_id )
 	end,
-	cursor = function( pic_x, pic_y, pic_z, char_data, color, index )		
-		pen.c.input_data = pen.c.input_data or {}
-		pen.c.input_data.safety = pen.c.input_data.safety or 0
-		pen.c.input_data.pos = pen.c.input_data.pos or { l = 1, c = 0 }
-
-		pen.c.input_data.drift = pen.c.input_data.drift or {}
-		pen.c.input_data.last_chr = pen.c.input_data.last_chr or 0
-		pen.c.input_data.last_lin = pen.c.input_data.last_lin or 1
-		pen.c.input_data.last_last_lin = pen.c.input_data.last_last_lin or 1
-		
+	cursor = function( pic_x, pic_y, pic_z, char_data, color, index )
 		local data = pen.c.input_data
 		local frame_num = GameGetFrameNum()
 		if( data.safety < frame_num ) then
-			data.safety, data.drift = frame_num, {
-				r = InputIsKeyJustDown( 79 --[[Arrow Right]]), l = InputIsKeyJustDown( 80 --[[Arrow Left]]),
-				d = InputIsKeyJustDown( 81 --[[Arrow Down]]), u = InputIsKeyJustDown( 82 --[[Arrow Up]])}
-			data.drift.l = data.drift.l or InputIsKeyJustDown( 42 --[[Return]])
+			data.safety = frame_num
+			data.drift.r = data.drift.r or InputIsKeyJustDown( 79 --[[Arrow Right]])
+			data.drift.l = data.drift.l or InputIsKeyJustDown( 80 --[[Arrow Left]])
+			data.drift.d = data.drift.d or InputIsKeyJustDown( 81 --[[Arrow Down]])
+			data.drift.u = data.drift.u or InputIsKeyJustDown( 82 --[[Arrow Up]])
 		end
 
 		if( data.last_lin ~= index.lin ) then

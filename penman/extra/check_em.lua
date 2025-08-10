@@ -311,9 +311,15 @@ function input()
 if( not( ModIsEnabled( "mnee" ))) then return end
 dofile_once( "mods/mnee/lib.lua" )
 
-mnee.new_input( "balls", 100, 100, 5, "me when fuckign the cфх цg aÃÉтш", {
+--we are so fuckign back
+local out, is_real = mnee.new_input( "balls", 100, 100, 5, "", { --me when fuckign the cфх цg aÃÉтш\n冬鸟务此 按键绑
     dims = { 200, 150 },
 })
+if( is_real ) then
+    print(out)
+    local f = pen.t2f( "kys", out )
+    if( pen.vld( f )) then f() end
+end
 
 end
 
