@@ -4202,7 +4202,7 @@ end
 ---@param data? PenmanScrollerData
 function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data )
 	func = pen.get_hybrid_table( func )
-	func[2] = func[2] or function( sid, pic_x, pic_y, pic_z, size_x, size_y, bar_size, bar_pos, data )
+	func[2] = func[2] or function( sid, pic_x, pic_y, pic_z, size_x, size_y, bar_height, bar_y, data )
 		local out = {}
 		local color = data.color or {
 			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
@@ -4215,11 +4215,12 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 		}
 		color[14] = color[14] or color[13]
 
-		local _,new_y,state,_,_,is_hovered = pen.new_dragger( sid.."_dragger", pic_x, bar_pos, 3, bar_size, pic_z )
+		local _,new_y,state,_,_,is_hovered = pen.new_dragger(
+			sid.."_dragger_y", pic_x, bar_y, 3, bar_height, pic_z )
 		if( data.can_scroll or not( data.hide_bar )) then
-			pen.new_pixel( pic_x + 1, bar_pos, pic_z, color[ is_hovered and 14 or 13 ], 1, bar_size )
-			pen.new_pixel( pic_x, bar_pos, pic_z, color[ is_hovered and 2 or 1 ], 1, bar_size )
-			pen.new_pixel( pic_x + 2, bar_pos, pic_z, color[ is_hovered and 4 or 3 ], 1, bar_size )
+			pen.new_pixel( pic_x + 1, bar_y, pic_z, color[ is_hovered and 14 or 13 ], 1, bar_height )
+			pen.new_pixel( pic_x, bar_y, pic_z, color[ is_hovered and 2 or 1 ], 1, bar_height )
+			pen.new_pixel( pic_x + 2, bar_y, pic_z, color[ is_hovered and 4 or 3 ], 1, bar_height )
 		end
 		out[1] = { new_y, state }
 		
@@ -4231,7 +4232,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 			pen.new_pixel( pic_x, pic_y + 1, pic_z, color[ is_hovered and 6 or 5 ])
 			pen.new_pixel( pic_x + 2, pic_y + 1, pic_z, color[ is_hovered and 8 or 7 ])
 		end
-		if( data.can_scroll and ( InputIsMouseButtonDown( 4 ) or InputIsKeyJustDown( 86 ))) then clicked = 1 end
+		if( data.can_scroll and not( InputIsKeyDown( 225 )) and InputIsMouseButtonDown( 4 )) then clicked = 1 end
 		out[2] = { clicked, r_clicked }
 
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y + size_y - 3, 3, 3, pic_z )
@@ -4241,7 +4242,52 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 			pen.new_pixel( pic_x, pic_y + size_y - 2, pic_z, color[ is_hovered and 10 or 9 ])
 			pen.new_pixel( pic_x + 2, pic_y + size_y - 2, pic_z, color[ is_hovered and 12 or 11 ])
 		end
-		if( data.can_scroll and ( InputIsMouseButtonDown( 5 ) or InputIsKeyJustDown( 87 ))) then clicked = 1 end
+		if( data.can_scroll and not( InputIsKeyDown( 225 )) and InputIsMouseButtonDown( 5 )) then clicked = 1 end
+		out[3] = { clicked, r_clicked }
+		
+		return out
+	end
+	func[3] = func[3] or function( sid, pic_x, pic_y, pic_z, size_x, size_y, bar_length, bar_x, data )
+		local out = {}
+		local color = data.color or {
+			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
+			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
+			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
+			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
+			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
+			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
+			{ 0, 0, 0, 0.83 }
+		}
+		color[14] = color[14] or color[13]
+
+		local new_x,_,state,_,_,is_hovered = pen.new_dragger(
+			sid.."_dragger_x", bar_x, pic_y, bar_length, 3, pic_z )
+		if( data.can_scroll or not( data.hide_bar )) then
+			pen.new_pixel( bar_x, pic_y + 1, pic_z, color[ is_hovered and 14 or 13 ], bar_length, 1 )
+			pen.new_pixel( bar_x, pic_y, pic_z, color[ is_hovered and 2 or 1 ], bar_length, 1 )
+			pen.new_pixel( bar_x, pic_y + 2, pic_z, color[ is_hovered and 4 or 3 ], bar_length, 1 )
+		end
+		out[1] = { new_x, state }
+		
+		local clicked, r_clicked = false, false
+		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, 3, 3, pic_z )
+		if( data.can_scroll or not( data.hide_bar )) then
+			pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, color[ is_hovered and 14 or 13 ])
+			pen.new_pixel( pic_x, pic_y + 1, pic_z, color[ is_hovered and 6 or 5 ])
+			pen.new_pixel( pic_x + 1, pic_y, pic_z, color[ is_hovered and 6 or 5 ])
+			pen.new_pixel( pic_x + 1, pic_y + 2, pic_z, color[ is_hovered and 8 or 7 ])
+		end
+		if( data.can_scroll and InputIsKeyDown( 225 ) and InputIsMouseButtonDown( 4 )) then clicked = 1 end
+		out[2] = { clicked, r_clicked }
+
+		clicked, r_clicked, is_hovered = pen.new_interface( pic_x + size_x - 3, pic_y, 3, 3, pic_z )
+		if( data.can_scroll or not( data.hide_bar )) then
+			pen.new_pixel( pic_x + size_x - 2, pic_y + 1, pic_z, color[ is_hovered and 14 or 13 ])
+			pen.new_pixel( pic_x + size_x - 1, pic_y + 1, pic_z, color[ is_hovered and 10 or 9 ])
+			pen.new_pixel( pic_x + size_x - 2, pic_y, pic_z, color[ is_hovered and 10 or 9 ])
+			pen.new_pixel( pic_x + size_x - 2, pic_y + 2, pic_z, color[ is_hovered and 12 or 11 ])
+		end
+		if( data.can_scroll and InputIsKeyDown( 225 ) and InputIsMouseButtonDown( 5 )) then clicked = 1 end
 		out[3] = { clicked, r_clicked }
 		
 		return out
@@ -4259,67 +4305,125 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 
 	pen.c.scroll_memo = pen.c.scroll_memo or {}
 	pen.c.scroll_memo[ sid ] = pen.c.scroll_memo[ sid ] or {}
-	pen.c.scroll_memo[ sid ].m = pen.c.scroll_memo[ sid ].m or {}
 
 	local old_height = pen.c.scroll_memo[ sid ].h or -1
-	local progress = pen.c.scroll_memo[ sid ].p or ( data.bottom_start and 1 or 0 )
-	local scroll_pos = old_height > size_y and ( size_y - math.abs( old_height ))*progress or 0
-	local new_height = pen.new_cutout( pic_x, pic_y, size_x, size_y, func[1], scroll_pos )
-	if( new_height > size_y ) then
-		if( data.can_scroll ) then pen.unscroller() end
-	else pen.c.scroll_memo[ sid ].p = 0; return end
+	local progress_y = pen.c.scroll_memo[ sid ].py or ( data.bottom_start and 1 or 0 )
+	local scroll_y = old_height > size_y and ( size_y - math.abs( old_height ))*progress_y or 0
+	local old_length = pen.c.scroll_memo[ sid ].l or -1
+	local progress_x = pen.c.scroll_memo[ sid ].px or ( data.right_start and 1 or 0 )
+	local scroll_x = old_length > size_x and ( size_x - math.abs( old_length ))*progress_x or 0
 
-	local bar_size = pen.rounder( math.max(( size_y - 6 )*math.min( size_y/new_height, 1 ), 1 ), -2 )
-	
-	local bar_y = ( size_y - ( 6 + bar_size ))
-	local bar_pos = pic_y + bar_y*progress + 3
-	local step = bar_y*( data.scroll_step or 11 )/( new_height - size_y )
-	if( data.is_left ) then pic_x = pic_x - 5 else pic_x = pic_x + size_x end
-	local out = func[2]( sid, pic_x, pic_y, pic_z - 0.01, size_x, size_y, bar_size, bar_pos, data )
-	local new_y = out[1][1]
-	
-	local discrete_target = pen.c.scroll_memo[ sid ].t
-	if( discrete_target ~= nil ) then
-		if( discrete_target == new_y ) then
-			pen.c.scroll_memo[ sid ].t = nil
-		else new_y = discrete_target end
-	end
-
-	local k = pen.c.scroll_memo[ sid ].m or 1
-	pen.c.scroll_memo[ sid ].m = ( out[2][1] or out[3][1]) and 2*k or 1
-	
-	for i = 2,3 do
-		if( out[i][1]) then
-			if( i == 2 ) then
-				pen.c.scroll_memo[ sid ].t = math.max( new_y - step*k, pic_y + 3 )
-			else pen.c.scroll_memo[ sid ].t = math.min( new_y + step*k, pic_y + bar_y + 3 ) end
-		elseif( out[i][2]) then pen.c.scroll_memo[ sid ].t = pic_y + 3 + ( i == 3 and bar_y or 0 ) end
-		if( out[i][1] or out[i][2]) then
-			pen.play_sound( pen.TUNES.VNL[ out[i][1] == 1 and "HOVER" or ( out[i][2] and "CLICK" or "SELECT" )])
-		end
-	end
+	local new_height, new_length = unpack( pen.new_cutout(
+		pic_x, pic_y, size_x, size_y, func[1], { scroll_y, scroll_x }))
+	if( data.can_scroll ) then pen.unscroller() end
 
 	local buffer = 1
-	local eid = sid.."_anim"
-	progress = math.min( math.max(( new_y - ( pic_y + 3 ))/bar_y, -buffer ), 1 + buffer )
-	progress = pen.estimate( eid, progress, "wgt0.75", 0.001, 0.02*step )
-	pen.c.scroll_memo[ sid ].p = math.min( math.max( progress, 0 ), 1 )
-
+	local is_static = false
 	local is_waiting = GameGetFrameNum()%7 ~= 0
-	local is_clipped = progress >= 0 and progress <= 1
-	local is_static = out[1][2] ~= 2 or pen.eps_compare( new_y, bar_pos )
-	if( not( is_clipped )) then
-		pen.c.estimator_memo[ eid ] = math.min( math.max( pen.c.estimator_memo[ eid ], 0 ), 1 )
-	elseif( not( is_static or is_waiting )) then pen.play_sound( pen.TUNES.VNL.HOVER ) end
 
-	if( old_height ~= new_height ) then
-		if( progress ~= 1 and old_height > 0 ) then
-			pen.c.scroll_memo[ sid ].p = math.min( math.max( scroll_pos/( size_y - new_height ), 0 ), 1 )
-			pen.c.estimator_memo[ eid ] = pen.c.scroll_memo[ sid ].p
+	if( new_height > size_y ) then
+		pen.c.scroll_memo[ sid ].my = pen.c.scroll_memo[ sid ].my or {}
+
+		local bar_height = pen.rounder( math.max(( size_y - 6 )*math.min( size_y/new_height, 1 ), 1 ), -2 )
+		local bar_y = ( size_y - ( 6 + bar_height ))
+		local pos_y = pic_y + bar_y*progress_y + 3
+
+		local step_y = bar_y*( data.scroll_step or 11 )/( new_height - size_y )
+		local out_y = func[2]( sid,
+			pic_x + ( data.is_left and -5 or size_x ), pic_y, pic_z - 0.01, size_x, size_y, bar_height, pos_y, data )
+
+		local new_y = out_y[1][1]
+		local target_y = pen.c.scroll_memo[ sid ].ty
+		if( target_y ~= nil ) then
+			if( target_y == new_y ) then
+				pen.c.scroll_memo[ sid ].ty = nil
+			else new_y = target_y end
 		end
 
-		pen.c.scroll_memo[ sid ].h = new_height
-	end
+		local ky = pen.c.scroll_memo[ sid ].my or 1
+		pen.c.scroll_memo[ sid ].my = ( out_y[2][1] or out_y[3][1]) and 2*ky or 1
+		for i = 2,3 do
+			if( out_y[i][1]) then
+				if( i == 2 ) then
+					pen.c.scroll_memo[ sid ].ty = math.max( new_y - step_y*ky, pic_y + 3 )
+				else pen.c.scroll_memo[ sid ].ty = math.min( new_y + step_y*ky, pic_y + bar_y + 3 ) end
+			elseif( out_y[i][2]) then pen.c.scroll_memo[ sid ].ty = pic_y + 3 + ( i == 3 and bar_y or 0 ) end
+			if( out_y[i][1] or out_y[i][2]) then
+				pen.play_sound( pen.TUNES.VNL[
+					out_y[i][1] == 1 and "HOVER" or ( out_y[i][2] and "CLICK" or "SELECT" )])
+			end
+		end
+
+		local eid_y = sid.."_anim_y"
+		progress_y = math.min( math.max(( new_y - ( pic_y + 3 ))/bar_y, -buffer ), 1 + buffer )
+		progress_y = pen.estimate( eid_y, progress_y, "wgt0.75", 0.001, 0.02*step_y )
+		pen.c.scroll_memo[ sid ].py = math.min( math.max( progress_y, 0 ), 1 )
+		is_static = out_y[1][2] ~= 2 or pen.eps_compare( new_y, pos_y )
+		if( not( progress_y >= 0 and progress_y <= 1 )) then
+			pen.c.estimator_memo[ eid_y ] = math.min( math.max( pen.c.estimator_memo[ eid_y ], 0 ), 1 )
+		elseif( not( is_static or is_waiting )) then pen.play_sound( pen.TUNES.VNL.HOVER ) end
+
+		if( old_height ~= new_height ) then
+			if( progress_y ~= 1 and old_height > 0 ) then
+				pen.c.scroll_memo[ sid ].py = math.min( math.max( scroll_y/( size_y - new_height ), 0 ), 1 )
+				pen.c.estimator_memo[ eid_y ] = pen.c.scroll_memo[ sid ].py
+			end
+	
+			pen.c.scroll_memo[ sid ].h = new_height
+		end
+	else pen.c.scroll_memo[ sid ].py = 0 end
+	
+	if( new_length > size_x ) then
+		pen.c.scroll_memo[ sid ].mx = pen.c.scroll_memo[ sid ].mx or {}
+
+		local bar_length = pen.rounder( math.max(( size_x - 6 )*math.min( size_x/new_length, 1 ), 1 ), -2 )
+		local bar_x = ( size_x - ( 6 + bar_length ))
+		local pos_x = pic_x + bar_x*progress_x + 3
+
+		local step_x = bar_x*( data.scroll_step or 11 )/( new_length - size_x )
+		local out_x = func[3]( sid, pic_x,
+			pic_y + ( data.is_top and -5 or size_y ), pic_z - 0.01, size_x, size_y, bar_length, pos_x, data )
+
+		local new_x = out_x[1][1]
+		local target_x = pen.c.scroll_memo[ sid ].tx
+		if( target_x ~= nil ) then
+			if( target_x == new_x ) then
+				pen.c.scroll_memo[ sid ].tx = nil
+			else new_x = target_x end
+		end
+
+		local kx = pen.c.scroll_memo[ sid ].mx or 1
+		pen.c.scroll_memo[ sid ].mx = ( out_x[2][1] or out_x[3][1]) and 2*kx or 1
+		for i = 2,3 do
+			if( out_x[i][1]) then
+				if( i == 2 ) then
+					pen.c.scroll_memo[ sid ].tx = math.max( new_x - step_x*kx, pic_x + 3 )
+				else pen.c.scroll_memo[ sid ].tx = math.min( new_x + step_x*kx, pic_x + bar_x + 3 ) end
+			elseif( out_x[i][2]) then pen.c.scroll_memo[ sid ].tx = pic_x + 3 + ( i == 3 and bar_x or 0 ) end
+			if( out_x[i][1] or out_x[i][2]) then
+				pen.play_sound( pen.TUNES.VNL[
+					out_x[i][1] == 1 and "HOVER" or ( out_x[i][2] and "CLICK" or "SELECT" )])
+			end
+		end
+
+		local eid_x = sid.."_anim_x"
+		progress_x = math.min( math.max(( new_x - ( pic_x + 3 ))/bar_x, -buffer ), 1 + buffer )
+		progress_x = pen.estimate( eid_x, progress_x, "wgt0.75", 0.001, 0.02*step_x )
+		pen.c.scroll_memo[ sid ].px = math.min( math.max( progress_x, 0 ), 1 )
+		is_static = out_x[1][2] ~= 2 or pen.eps_compare( new_x, pos_x )
+		if( not( progress_x >= 0 and progress_x <= 1 )) then
+			pen.c.estimator_memo[ eid_x ] = math.min( math.max( pen.c.estimator_memo[ eid_x ], 0 ), 1 )
+		elseif( not( is_static or is_waiting )) then pen.play_sound( pen.TUNES.VNL.HOVER ) end
+
+		if( old_length ~= new_length ) then
+			if( progress_x ~= 1 and old_length > 0 ) then
+				pen.c.scroll_memo[ sid ].px = math.min( math.max( scroll_x/( size_x - new_length ), 0 ), 1 )
+				pen.c.estimator_memo[ eid_x ] = pen.c.scroll_memo[ sid ].px
+			end
+	
+			pen.c.scroll_memo[ sid ].l = new_length
+		end
+	else pen.c.scroll_memo[ sid ].px = 0 end
 end
 
 function pen.new_slider( uid, pic_x, pic_y, pic_z, length, data )
@@ -4575,8 +4679,8 @@ function pen.new_scrolling_text( sid, pic_x, pic_y, pic_z, dims, text, data )
 	elseif( dims[2] ~= nil ) then
 		data.dims = { dims[1], -1 }
 		return pen.new_scroller( sid, pic_x, pic_y, pic_z - 0.001, dims[1], dims[2], function( scroll_pos )
-			local dims = pen.new_text( 0, scroll_pos, pic_z, text, data )
-			return dims[2]
+			local dims = pen.new_text( 0, scroll_pos[1], pic_z, text, data )
+			return { dims[2], 1 }
 		end)
 	end
 	

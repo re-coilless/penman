@@ -311,15 +311,23 @@ function input()
 if( not( ModIsEnabled( "mnee" ))) then return end
 dofile_once( "mods/mnee/lib.lua" )
 
---we are so fuckign back
-local out, is_real = mnee.new_input( "balls", 100, 100, 5, "", { --me when fuckign the cфх цg aÃÉтш\n冬鸟务此 按键绑
-    dims = { 200, 150 },
+local iid = "balls"
+-- if( GameGetFrameNum() > 600 ) then iid = nil end
+
+local out, is_real = mnee.new_input( iid, 100, 100, 5, "", {
+    dims = { 200, 50 }, no_wrap = true,
 })
 if( is_real ) then
     print(out)
     local f = pen.t2f( "kys", out )
     if( pen.vld( f )) then f() end
 end
+
+mnee.new_input( "ballz", 100, 175, 5, "me when fuckign the cфх цg aÃÉтш\n冬鸟务此 按键绑", {
+    dims = { 200, 50 },
+})
+
+pen.gui_builder( true )
 
 end
 
@@ -334,15 +342,21 @@ end
 
 pen.new_pixel( 100, 100, 5, pen.PALETTE.W, 55, 30 )
 pen.new_scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
-    local dims = pen.new_text( 0, scroll_pos, 0, t_memo, { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
-    return dims[2]
+    local scroll_y, scroll_x = unpack( scroll_pos )
+    local dims = pen.new_text( 0, scroll_y, 0, t_memo, { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
+    return { dims[2], 1 }
 end)
+pen.debug_print( pen.t.parse( pen.c.scroll_memo[ "balls" ], true ), 200, 90, true )
 
 pen.new_pixel( 100, 200, 5, pen.PALETTE.W, 60, 15 )
 pen.new_scroller( "ass", 100, 200, -5, 60, 15, function( scroll_pos )
-    local dims = pen.new_text( 0, scroll_pos, 0, test_input[1], { fully_featured = true, dims = {60,-1}, color = {0,255,0}})
-    return dims[2]
+    local scroll_y, scroll_x = unpack( scroll_pos )
+    local dims = pen.new_text( scroll_x, scroll_y, 0, test_input[1], { fully_featured = true, color = {0,255,0}})
+    return { dims[2], dims[1]}
 end)
+pen.debug_print( pen.t.parse( pen.c.scroll_memo[ "ass" ], true ), 200, 190, true )
+
+if( true ) then return end
 
 local item = "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!"
 pen.new_scrolling_text( "hmm", 100, 170, 5, 30, item, { fully_featured = true })
