@@ -362,11 +362,11 @@ local item = "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>
 pen.new_scrolling_text( "hmm", 100, 170, 5, 30, item, { fully_featured = true })
 
 pen.new_scrolling_text( "hhmm", 200, 170, 5, { 30, 30 }, item, { fully_featured = true, font_mods = {
-    e1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
+    e1 = function( data, pic_x, pic_y, pic_z, char_data, color, indexes )
         return pen.uncutter( function( cut_x, cut_y, cut_w, cut_h )
             pic_x.g, pic_y.g = pic_x.g + cut_x, pic_y.g + cut_y
             pic_x.l, pic_y.l = pic_x.l + cut_x, pic_y.l + cut_y
-            return pen.FONT_MODS.tip( pic_x, pic_y, pic_z, char_data, color, indexes, "dfs", "LESSS GOOOOOO" )
+            return pen.FONT_MODS.tip( data, pic_x, pic_y, pic_z, char_data, color, indexes, "dfs", "LESSS GOOOOOO" )
         end)
     end,
 }})
@@ -398,8 +398,8 @@ pen.new_tooltip( test_input[3], { tid = "bs1" })
 -- pen.new_tooltip( test_input[2], { is_active = yep, tid = "bs4", is_over = true, is_left = true })
 pen.new_tooltip( "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", {
     is_active = yep, pos = {390,199}, allow_hover = true, do_corrections = true, font_mods = {
-        e1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
-            return pen.FONT_MODS.tip( pic_x, pic_y, pic_z, char_data, color, indexes, "balls", "LESSS GOOOOOO" )
+        e1 = function( data, pic_x, pic_y, pic_z, char_data, color, indexes )
+            return pen.FONT_MODS.tip( data, pic_x, pic_y, pic_z, char_data, color, indexes, "balls", "LESSS GOOOOOO" )
         end,
     }
 })
@@ -517,15 +517,15 @@ pen.new_text( 100, 150, 0, test_input[1], {
     -- is_right_x = true,
     is_centered_y = true,
     font_mods = {
-        c1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
+        c1 = function( data, pic_x, pic_y, pic_z, char_data, color, indexes )
             return pic_x.l, pic_y.l, {0,255,0,0.5}
         end,
-        c2 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
+        c2 = function( data, pic_x, pic_y, pic_z, char_data, color, indexes )
             return pic_x.l, pic_y.l, pen.PALETTE.PRSP.RED
         end,
         
-        e1 = function( pic_x, pic_y, pic_z, char_data, color, indexes )
-            return pen.FONT_MODS.hyperlink( pic_x, pic_y, pic_z, char_data, color, indexes, "balls" )
+        e1 = function( data, pic_x, pic_y, pic_z, char_data, color, indexes )
+            return pen.FONT_MODS.hyperlink( data, pic_x, pic_y, pic_z, char_data, color, indexes, "balls" )
         end,
     },
 })

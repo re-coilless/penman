@@ -4204,105 +4204,130 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 	func = pen.get_hybrid_table( func )
 	func[2] = func[2] or function( sid, pic_x, pic_y, pic_z, size_x, size_y, bar_height, bar_y, data )
 		local out = {}
-		local color = data.color or {
-			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
-			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
+		local color = data.bar_colors or {
 			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
 			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
 			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
 			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
 			{ 0, 0, 0, 0.83 }
 		}
-		color[14] = color[14] or color[13]
+		color[10] = color[10] or color[9]
 
+		local clicked, r_clicked = false, false
+		local is_shifted = not( InputIsKeyDown( 225 ))
+		if( data.is_compact ) then
+			out[1] = { bar_y, 0 }
+			out[2] = { false, false }
+			out[3] = { false, false }
+			if(( data.can_scroll and is_shifted
+				and InputIsMouseButtonDown( 4 )) or data.go_up ) then out[2][1] = 1 end
+			if(( data.can_scroll and is_shifted
+				and InputIsMouseButtonDown( 5 )) or data.go_down ) then out[3][1] = 1 end
+			if( data.can_scroll or not( data.hide_bar )) then
+				pen.new_pixel( pic_x + ( data.is_left and 5 or -1 ), pic_y, pic_z, color[7], 1, 2, 0.75 )
+				pen.new_pixel( pic_x + ( data.is_left and 5 or -1 ),
+					bar_y, pic_z, color[ data.can_scroll and 1 or 3 ], 1, bar_height, 0.75 )
+				pen.new_pixel( pic_x + ( data.is_left and 5 or -1 ), pic_y + size_y - 2, pic_z, color[7], 1, 2, 0.75 )
+			end
+
+			return out
+		end
+		
 		local _,new_y,state,_,_,is_hovered = pen.new_dragger(
 			sid.."_dragger_y", pic_x, bar_y, 3, bar_height, pic_z )
 		if( data.can_scroll or not( data.hide_bar )) then
-			pen.new_pixel( pic_x + 1, bar_y, pic_z, color[ is_hovered and 14 or 13 ], 1, bar_height )
+			pen.new_pixel( pic_x + 1, bar_y, pic_z, color[ is_hovered and 10 or 9 ], 1, bar_height )
 			pen.new_pixel( pic_x, bar_y, pic_z, color[ is_hovered and 2 or 1 ], 1, bar_height )
 			pen.new_pixel( pic_x + 2, bar_y, pic_z, color[ is_hovered and 4 or 3 ], 1, bar_height )
 		end
 		out[1] = { new_y, state }
 		
-		local clicked, r_clicked = false, false
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, 3, 3, pic_z )
 		if( data.can_scroll or not( data.hide_bar )) then
-			pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, color[ is_hovered and 14 or 13 ])
+			pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, color[ is_hovered and 10 or 9 ])
 			pen.new_pixel( pic_x + 1, pic_y, pic_z, color[ is_hovered and 6 or 5 ])
 			pen.new_pixel( pic_x, pic_y + 1, pic_z, color[ is_hovered and 6 or 5 ])
 			pen.new_pixel( pic_x + 2, pic_y + 1, pic_z, color[ is_hovered and 8 or 7 ])
 		end
-		if( data.can_scroll and not( InputIsKeyDown( 225 )) and InputIsMouseButtonDown( 4 )) then clicked = 1 end
+		if(( data.can_scroll and is_shifted and InputIsMouseButtonDown( 4 )) or data.go_up ) then clicked = 1 end
 		out[2] = { clicked, r_clicked }
 
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y + size_y - 3, 3, 3, pic_z )
 		if( data.can_scroll or not( data.hide_bar )) then
-			pen.new_pixel( pic_x + 1, pic_y + size_y - 2, pic_z, color[ is_hovered and 14 or 13 ])
-			pen.new_pixel( pic_x + 1, pic_y + size_y - 1, pic_z, color[ is_hovered and 10 or 9 ])
-			pen.new_pixel( pic_x, pic_y + size_y - 2, pic_z, color[ is_hovered and 10 or 9 ])
-			pen.new_pixel( pic_x + 2, pic_y + size_y - 2, pic_z, color[ is_hovered and 12 or 11 ])
+			pen.new_pixel( pic_x + 1, pic_y + size_y - 2, pic_z, color[ is_hovered and 10 or 9 ])
+			pen.new_pixel( pic_x + 1, pic_y + size_y - 1, pic_z, color[ is_hovered and 6 or 5 ])
+			pen.new_pixel( pic_x, pic_y + size_y - 2, pic_z, color[ is_hovered and 6 or 5 ])
+			pen.new_pixel( pic_x + 2, pic_y + size_y - 2, pic_z, color[ is_hovered and 8 or 7 ])
 		end
-		if( data.can_scroll and not( InputIsKeyDown( 225 )) and InputIsMouseButtonDown( 5 )) then clicked = 1 end
+		if(( data.can_scroll and is_shifted and InputIsMouseButtonDown( 5 )) or data.go_down ) then clicked = 1 end
 		out[3] = { clicked, r_clicked }
 		
 		return out
 	end
 	func[3] = func[3] or function( sid, pic_x, pic_y, pic_z, size_x, size_y, bar_length, bar_x, data )
 		local out = {}
-		local color = data.color or {
-			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
-			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
+		local color = data.bar_colors or {
 			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
 			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
 			pen.PALETTE.VNL.NINE_MAIN, pen.PALETTE.VNL.NINE_ACCENT,
 			pen.PALETTE.VNL.NINE_MAIN_DARK, pen.PALETTE.VNL.NINE_ACCENT_DARK,
 			{ 0, 0, 0, 0.83 }
 		}
-		color[14] = color[14] or color[13]
+		color[10] = color[10] or color[9]
+
+		local clicked, r_clicked = false, false
+		local is_shifted = not( data.got_vertical ) or InputIsKeyDown( 225 )
+		if( data.is_compact ) then
+			out[1] = { bar_x, 0 }
+			out[2] = { false, false }
+			out[3] = { false, false }
+			if(( data.can_scroll and is_shifted
+				and InputIsMouseButtonDown( 4 )) or data.go_left ) then out[2][1] = 1 end
+			if(( data.can_scroll and is_shifted
+				and InputIsMouseButtonDown( 5 )) or data.go_right ) then out[3][1] = 1 end
+			if( data.can_scroll or not( data.hide_bar )) then
+				pen.new_pixel( pic_x, pic_y + ( data.is_top and 5 or -1 ), pic_z, color[7], 2, 1, 0.75 )
+				pen.new_pixel( bar_x, pic_y + ( data.is_top and 5 or -1 ),
+					pic_z, color[ data.can_scroll and 1 or 3 ], bar_length, 1, 0.75 )
+				pen.new_pixel( pic_x + size_x - 2, pic_y + ( data.is_top and 5 or -1 ), pic_z, color[7], 2, 1, 0.75 )
+			end
+
+			return out
+		end
 
 		local new_x,_,state,_,_,is_hovered = pen.new_dragger(
 			sid.."_dragger_x", bar_x, pic_y, bar_length, 3, pic_z )
 		if( data.can_scroll or not( data.hide_bar )) then
-			pen.new_pixel( bar_x, pic_y + 1, pic_z, color[ is_hovered and 14 or 13 ], bar_length, 1 )
+			pen.new_pixel( bar_x, pic_y + 1, pic_z, color[ is_hovered and 10 or 9 ], bar_length, 1 )
 			pen.new_pixel( bar_x, pic_y, pic_z, color[ is_hovered and 2 or 1 ], bar_length, 1 )
 			pen.new_pixel( bar_x, pic_y + 2, pic_z, color[ is_hovered and 4 or 3 ], bar_length, 1 )
 		end
 		out[1] = { new_x, state }
 		
-		local clicked, r_clicked = false, false
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x, pic_y, 3, 3, pic_z )
 		if( data.can_scroll or not( data.hide_bar )) then
-			pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, color[ is_hovered and 14 or 13 ])
+			pen.new_pixel( pic_x + 1, pic_y + 1, pic_z, color[ is_hovered and 10 or 9 ])
 			pen.new_pixel( pic_x, pic_y + 1, pic_z, color[ is_hovered and 6 or 5 ])
 			pen.new_pixel( pic_x + 1, pic_y, pic_z, color[ is_hovered and 6 or 5 ])
 			pen.new_pixel( pic_x + 1, pic_y + 2, pic_z, color[ is_hovered and 8 or 7 ])
 		end
-		if( data.can_scroll and InputIsKeyDown( 225 ) and InputIsMouseButtonDown( 4 )) then clicked = 1 end
+		if(( data.can_scroll and is_shifted and InputIsMouseButtonDown( 4 )) or data.go_left ) then clicked = 1 end
 		out[2] = { clicked, r_clicked }
 
 		clicked, r_clicked, is_hovered = pen.new_interface( pic_x + size_x - 3, pic_y, 3, 3, pic_z )
 		if( data.can_scroll or not( data.hide_bar )) then
-			pen.new_pixel( pic_x + size_x - 2, pic_y + 1, pic_z, color[ is_hovered and 14 or 13 ])
-			pen.new_pixel( pic_x + size_x - 1, pic_y + 1, pic_z, color[ is_hovered and 10 or 9 ])
-			pen.new_pixel( pic_x + size_x - 2, pic_y, pic_z, color[ is_hovered and 10 or 9 ])
-			pen.new_pixel( pic_x + size_x - 2, pic_y + 2, pic_z, color[ is_hovered and 12 or 11 ])
+			pen.new_pixel( pic_x + size_x - 2, pic_y + 1, pic_z, color[ is_hovered and 10 or 9 ])
+			pen.new_pixel( pic_x + size_x - 1, pic_y + 1, pic_z, color[ is_hovered and 6 or 5 ])
+			pen.new_pixel( pic_x + size_x - 2, pic_y, pic_z, color[ is_hovered and 6 or 5 ])
+			pen.new_pixel( pic_x + size_x - 2, pic_y + 2, pic_z, color[ is_hovered and 8 or 7 ])
 		end
-		if( data.can_scroll and InputIsKeyDown( 225 ) and InputIsMouseButtonDown( 5 )) then clicked = 1 end
+		if(( data.can_scroll and is_shifted and InputIsMouseButtonDown( 5 )) or data.go_right ) then clicked = 1 end
 		out[3] = { clicked, r_clicked }
 		
 		return out
 	end
 	
 	data = data or {}
-	if( data.scroll_always ) then
-		data.can_scroll = true
-	elseif( data.scroll_always ~= false ) then
-		data.forced_zone = data.forced_zone or {}
-		_,_,data.can_scroll = pen.new_interface(
-			pic_x + ( data.forced_zone[3] or 0 ), pic_y + ( data.forced_zone[4] or 0 ),
-			data.forced_zone[1] or ( size_x + 5 ), data.forced_zone[2] or size_y, pic_z )
-	end
-
 	pen.c.scroll_memo = pen.c.scroll_memo or {}
 	pen.c.scroll_memo[ sid ] = pen.c.scroll_memo[ sid ] or {}
 
@@ -4315,15 +4340,24 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 
 	local new_height, new_length = unpack( pen.new_cutout(
 		pic_x, pic_y, size_x, size_y, func[1], { scroll_y, scroll_x }))
-	if( data.can_scroll ) then pen.unscroller() end
+	local do_vert, do_horz = new_height > size_y, new_length > size_x
+	if( data.scroll_always ) then
+		data.can_scroll = true
+	elseif( data.scroll_always ~= false ) then
+		data.forced_zone = data.forced_zone or {}
+		_,_,data.can_scroll = pen.new_interface(
+			pic_x + ( data.forced_zone[3] or 0 ),
+			pic_y + ( data.forced_zone[4] or 0 ),
+			data.forced_zone[1] or size_x, data.forced_zone[2] or size_y, pic_z )
+	end
 
 	local buffer = 1
 	local is_static = false
 	local is_waiting = GameGetFrameNum()%7 ~= 0
+	if( data.can_scroll ) then pen.unscroller() end
+	data.got_vertical = do_vert
 
-	if( new_height > size_y ) then
-		pen.c.scroll_memo[ sid ].my = pen.c.scroll_memo[ sid ].my or {}
-
+	if( do_vert ) then
 		local bar_height = pen.rounder( math.max(( size_y - 6 )*math.min( size_y/new_height, 1 ), 1 ), -2 )
 		local bar_y = ( size_y - ( 6 + bar_height ))
 		local pos_y = pic_y + bar_y*progress_y + 3
@@ -4373,9 +4407,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 		end
 	else pen.c.scroll_memo[ sid ].py = 0 end
 	
-	if( new_length > size_x ) then
-		pen.c.scroll_memo[ sid ].mx = pen.c.scroll_memo[ sid ].mx or {}
-
+	if( do_horz ) then
 		local bar_length = pen.rounder( math.max(( size_x - 6 )*math.min( size_x/new_length, 1 ), 1 ), -2 )
 		local bar_x = ( size_x - ( 6 + bar_length ))
 		local pos_x = pic_x + bar_x*progress_x + 3
@@ -4618,7 +4650,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 				local font_mod = data.font_mods[ func ] or pen.FONT_MODS[ func ]
 				if( font_mod ~= nil ) then
 					c_lcl[ func ] = ( c_lcl[ func ] or 0 ) + 1
-					new_x, new_y, new_clr, new_font, new_char = font_mod(
+					new_x, new_y, new_clr, new_font, new_char = font_mod( data,
 						{ l = pos_x, g = orig_x }, { l = pos_y, g = orig_y }, pic_z,
 						{ char = char, dims = off, font = font, extra = extra_list, ram = pen.c.font_ram },
 						{ clr[1], clr[2], clr[3], clr[4] or data.alpha }, { gbl = c_gbl, lcl = c_lcl[ func ], chr = letter_id, lin = c_lin }
@@ -5000,21 +5032,21 @@ pen.FONT_SPACING = {
 	["data/fonts/generated/notosans_ko_36.bin"] = 2.5,
 }
 pen.FONT_MODS = {
-	_bold = function( pic_x, pic_y, pic_z, char_data, color, index )
+	_bold = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		pen.colourer( nil, color )
 		GuiZSetForNextWidget( pen.c.gui_data.g, pic_z )
 		local off_x, off_y = unpack( char_data.dims )
 		GuiText( pen.c.gui_data.g, pic_x.l - 0.25*off_x, pic_y.l - 0.25*off_y, char_data.char, 1.25, char_data.font[1], char_data.font[2])
 		return nil, nil, nil, nil, ""
 	end,
-	_italic = function( pic_x, pic_y, pic_z, char_data, color, index )
+	_italic = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		--get letter pic and angle it
 	end,
-	crossed = function( pic_x, pic_y, pic_z, char_data, color, index ) --make this be font height related
+	crossed = function( data, pic_x, pic_y, pic_z, char_data, color, index ) --make this be font height related
 		local off_x, off_y = unpack( char_data.dims )
 		pen.new_pixel( pic_x.g - 1, pic_y.g + ( off_y - 1 )/2, pic_z + 0.001, color, ( off_x + 2 ), 1 )
 	end,
-	underscore = function( pic_x, pic_y, pic_z, char_data, color, index ) --make this be font height related
+	underscore = function( data, pic_x, pic_y, pic_z, char_data, color, index ) --make this be font height related
 		local alpha = color[4]
 		local new_color = color
 		if( not( char_data.ram.under_color_locked ) and pen.vld( char_data.extra[1])) then
@@ -5032,12 +5064,12 @@ pen.FONT_MODS = {
 		local off_x, off_y = unpack( char_data.dims )
 		pen.new_pixel( pic_x.g, pic_y.g + off_y*0.8, pic_z + 0.001, new_color, off_x, 1, alpha )
 	end,
-	shadow = function( pic_x, pic_y, pic_z, char_data, color, index )
+	shadow = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		GuiZSetForNextWidget( pen.c.gui_data.g, pic_z + 0.0001 )
 		pen.colourer( nil, pen.PALETTE.SHADOW, 0.5*(( color or {})[4] or 1 ))
 		GuiText( pen.c.gui_data.g, pic_x.l + 0.6, pic_y.l + 0.6, char_data.char, 1, char_data.font[1], char_data.font[2])
 	end,
-	runic = function( pic_x, pic_y, pic_z, char_data, color, index )
+	runic = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		local new_one = char_data.char
 		local new_byte = pen.magic_byte( new_one )
 		if( new_byte > 10000 ) then new_one = pen.magic_byte( 65 + new_byte%57 ) end
@@ -5045,7 +5077,7 @@ pen.FONT_MODS = {
 		font = ( pen.t.unarray( pen.t.pack( GlobalsGetValue( pen.GLOBAL_FONT_REMAP, "" ))) or {})[ font ] or font
 		return nil, nil, nil, { font, true }, new_one == "$" and "!" or new_one
 	end,
-	color = function( pic_x, pic_y, pic_z, char_data, color, index )
+	color = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		local new_color = nil
 		if( pen.vld( char_data.extra[1])) then
 			new_color = pen.t.pack( char_data.extra[ #char_data.extra ])
@@ -5058,29 +5090,29 @@ pen.FONT_MODS = {
 		return nil, nil, new_color
 	end,
 
-	indent = function( pic_x, pic_y, pic_z, char_data, color, index )
+	indent = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		return pic_x.l + 2, pic_y.l
 	end,
-	wave = function( pic_x, pic_y, pic_z, char_data, color, index )
+	wave = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		return nil, pic_y.l + math.sin( 0.5*index.gbl + GameGetFrameNum()/7 )
 	end,
-	quake = function( pic_x, pic_y, pic_z, char_data, color, index )
+	quake = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		pic_x.l = pic_x.l + pen.generic_random( 0, 100, nil, true )/200
 		pic_y.l = pic_y.l + pen.generic_random( 0, 100, nil, true )/200
 		return pic_x.l, pic_y.l
 	end,
-	cancer = function( pic_x, pic_y, pic_z, char_data, color, index )
+	cancer = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		local new_one = pen.magic_byte( pen.generic_random( 33, 127 ))
 		return nil, nil, nil, nil, new_one == "$" and "!" or new_one
 	end,
-	rainbow = function( pic_x, pic_y, pic_z, char_data, color, index )
+	rainbow = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		color = pen.magic_rgb( color, false, "hsv" )
 		color[1] = (( 5*index.gbl + GameGetFrameNum())%100 )/100
 		color[2] = math.max( color[2], 0.5 )
 		return nil, nil, pen.magic_rgb( color, true, "hsv" )
 	end,
 	
-	button = function( pic_x, pic_y, pic_z, char_data, color, index, bid )
+	button = function( data, pic_x, pic_y, pic_z, char_data, color, index, bid )
 		local frame_num = GameGetFrameNum()
 		local id_tbl = { "hyperlink_state", bid or "dft_btn" }
 		local clicked, r_clicked, is_hovered = pen.cache( id_tbl, function( old_val )
@@ -5103,7 +5135,7 @@ pen.FONT_MODS = {
 		end
 		return nil, nil, color
 	end,
-	tip = function( pic_x, pic_y, pic_z, char_data, color, index, tip_id, text )
+	tip = function( data, pic_x, pic_y, pic_z, char_data, color, index, tip_id, text )
 		tip_id = tip_id or "dft_tip"
 
 		local frame_num = GameGetFrameNum()
@@ -5118,71 +5150,77 @@ pen.FONT_MODS = {
 			})
 		end
 		
-		return pen.FONT_MODS.button( pic_x, pic_y, pic_z, char_data, color, index, tip_id )
+		return pen.FONT_MODS.button( data, pic_x, pic_y, pic_z, char_data, color, index, tip_id )
 	end,
-	hyperlink = function( pic_x, pic_y, pic_z, char_data, color, index, link_id )
+	hyperlink = function( data, pic_x, pic_y, pic_z, char_data, color, index, link_id )
 		link_id = link_id or "dft_lnk"
 
 		local frame_num = GameGetFrameNum()
 		local clicked, r_clicked, is_hovered = pen.cache({ "hyperlink_state", link_id })
 		color = ( clicked or 0 ) == 0 and pen.PALETTE.VNL.MANA or pen.PALETTE.VNL.RED
 		if( frame_num < ( is_hovered or 0 )) then
-			pen.FONT_MODS.underscore( pic_x, pic_y, pic_z, char_data, color, index )
+			pen.FONT_MODS.underscore( data, pic_x, pic_y, pic_z, char_data, color, index )
 		end
 		
-		return pen.FONT_MODS.button( pic_x, pic_y, pic_z, char_data, color, index, link_id )
+		return pen.FONT_MODS.button( data, pic_x, pic_y, pic_z, char_data, color, index, link_id )
 	end,
-	cursor = function( pic_x, pic_y, pic_z, char_data, color, index )
-		local data = pen.c.input_data
+	cursor = function( data, pic_x, pic_y, pic_z, char_data, color, index )
+		local idt = pen.c.input_data
 		local frame_num = GameGetFrameNum()
-		if( data.safety < frame_num ) then
-			data.safety = frame_num
-			data.drift.r = data.drift.r or InputIsKeyJustDown( 79 --[[Arrow Right]])
-			data.drift.l = data.drift.l or InputIsKeyJustDown( 80 --[[Arrow Left]])
-			data.drift.d = data.drift.d or InputIsKeyJustDown( 81 --[[Arrow Down]])
-			data.drift.u = data.drift.u or InputIsKeyJustDown( 82 --[[Arrow Up]])
+		if( idt.safety < frame_num ) then
+			idt.safety = frame_num
+			idt.drift.r = idt.drift.r or InputIsKeyJustDown( 79 --[[Arrow Right]])
+			idt.drift.l = idt.drift.l or InputIsKeyJustDown( 80 --[[Arrow Left]])
+			idt.drift.d = idt.drift.d or InputIsKeyJustDown( 81 --[[Arrow Down]])
+			idt.drift.u = idt.drift.u or InputIsKeyJustDown( 82 --[[Arrow Up]])
 		end
 
-		if( data.last_lin ~= index.lin ) then
-			local prev_lin = math.abs( data.last_lin )
-			if( data.drift.l and data.pos.l == index.lin ) then
-				data.drift.l = false
-				local will_jump = data.pos.c < 1
-				data.pos.c = will_jump and data.last_chr or ( data.pos.c - 1 )
-				if( will_jump ) then data.pos.l = prev_lin end
-			elseif( data.drift.u and data.pos.l == index.lin ) then
-				data.drift.u = false
-				data.pos.l = prev_lin
-				data.pos.c = math.min( data.pos.c, data.last_chr )
-			elseif( data.drift.r and data.pos.l == prev_lin ) then
-				data.drift.r = false
-				local will_jump = data.pos.c == data.last_chr
-				data.pos.c = will_jump and 0 or ( data.pos.c + 1 )
-				if( will_jump ) then data.pos.l = index.lin end
-			elseif( data.drift.d and data.pos.l == data.last_last_lin ) then
-				data.drift.d = false
-				data.pos.l = prev_lin
-				data.pos.c = math.min( data.pos.c, data.last_chr )
+		if( idt.last_lin ~= index.lin ) then
+			local prev_lin = math.abs( idt.last_lin )
+			if( idt.drift.l and idt.pos.l == index.lin ) then
+				idt.drift.l = false
+				local will_jump = idt.pos.c < 1
+				idt.pos.c = will_jump and idt.last_chr or ( idt.pos.c - 1 )
+				if( will_jump ) then idt.pos.l = prev_lin end
+			elseif( idt.drift.u and idt.pos.l == index.lin ) then
+				idt.drift.u = false
+				idt.pos.l = prev_lin
+				idt.pos.c = math.min( idt.pos.c, idt.last_chr )
+			elseif( idt.drift.r and idt.pos.l == prev_lin ) then
+				idt.drift.r = false
+				local will_jump = idt.pos.c == idt.last_chr
+				idt.pos.c = will_jump and 0 or ( idt.pos.c + 1 )
+				if( will_jump ) then idt.pos.l = index.lin end
+			elseif( idt.drift.d and idt.pos.l == idt.last_last_lin ) then
+				idt.drift.d = false
+				idt.pos.l = prev_lin
+				idt.pos.c = math.min( idt.pos.c, idt.last_chr )
 			end
 
-			data.last_last_lin = math.abs( data.last_lin )
+			idt.last_last_lin = math.abs( idt.last_lin )
 		end
 
-		local is_here = data.pos.l == index.lin and
-			( data.pos.c == index.chr or ( data.pos.c == 0 and index.chr == 1 ))
+		local is_here = idt.pos.l == index.lin and
+			( idt.pos.c == index.chr or ( idt.pos.c == 0 and index.chr == 1 ))
 		if( is_here ) then
-			data.index = index.gbl + ( data.pos.c == 0 and -1 or 0 ) end
-		if( GameGetFrameNum()%30 < 15 and is_here ) then
-			local step = data.pos.c == 0 and 0 or char_data.dims[1]
-			pen.new_pixel( pic_x.g + step - 1,
-				pic_y.g, pic_z, pen.PALETTE.VNL.YELLOW, 1, char_data.dims[2])
+			idt.index = index.gbl + ( idt.pos.c == 0 and -1 or 0 ) end
+		if( is_here ) then
+			local frame_num = GameGetFrameNum()
+			local step = idt.pos.c == 0 and 1 or char_data.dims[1]
+			pen.new_pixel( pic_x.g + step - 1, pic_y.g, pic_z,
+				pen.PALETTE.VNL.YELLOW, 1, char_data.dims[2], frame_num%30 < 15 and 1 or 0.1 )
+			if( frame_num%3 == 0 and pen.vld( pen.c.cutter_dims )) then
+				data.go_right = pic_x.g + step - 2 > pen.c.cutter_dims.wh[1]
+				data.go_left, data.go_up = pic_x.g + step - 1 < 0, pic_y.g < 0
+				data.go_down = pic_y.g + char_data.dims[2] - 1 > pen.c.cutter_dims.wh[2]
+			end
 		end
 
-		data.last_chr = index.chr
-		data.last_lin = index.lin
+		idt.last_chr = index.chr
+		idt.last_lin = index.lin
 		return nil, nil, nil, nil, ""
 	end,
-	_typing = function( pic_x, pic_y, pic_z, char_data, color, index )
+	_typing = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		--char_data.extra for modifications (compare the index num with index.chr)
 		--letters appear through alpha sin interpolating top down
 	end,
