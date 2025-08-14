@@ -4612,12 +4612,13 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 
 		local pos_x = pic_x + data.scale*( off_x + element.x )
 		local pos_y = pic_y + data.scale*( off_y + element.y )
-		if( is_inside ) then
+		if( is_inside and not( data.no_culling )) then
 			local real_x = pen.c.cutter_dims.xy[1] + pos_x
 			if( pos_x < 0 ) then real_x = pen.c.cutter_dims.xy[1] end
 			local real_y = pen.c.cutter_dims.xy[2] + pos_y
 			if( pos_y < 0 ) then real_y = real_y + new_line + 1 end
-			if( not( pen.check_bounds({ real_x, real_y }, pen.c.cutter_dims.wh, pen.c.cutter_dims.xy ))) then return end
+			local is_real = pen.check_bounds({ real_x, real_y }, pen.c.cutter_dims.wh, pen.c.cutter_dims.xy )
+			if( not( is_real )) then return end
 		end
 
 		if( not( pen.vld( element.f ))) then
@@ -5111,6 +5112,10 @@ pen.FONT_MODS = {
 		color[2] = math.max( color[2], 0.5 )
 		return nil, nil, pen.magic_rgb( color, true, "hsv" )
 	end,
+	_typing = function( data, pic_x, pic_y, pic_z, char_data, color, index )
+		--char_data.extra for modifications (compare the index num with index.chr)
+		--letters appear through alpha sin interpolating top down
+	end,
 	
 	button = function( data, pic_x, pic_y, pic_z, char_data, color, index, bid )
 		local frame_num = GameGetFrameNum()
@@ -5164,17 +5169,18 @@ pen.FONT_MODS = {
 		
 		return pen.FONT_MODS.button( data, pic_x, pic_y, pic_z, char_data, color, index, link_id )
 	end,
+	
 	cursor = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		local idt = pen.c.input_data
 		local frame_num = GameGetFrameNum()
 		if( idt.safety < frame_num ) then
-			idt.safety = frame_num
+			idt.safety, idt.new_lin, idt.space_num = frame_num, 0, 0
 			idt.drift.r = idt.drift.r or InputIsKeyJustDown( 79 --[[Arrow Right]])
 			idt.drift.l = idt.drift.l or InputIsKeyJustDown( 80 --[[Arrow Left]])
 			idt.drift.d = idt.drift.d or InputIsKeyJustDown( 81 --[[Arrow Down]])
 			idt.drift.u = idt.drift.u or InputIsKeyJustDown( 82 --[[Arrow Up]])
 		end
-
+		
 		if( idt.last_lin ~= index.lin ) then
 			local prev_lin = math.abs( idt.last_lin )
 			if( idt.drift.l and idt.pos.l == index.lin ) then
@@ -5195,34 +5201,45 @@ pen.FONT_MODS = {
 				idt.drift.d = false
 				idt.pos.l = prev_lin
 				idt.pos.c = math.min( idt.pos.c, idt.last_chr )
+			elseif( frame_num - ( idt.frame_rendered or frame_num ) > 10 ) then
+				if( idt.last_lin < 0 and idt.pos.c ~= 0 ) then
+					idt.pos.l = math.abs( idt.last_lin )
+					idt.pos.c = idt.last_chr
+				end
 			end
 
 			idt.last_last_lin = math.abs( idt.last_lin )
 		end
 
+		if( -idt.last_lin == idt.pos.l - 1 and idt.pos.c == 0 ) then
+			idt.new_lin = -idt.last_lin
+		end
+
+		if( idt.frame_rendered ~= idt.safety ) then
+			if( char_data.char == " " ) then idt.space_num = idt.space_num + 1 end
+		end
+
 		local is_here = idt.pos.l == index.lin and
 			( idt.pos.c == index.chr or ( idt.pos.c == 0 and index.chr == 1 ))
-		if( is_here ) then
-			idt.index = index.gbl + ( idt.pos.c == 0 and -1 or 0 ) end
-		if( is_here ) then
-			local frame_num = GameGetFrameNum()
-			local step = idt.pos.c == 0 and 1 or char_data.dims[1]
-			pen.new_pixel( pic_x.g + step - 1, pic_y.g, pic_z,
+		local is_new = idt.new_lin == index.lin and index.chr == 1
+		if( is_here or is_new ) then
+			idt.frame_rendered = frame_num - pen.b2n( is_new )
+			local step_x = idt.pos.c == 0 and 1 or char_data.dims[1]
+			local step_y = is_new and char_data.dims[2] or 0
+			pen.new_pixel( pic_x.g + step_x - 1, pic_y.g + step_y, pic_z + 0.002,
 				pen.PALETTE.VNL.YELLOW, 1, char_data.dims[2], frame_num%30 < 15 and 1 or 0.1 )
+			if( not( is_new )) then
+				idt.index = index.gbl + ( idt.pos.c == 0 and -1 or 0 ) end
 			if( frame_num%3 == 0 and pen.vld( pen.c.cutter_dims )) then
-				data.go_right = pic_x.g + step - 2 > pen.c.cutter_dims.wh[1]
-				data.go_left, data.go_up = pic_x.g + step - 1 < 0, pic_y.g < 0
-				data.go_down = pic_y.g + char_data.dims[2] - 1 > pen.c.cutter_dims.wh[2]
+				data.go_right = pic_x.g + step_x - 2 > pen.c.cutter_dims.wh[1]
+				data.go_left, data.go_up = pic_x.g + step_x - 1 < 0, pic_y.g + step_y < 0
+				data.go_down = pic_y.g + step_y + char_data.dims[2] - 1 > pen.c.cutter_dims.wh[2]
 			end
 		end
 
 		idt.last_chr = index.chr
 		idt.last_lin = index.lin
 		return nil, nil, nil, nil, ""
-	end,
-	_typing = function( data, pic_x, pic_y, pic_z, char_data, color, index )
-		--char_data.extra for modifications (compare the index num with index.chr)
-		--letters appear through alpha sin interpolating top down
 	end,
 }
 

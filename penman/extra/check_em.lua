@@ -313,19 +313,42 @@ dofile_once( "mods/mnee/lib.lua" )
 
 local iid = "balls"
 -- if( GameGetFrameNum() > 600 ) then iid = nil end
+local source = "Now that you have a feeling for the keyboard and typing easy words, you will move on to full sentences with capitalization.\nTake your time and focus on keeping your eyes off of your keyboard!"
+
+pen.c.typing_test = pen.c.typing_test or {}
+local state = pen.c.typing_test.state or 0
 
 local out, is_real = mnee.new_input( iid, 100, 100, 5, "", {
-    dims = { 200, 50 }, no_wrap = true,
+    dims = { 200, 37 }, no_wrap = false, is_live = true,
+    color = state ~= 0 and pen.PALETTE.VNL[ state > 0 and "RUNIC" or "WARNING" ] or nil,
 })
 if( is_real ) then
-    print(out)
-    local f = pen.t2f( "kys", out )
-    if( pen.vld( f )) then f() end
+    pen.c.typing_test.timer = pen.c.typing_test.timer or GameGetRealWorldTimeSinceStarted()*1000
+
+    local is_correct = 1
+    pen.w2c( source, function( char_id, letter_id, start_id, end_id )
+        local a = string.sub( out, start_id, end_id )
+        local b = string.sub( source, start_id, end_id )
+        if( a ~= b ) then is_correct = a == "" and 0 or -1; return true end
+    end)
+
+    if( is_correct == 1 ) then
+        if( pen.c.typing_test.state ~= 1 ) then
+            local t = GameGetRealWorldTimeSinceStarted()*1000 - pen.c.typing_test.timer
+            GamePrint( "Your WPM: "..pen.rounder( 60000*35/t ))
+        end
+        pen.c.typing_test.state = 1
+    else pen.c.typing_test.state = is_correct end
 end
 
-mnee.new_input( "ballz", 100, 175, 5, "me when fuckign the cфх цg aÃÉтш\n冬鸟务此 按键绑", {
-    dims = { 200, 50 },
+mnee.new_input( "ballz", 100, 175, 5, source, {
+    dims = { 200, 55 },
 })
+-- if( is_real ) then
+--     print(out)
+--     local f = pen.t2f( "kys", out )
+--     if( pen.vld( f )) then f() end
+-- end
 
 pen.gui_builder( true )
 
