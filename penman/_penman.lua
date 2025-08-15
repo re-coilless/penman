@@ -4382,7 +4382,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 					pen.c.scroll_memo[ sid ].ty = math.max( new_y - step_y*ky, pic_y + 3 )
 				else pen.c.scroll_memo[ sid ].ty = math.min( new_y + step_y*ky, pic_y + bar_y + 3 ) end
 			elseif( out_y[i][2]) then pen.c.scroll_memo[ sid ].ty = pic_y + 3 + ( i == 3 and bar_y or 0 ) end
-			if( out_y[i][1] or out_y[i][2]) then
+			if( not( data.go_down or data.go_up ) and ( out_y[i][1] or out_y[i][2])) then
 				pen.play_sound( pen.TUNES.VNL[
 					out_y[i][1] == 1 and "HOVER" or ( out_y[i][2] and "CLICK" or "SELECT" )])
 			end
@@ -4432,7 +4432,7 @@ function pen.new_scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 					pen.c.scroll_memo[ sid ].tx = math.max( new_x - step_x*kx, pic_x + 3 )
 				else pen.c.scroll_memo[ sid ].tx = math.min( new_x + step_x*kx, pic_x + bar_x + 3 ) end
 			elseif( out_x[i][2]) then pen.c.scroll_memo[ sid ].tx = pic_x + 3 + ( i == 3 and bar_x or 0 ) end
-			if( out_x[i][1] or out_x[i][2]) then
+			if( not( data.go_right or data.go_left ) and ( out_x[i][1] or out_x[i][2])) then
 				pen.play_sound( pen.TUNES.VNL[
 					out_x[i][1] == 1 and "HOVER" or ( out_x[i][2] and "CLICK" or "SELECT" )])
 			end
@@ -4525,11 +4525,11 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 				off_x = pen.get_text_dims( t, data.font, is_pixel_font )
 				off_x = ( math.abs( dims[1]) - off_x )/2
 			end
-
+			
 			shadowed_text( pic_x + off_x, pic_y + ( i - 1 )*new_line + off_y, pic_z,
 				t, data.scale, data.font, is_pixel_font, data.color, data.alpha, data.has_shadow )
 		end
-		return dims
+		return dims, new_line
 	end
 	
 	local structure = pen.cache({ "metafont",
@@ -4676,7 +4676,7 @@ function pen.new_text( pic_x, pic_y, pic_z, text, data )
 	
 	pen.c.font_ram = nil
 
-	return dims
+	return dims, new_line
 end
 
 function pen.new_shadowed_text( pic_x, pic_y, pic_z, text, data )
@@ -5169,12 +5169,13 @@ pen.FONT_MODS = {
 		
 		return pen.FONT_MODS.button( data, pic_x, pic_y, pic_z, char_data, color, index, link_id )
 	end,
-	
+
 	cursor = function( data, pic_x, pic_y, pic_z, char_data, color, index )
 		local idt = pen.c.input_data
 		local frame_num = GameGetFrameNum()
 		if( idt.safety < frame_num ) then
-			idt.safety, idt.new_lin, idt.space_num = frame_num, 0, 0
+			idt.safety, idt.new_lin = frame_num, 0
+			idt.is_space, idt.space_num = false, 0
 			idt.drift.r = idt.drift.r or InputIsKeyJustDown( 79 --[[Arrow Right]])
 			idt.drift.l = idt.drift.l or InputIsKeyJustDown( 80 --[[Arrow Left]])
 			idt.drift.d = idt.drift.d or InputIsKeyJustDown( 81 --[[Arrow Down]])
@@ -5201,13 +5202,13 @@ pen.FONT_MODS = {
 				idt.drift.d = false
 				idt.pos.l = prev_lin
 				idt.pos.c = math.min( idt.pos.c, idt.last_chr )
-			elseif( frame_num - ( idt.frame_rendered or frame_num ) > 10 ) then
+			elseif( frame_num - ( idt.frame_rendered or frame_num ) > 2 ) then
 				if( idt.last_lin < 0 and idt.pos.c ~= 0 ) then
 					idt.pos.l = math.abs( idt.last_lin )
 					idt.pos.c = idt.last_chr
 				end
 			end
-
+			
 			idt.last_last_lin = math.abs( idt.last_lin )
 		end
 
@@ -5218,7 +5219,7 @@ pen.FONT_MODS = {
 		if( idt.frame_rendered ~= idt.safety ) then
 			if( char_data.char == " " ) then idt.space_num = idt.space_num + 1 end
 		end
-
+		
 		local is_here = idt.pos.l == index.lin and
 			( idt.pos.c == index.chr or ( idt.pos.c == 0 and index.chr == 1 ))
 		local is_new = idt.new_lin == index.lin and index.chr == 1
@@ -5235,6 +5236,7 @@ pen.FONT_MODS = {
 				data.go_left, data.go_up = pic_x.g + step_x - 1 < 0, pic_y.g + step_y < 0
 				data.go_down = pic_y.g + step_y + char_data.dims[2] - 1 > pen.c.cutter_dims.wh[2]
 			end
+			if( char_data.char == " " ) then idt.is_space = true end
 		end
 
 		idt.last_chr = index.chr
