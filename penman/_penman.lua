@@ -5176,13 +5176,17 @@ pen.FONT_MODS = {
 		if( idt.safety < frame_num ) then
 			idt.safety, idt.new_lin = frame_num, 0
 			idt.is_space, idt.space_num = false, 0
-			idt.drift.r = idt.drift.r or InputIsKeyJustDown( 79 --[[Arrow Right]])
-			idt.drift.l = idt.drift.l or InputIsKeyJustDown( 80 --[[Arrow Left]])
-			idt.drift.d = idt.drift.d or InputIsKeyJustDown( 81 --[[Arrow Down]])
-			idt.drift.u = idt.drift.u or InputIsKeyJustDown( 82 --[[Arrow Up]])
+			idt.drift.r = idt.drift.r or InputIsKeyJustDown( 79 --[[Right]])
+			idt.drift.l = idt.drift.l or InputIsKeyJustDown( 80 --[[Left]])
+			idt.drift.d = idt.drift.d or InputIsKeyJustDown( 81 --[[Down]])
+			idt.drift.u = idt.drift.u or InputIsKeyJustDown( 82 --[[Up]])
+			idt.drift.hl = ( idt.drift.r or idt.drift.l or idt.drift.d or idt.drift.u )
+				and ( InputIsKeyDown( 225 --[[Left Shift]]) or InputIsKeyDown( 229 --[[Right Shift]]))
 		end
 		
 		if( idt.last_lin ~= index.lin ) then
+			if( idt.drift.hl ) then idt.hdata[3] = idt.hdata[3] or { idt.pos.l, idt.pos.c } end
+			
 			local prev_lin = math.abs( idt.last_lin )
 			if( idt.drift.l and idt.pos.l == index.lin ) then
 				idt.drift.l = false
@@ -5208,6 +5212,8 @@ pen.FONT_MODS = {
 					idt.pos.c = idt.last_chr
 				end
 			end
+
+			if( idt.drift.hl ) then idt.hdata[4] = { idt.pos.l, idt.pos.c } end
 			
 			idt.last_last_lin = math.abs( idt.last_lin )
 		end
@@ -5219,7 +5225,7 @@ pen.FONT_MODS = {
 		if( idt.frame_rendered ~= idt.safety ) then
 			if( char_data.char == " " ) then idt.space_num = idt.space_num + 1 end
 		end
-		
+
 		local is_here = idt.pos.l == index.lin and
 			( idt.pos.c == index.chr or ( idt.pos.c == 0 and index.chr == 1 ))
 		local is_new = idt.new_lin == index.lin and index.chr == 1
@@ -5237,6 +5243,17 @@ pen.FONT_MODS = {
 				data.go_down = pic_y.g + step_y + char_data.dims[2] - 1 > pen.c.cutter_dims.wh[2]
 			end
 			if( char_data.char == " " ) then idt.is_space = true end
+		end
+
+		if( pen.vld(( idt.hdata or {})[3])) then
+			local _pos_id = 10000*( idt.hdata[3][1] or -1 ) + ( idt.hdata[3][2] or -1 )
+			local h_pos_id = 10000*( idt.hdata[4][1] or -1 ) + ( idt.hdata[4][2] or -1 )
+			if( _pos_id > h_pos_id ) then local temp = _pos_id; _pos_id = h_pos_id; h_pos_id = temp end
+			local this_pos_id = 10000*index.lin + index.chr
+			if( this_pos_id >= _pos_id and this_pos_id <= h_pos_id ) then
+				pen.new_pixel( pic_x.g, pic_y.g, pic_z + 0.003,
+					pen.PALETTE.VNL.YELLOW, char_data.dims[1], char_data.dims[2], 0.25 )
+			end
 		end
 
 		idt.last_chr = index.chr
