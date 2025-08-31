@@ -24,12 +24,12 @@ if( GameHasFlagRun( pen.FLAG_UPDATE_UTF )) then
 		for the_concept_of_character_itself in string.gmatch( the_concept_of_language_itself, "." ) do
 			local the_concept_of_byte_itself = string.byte( the_concept_of_character_itself )
 			if( the_concept_of_byte_itself == string.byte( "." )) then
-				if( the_concept_of_number_itself > 0 and pen.BYTE_TO_ID[ the_concept_of_number_itself ] == nil ) then
+				if( the_concept_of_number_itself > 0 and pen.BYTE2ID[ the_concept_of_number_itself ] == nil ) then
 					local the_concept_of_i_itself = 1
 					for str in string.gmatch( the_concept_of_language_itself, pen.ptrn( "%." )) do
 						if( the_concept_of_i_itself == the_concept_of_counter_itself ) then
-							pen.BYTE_TO_ID[ the_concept_of_number_itself ] = pen.magic_byte( str )
-							print( "["..the_concept_of_number_itself.."]="..pen.BYTE_TO_ID[ the_concept_of_number_itself ])
+							pen.BYTE2ID[ the_concept_of_number_itself ] = pen.magic_byte( str )
+							print( "["..the_concept_of_number_itself.."]="..pen.BYTE2ID[ the_concept_of_number_itself ])
 							break
 						end
 						the_concept_of_i_itself = the_concept_of_i_itself + 1
@@ -187,7 +187,7 @@ function pen.lib.font_builder( font, chars, atlas, data ) --search the id at htt
 				attr = {
 					id = i, width = 0,
 					offset_x = 0, offset_y = 0,
-					rect_h = 0, rect_w = 0,
+					rect_w = 0, rect_h = 0,
 					rect_x = 0, rect_y = 0,
 				},
 			})
@@ -197,17 +197,15 @@ function pen.lib.font_builder( font, chars, atlas, data ) --search the id at htt
 		if( chars[ c.attr.id ] == nil ) then return end
 		if( not( chars[ c.attr.id ].forced )) then return end
 		
-		c.attr.rect_x = x_memo
-		c.attr.rect_y = chars[ c.attr.id ].pos[2] or 0
-		c.attr.width = chars[ c.attr.id ].pos[3]
+		c.attr.rect_x, c.attr.rect_y = x_memo, 0
+		c.attr.width = chars[ c.attr.id ].pos[3] or chars[ c.attr.id ].rect_w
 		table.insert( new_chars, {
-			chars[ c.attr.id ].pos[1],
-			chars[ c.attr.id ].pos[2],
-			chars[ c.attr.id ].pos[3],
-			c.attr.rect_x, c.attr.rect_y,
+			chars[ c.attr.id ].pos[1], chars[ c.attr.id ].pos[2],
+			c.attr.width, c.attr.rect_x, c.attr.rect_y,
 		})
+		
 		c.attr.rect_w = chars[ c.attr.id ].rect_w
-		c.attr.rect_h = chars[ c.attr.id ].rect_h
+		c.attr.rect_h = chars[ c.attr.id ].rect_h or pic_h
 		c.attr.offset_x = chars[ c.attr.id ].offset_x or 0
 		c.attr.offset_y = chars[ c.attr.id ].offset_y or 0
 		x_memo = x_memo + c.attr.width + 1

@@ -20,7 +20,9 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --Store 4 closest widgets for the left, right, up, down to the currently focused one + store the widget closest to 0 to pick as focusable when the time comes, allow one to force focus through code
 --Allow emulating focusing inputs (0 is nothing, 1 is right, 2 is up, 3 is lmb, 4 is select, -1 is left, -2 is down, -3 is rmb, -4 is unselect)
 --make sure this has an inherent compatibility with multiplayer (4 players max)
---(dpad/left_stick/keyborad_arrows to switch between, x/keypad_0 to select (dragger should work), triangle/keypad_. for rmb)
+--(dpad/left_stick to switch between, A for lmb (dragger should work in full 2D plane), Y for rmb, R1 for shift)
+--gamepad selection visualization is circular blinking of every corner between two colors unique for every player
+--controllers should be mnee inmode guied too
 
 --[TODO]
 --make sure player.png in pics is up to date with latest spritesheet pipeline
@@ -44,6 +46,7 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --add sfxes (separate banks for prospero, hermes, trigger)
 --testing environment that has full in-world function simulation
 --https://link.springer.com/content/pdf/10.1023/A:1007670802811.pdf for AI? (an environemnt where the data is being collected by dev roleplaying as enemy; https://vk.com/away.php?to=https%3A%2F%2Fmachinelearningmastery.com%2Fa-tour-of-machine-learning-algorithms%2F&utf=1); probably just build an external python thing that interfaces with the game and exports models as lua tables
+--penman github wiki should be the wiki for the entire penman modding framework
 
 penman_d = penman_d or ModImageMakeEditable
 penman_r = penman_r or ModTextFileGetContent

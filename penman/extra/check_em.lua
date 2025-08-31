@@ -36,7 +36,8 @@ local test_input = {
     "#$%& (45\n|{-}you_should_not_see_this{-}|{>wave>{\n\thmmmmm {-}balls{-}NOPQ {>quake>{{-}ass{-}6LM.,}<wave<}\n/_;;;;; NOPQ}<quake<} 6LM.,efghÃÄÅ{>e1>{ÇÈÉтуzab cфхцgaш”6LM.,}<e1<}g{>c2>{{>shadow>{efjjg}<shadow<}{>runic>{{>color>{{-}|255|0|0|{-}ghghㅃÃту}<color<}}<runic<}ф{>color>{хцчш}<color<}”„…∞{>rainbow>{でとどぬballlls}<rainbow<} {>crossed>{{>cancer>{;ass}<cancer<}}<crossed<} hmmmでとg}<c2<}g ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf",
     "#$%& (45\n||\n\thmmmmm NOPQ 6LM.,\n/_;;;;; NOPQ 6LM.,efghÃÄÅÇÈÉтуzab cфхцgaш”6LM.,efjjgghghÃÉтуфхцчш”„…∞でとどぬballlls ;ass hmmmでとgg ㅁㅂㅃㅅ ㅆ匆册卯 犯外处 冬鸟务此 按键绑 定无法 被更 改！ dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf",
     "{>underscore>{{>shadow>{{-}|HRMS|RED_2|FORCED|{-}000{>color>{{-}|PRSP|BLUE|{-}abc{-}|PRSP|RED|{-}de}<shadow<}fg}<color<}}<underscore<}",
-    "dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf"
+    "dfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldfdfjkghdfjglkfdjglkfdjglkf}<<}DjglkfdjglkfdjglkfdjglkfdjGakdjkldf",
+    "`~©∞ | /?âÂ | 1!ãÃ | 2ⓐąĄ | 3#ćĆ | 4$êÊ | 5%ęĘ | 6^îÎ | 7&ńŃ | 8*śŚ | 9(źŹ | 0)żŻ | -_«» | =+—¬ | \\|¡¿ | qQæÆ | wWåÅ | eEëË | rRýÝ | tTþÞ | yYÿŸ | uUüÜ | iIïÏ | oOöÖ | pPœŒ | \'\"ûÛ | aAäÄ | sSßẞ | dDđĐ | fFèÈ | gGéÉ | hHùÙ | jJúÚ | kKĳĲ | lLøØ | [{ôÔ | ]}łŁ | zZàÀ | xXáÁ | cCçÇ | vVìÌ | bBíÍ | nNñÑ | mMõÕ | ,<òÒ | .>óÓ | ;:°…"
 }
 
 -- *************************************************************************
@@ -320,7 +321,7 @@ pen.c.typing_test = pen.c.typing_test or {}
 local state = pen.c.typing_test.state or 0
 
 local out, is_real = mnee.new_input( iid, 100, 100, 5, 200, 37, "", {
-    no_wrap = false, is_live = true,
+    no_wrap = false, is_live = true, --ban_unicode = true, force_numerical = true,
     color = state ~= 0 and pen.PALETTE.VNL[ state > 0 and "RUNIC" or "WARNING" ] or nil,
 })
 if( is_real ) then
@@ -342,7 +343,7 @@ if( is_real ) then
     else pen.c.typing_test.state = is_correct end
 end
 
-mnee.new_input( "ballz", 100, 175, 5, 200, 55, source )
+mnee.new_input( "ballz", 100, 175, 5, 200, 55, test_input[5] )
 -- if( is_real ) then
 --     print(out)
 --     local f = pen.t2f( "kys", out )
@@ -521,7 +522,7 @@ end
 function fonting()
 
 -- GamePrint( "∞" )
--- GamePrint( pen.magic_byte( pen.BYTE_TO_ID[ 237117598 ]))
+-- GamePrint( pen.magic_byte( pen.BYTE2ID[ 237117598 ]))
 -- GamePrint( pen.magic_byte( pen.magic_byte( "∞" )))
 
 pen.new_text( 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })

@@ -830,7 +830,7 @@ function pen.w2c( word, on_char, do_pre, on_iter )
 		if( on_char ~= nil ) then
 			num = bit.lshift( num, 10 ) + string.byte( c )
 
-			local char_id = pen.BYTE_TO_ID[ num ]
+			local char_id = pen.BYTE2ID[ num ]
 			if( char_id ) then
 				num, letter_id = 0, letter_id + 1
 				if( on_char( char_id, letter_id, start_id, end_id )) then break end
@@ -4076,10 +4076,13 @@ function pen.new_button( pic_x, pic_y, pic_z, pic, data )
 	if( data.is_centered ) then off_x, off_y = pen.rotate_offset( -w/2, -h/2, data.angle ) end
 	data.clicked, data.r_clicked, data.is_hovered = pen.new_interface( pic_x + off_x, pic_y + off_y, w, h, pic_iz, data )
 
+	data.clicked = data.clicked or data._clicked
 	if( data.lmb_event ~= nil and data.clicked ) then
 		pic_x, pic_y, pic_z, pic, data = data.lmb_event( pic_x, pic_y, pic_z, pic, data ) end
+	data.r_clicked = data.r_clicked or data._r_clicked
 	if( data.rmb_event ~= nil and data.r_clicked ) then
 		pic_x, pic_y, pic_z, pic, data = data.rmb_event( pic_x, pic_y, pic_z, pic, data ) end
+	data.is_hovered = data.is_hovered or data._is_hovered
 	if( data.hov_event ~= nil and data.is_hovered ) then
 		pic_x, pic_y, pic_z, pic, data = data.hov_event( pic_x, pic_y, pic_z, pic, data )
 	elseif( data.idle_event ~= nil ) then
@@ -4134,11 +4137,14 @@ end
 function pen.uncutter( func )
 	local _,_,_,orig_gui = pen.gui_builder( GuiCreate())
 
-	local x, y = unpack( pen.c.cutter_dims.xy )
-	local w, h = unpack( pen.c.cutter_dims.wh )
-	pen.c.cutter_dims = nil
-	local out = { func( x, y, w, h )}
-	pen.c.cutter_dims = { xy = { x, y }, wh = { w, h }}
+	local out = {}
+	if( pen.vld( pen.c.cutter_dims )) then
+		local x, y = unpack( pen.c.cutter_dims.xy )
+		local w, h = unpack( pen.c.cutter_dims.wh )
+		pen.c.cutter_dims = nil
+		out = { func( x, y, w, h )}
+		pen.c.cutter_dims = { xy = { x, y }, wh = { w, h }}
+	else out = { func( 0, 0, pen.get_screen_data())} end
 	
 	pen.gui_builder( false )
 	if( orig_gui ) then pen.gui_builder( orig_gui ) end
@@ -4953,6 +4959,7 @@ pen.GLOBAL_INTERFACE_Z = "PENMAN_INTERFACE_Z"
 pen.GLOBAL_TIPZ_RESOLVER = "PENMAN_TIPZ_RESOLVER"
 pen.GLOBAL_DRAGGER_SAFETY = "PENMAN_DRAGGER_FRAME"
 pen.GLOBAL_INTERFACE_MEMO = "PENMAN_INTERFACE_MEMO"
+pen.GLOBAL_KEYBOARD_STYLE = "PENMAN_KEYBOARD_STYLE"
 pen.GLOBAL_TIPZ_RESOLVER_FRAME = "PENMAN_TIPZ_FRAME"
 pen.GLOBAL_INTERFACE_FRAME = "PENMAN_INTERFACE_FRAME"
 pen.GLOBAL_UNSCROLLER_SAFETY = "PENMAN_UNSCROLLER_FRAME"
@@ -4975,6 +4982,7 @@ pen.FILE_MATTER = "data/debug/matter_test.xml"
 pen.FILE_MATTER_COLOR = "data/debug/matter_color.xml"
 pen.FILE_MAGIC_EMITTER = "data/debug/magic_emitter.xml"
 pen.FILE_MAGIC_EXPLOSION = "data/debug/magic_explosion.xml"
+pen.FILE_KEYBOARD = "data/debug/keyboard.lua"
 pen.FILE_T2F = "data/debug/vpn"
 
 pen.SETTING_PPB = "PENMAN.SETTING_PPB"
@@ -5176,11 +5184,11 @@ pen.FONT_MODS = {
 		if( idt.safety < frame_num ) then
 			idt.safety, idt.new_lin = frame_num, 0
 			idt.is_space, idt.space_num = false, 0
-			idt.drift.r = idt.drift.r or InputIsKeyJustDown( 79 --[[Right]])
-			idt.drift.l = idt.drift.l or InputIsKeyJustDown( 80 --[[Left]])
-			idt.drift.d = idt.drift.d or InputIsKeyJustDown( 81 --[[Down]])
-			idt.drift.u = idt.drift.u or InputIsKeyJustDown( 82 --[[Up]])
-			idt.drift.hl = ( idt.drift.r or idt.drift.l or idt.drift.d or idt.drift.u )
+			local r, l = InputIsKeyJustDown( 79 --[[Right]]), InputIsKeyJustDown( 80 --[[Left]])
+			local d, u = InputIsKeyJustDown( 81 --[[Down]]), InputIsKeyJustDown( 82 --[[Up]])
+			idt.drift.r, idt.drift.l = idt.drift.r or r, idt.drift.l or l
+			idt.drift.d, idt.drift.u = idt.drift.d or d, idt.drift.u or u
+			idt.drift.hl = ( r or l or d or u )
 				and ( InputIsKeyDown( 225 --[[Left Shift]]) or InputIsKeyDown( 229 --[[Right Shift]]))
 		end
 		
@@ -5234,7 +5242,7 @@ pen.FONT_MODS = {
 			local step_x = idt.pos.c == 0 and 1 or char_data.dims[1]
 			local step_y = is_new and char_data.dims[2] or 0
 			pen.new_pixel( pic_x.g + step_x - 1, pic_y.g + step_y, pic_z + 0.002,
-				pen.PALETTE.VNL.YELLOW, 1, char_data.dims[2], frame_num%30 < 15 and 1 or 0.1 )
+				data.cursor_color or pen.PALETTE.VNL.YELLOW, 1, char_data.dims[2], frame_num%30 < 15 and 1 or 0.1 )
 			if( not( is_new )) then
 				idt.index = index.gbl + ( idt.pos.c == 0 and -1 or 0 ) end
 			if( frame_num%3 == 0 and pen.vld( pen.c.cutter_dims )) then
@@ -5252,7 +5260,7 @@ pen.FONT_MODS = {
 			local this_pos_id = 10000*index.lin + index.chr
 			if( this_pos_id >= _pos_id and this_pos_id <= h_pos_id ) then
 				pen.new_pixel( pic_x.g, pic_y.g, pic_z + 0.003,
-					pen.PALETTE.VNL.YELLOW, char_data.dims[1], char_data.dims[2], 0.25 )
+					data.cursor_color or pen.PALETTE.VNL.YELLOW, char_data.dims[1], char_data.dims[2], 0.25 )
 			end
 		end
 
@@ -5592,7 +5600,7 @@ pen.LAYERS = {
 	MAIN_FRONT = -5,
 	MAIN_UI = -10,
 
-	ICONS_BACK = -10,
+	ICONS_BACK = -13,
 	ICONS = -15,
 	ICONS_FRONT = -20,
 
@@ -6736,7 +6744,7 @@ pen.CANCER_COMPS = {
 	WormPlayerComponent = {},
 }
 
-pen.BYTE_TO_ID = {
+pen.BYTE2ID = {
 	[0]=0,	[9]=9,	[10]=10,
 	
 	[32]=32,	[33]=33,	[34]=34,	[35]=35,	[36]=36,	[37]=37,	[38]=38,	[39]=39,	[40]=40,	[41]=41,	[42]=42,
@@ -6768,13 +6776,13 @@ pen.BYTE_TO_ID = {
 	[213172]=1076,	[213173]=1077,	[213174]=1078,	[213175]=1079,	[213176]=1080,	[213177]=1081,	[213178]=1082,	[213179]=1083,
 	[213180]=1084,	[213181]=1085,	[213182]=1086,	[213183]=1087,	[214144]=1088,	[214145]=1089,	[214146]=1090,	[214147]=1091,
 	[214148]=1092,	[214149]=1093,	[214150]=1094,	[214151]=1095,	[214152]=1096,	[214153]=1097,	[214154]=1098,	[214155]=1099,
-	[214156]=1100,	[214157]=1101,	[214158]=1102,	[214159]=1103,	[214161]=1105,
+	[214156]=1100,	[214157]=1101,	[214158]=1102,	[214159]=1103,	[214161]=1105,	[200848]=196,	[200882]=196,	[199826]=195,	[199838]=195,	[236120222]=2170,	[201912]=197,	[199837]=195,	[200849]=196,	[200883]=196,	[199858]=195,	[199870]=195,	[199871]=195,	[199869]=195,	[199814]=195,	[199846]=195,
 
 	[237111465]=8361,	[237109400]=8216,	[237109408]=8224,	[237118624]=8800,	[237118600]=8776,	[237118629]=8805,	[237118628]=8804,
 	[237111468]=8364,	[237111485]=8381,	[237113495]=8471,	[237113506]=8482,	[237113504]=8480,	[237117594]=8730,	[237109437]=8253,
 	[237121688]=8984,	[237121701]=8997,	[237115537]=8593,	[237115539]=8595,	[237115536]=8592,	[237115538]=8594,	[237132943]=9679,
 	[237131936]=9632,	[237133968]=9744,	[237133969]=9745,	[237133970]=9746,	[237138067]=10003,	[237138070]=10006,	[237109395]=8211,
-	[237109396]=8212,	[237109401]=8217,	[237109404]=8220,	[237109405]=8221,	[237109406]=8222,	[237109414]=8230,	[237117598]=8734,
+	[237109396]=8212,	[237109401]=8217,	[237109404]=8220,	[237109405]=8221,	[237109406]=8222,	[237109414]=8230,	[237117598]=8734,	[237128848]=2195,
 
 	[250798268]=65084,	[250798231]=65047,	[250798232]=65048,	[237141160]=10216,	[237141162]=10218,	[237148297]=10633,	[237139116]=10092,
 	[237139118]=10094,	[237139120]=10096,	[237121705]=9001,	[237148305]=10641,	[237149372]=10748,	[237141161]=10217,	[237141163]=10219,
@@ -8282,6 +8290,26 @@ pen.FILE_XML_FONT = [[
 	<CharSpace>0</CharSpace>
 	<WordSpace>6</WordSpace>
 </FontData>
+]]
+
+pen.FILE_XML_KEY = [[
+<Sprite
+	filename="[PATH]"
+	default_animation="stand"
+	>
+	
+	<RectAnimation
+		name="stand"
+		pos_x="[POS_X]"
+		pos_y="[POS_Y]"
+		frame_width="10"
+		frame_height="10"
+		frame_count="1"
+		frames_per_row="1"
+		frame_wait="999999999999999"
+		loop="1"
+	></RectAnimation>
+</Sprite>
 ]]
 
 ---@class PenmanButtonData
