@@ -1,7 +1,7 @@
 ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 
 --matter file builder that allows for matter types (molten_metal or poison_liquid); make sure one can apply several at once (so stuff like "molten" and "metal" assemble into a proper molten metal thing)
---in-line text mod comments should use "!" instead of "|", just use ansi standard
+--in-line text mods/comments should use ansi standard
 --add new table to penman to house all gameplay-first functionality
 --there should be inherent consistency with "info" (context-spesific parameters of a distinct object) and "data" (a group of parameters applicable to a function) variable names
 --palette png file with all the color names spelled in corresponding color
@@ -16,15 +16,8 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --add this https://github.com/TakWolf/fusion-pixel-font
 --make custom monospace highres and pixelated fonts
 
---jpading for buttons (can_jpad param)
---Store 4 closest widgets for the left, right, up, down to the currently focused one + store the widget closest to 0 to pick as focusable when the time comes, allow one to force focus through code
---Allow emulating focusing inputs (0 is nothing, 1 is right, 2 is up, 3 is lmb, 4 is select, -1 is left, -2 is down, -3 is rmb, -4 is unselect)
---make sure this has an inherent compatibility with multiplayer (4 players max)
---(dpad/left_stick to switch between, A for lmb (dragger should work in full 2D plane), Y for rmb, R1 for shift)
---gamepad selection visualization is circular blinking of every corner between two colors unique for every player
---controllers should be mnee inmode guied too
-
 --[TODO]
+--schedule based profiler that operates on globals and allows cross-context evaluation as well as graphing and execution order
 --make sure player.png in pics is up to date with latest spritesheet pipeline
 --check if globals in settings are accessible across all files (and if so make penman autoinject the lib)
 --investigate gui shaders
@@ -42,8 +35,7 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --dropdown with search capabilities (combine input with scroller)
 --cached get_terrain via raymarching (https://youtu.be/BNZtUB7yhX4?t=92), cahe updates are triggered by a sparse grid around every entity that calls this
 --GameEntityPlaySound might be able to ignore the sfx limit (thanks to lamia)
---tinker with copi's spriteemitter image concept (a straightforward way of adding them to entites with animation support)
---add sfxes (separate banks for prospero, hermes, trigger)
+--add sfxes (separate banks for hermes and trigger)
 --testing environment that has full in-world function simulation
 --https://link.springer.com/content/pdf/10.1023/A:1007670802811.pdf for AI? (an environemnt where the data is being collected by dev roleplaying as enemy; https://vk.com/away.php?to=https%3A%2F%2Fmachinelearningmastery.com%2Fa-tour-of-machine-learning-algorithms%2F&utf=1); probably just build an external python thing that interfaces with the game and exports models as lua tables
 --penman github wiki should be the wiki for the entire penman modding framework

@@ -80,7 +80,7 @@ pen.lib.font_builder( "data/fonts/font_pixel_noshadow.xml", {
 pen.t.print( pen.t.parse( "{[\"main\"]={[\",\"]=0x1.000000p+0,[\"right_alt\"]=0x1.000000p+0}}" ))
 
 print( pen.t.pack( pen.t.unarray({ ass = 1, balls = 2, hmmm = 3, [5] = 5, [18] = 20 })))
-pen.t.print( pen.t.unarray( pen.t.pack( "|:ass:1:|:balls:2:|:hmmm:3:|:5:5:|:18:20:|" )))
+pen.t.print( pen.t.unarray( pen.t.pack( "|!ass!1!|!balls!2!|!hmmm!3!|!5!5!|!18!20!|" )))
 print( pen.t.parse({ ass = 1, balls = 2, hmmm = 3, [5] = 5, [18] = 20 }))
 pen.t.print( pen.t.parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
 
@@ -343,7 +343,7 @@ if( is_real ) then
     else pen.c.typing_test.state = is_correct end
 end
 
-mnee.new_input( "ballz", 100, 175, 5, 200, 55, test_input[5] )
+mnee.new_input( "ballz", 100, 175, 5, 200, 55, test_input[5], { jpad = true })
 -- if( is_real ) then
 --     print(out)
 --     local f = pen.t2f( "kys", out )
