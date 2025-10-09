@@ -1,4 +1,4 @@
-dofile_once( "mods/penman/_libman.lua" )
+dofile_once( "mods/penman/_penman.lua" )
 
 local gui_id = GetUpdatedEntityID()
 local gui_x, gui_y = EntityGetTransform( gui_id )
@@ -56,7 +56,7 @@ pen.child_play_full( root_id, function( child )
 		end
 
 		s_x, s_y = pen.world2gui( s_x, s_y, true, true )
-		local clicked, r_clicked, is_hovered = pen.new_interface(
+		local clicked, r_clicked, is_hovered = pen.new.interface(
 			x, y, s_x, s_y, z, { angle = r, is_debugging = is_debugging })
 		if( pen.vld( on_action ) and ( clicked or r_clicked or is_hovered )) then on_action() end
 	end
@@ -64,7 +64,7 @@ end)
 
 --update data structure
 
-pen.gui_builder( true )
+pen.new.builder( true )
 
 --[[
 local function do_ctrl( dude_id )

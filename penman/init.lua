@@ -1,37 +1,39 @@
 ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 
---matter file builder that allows for matter types (molten_metal or poison_liquid); make sure one can apply several at once (so stuff like "molten" and "metal" assemble into a proper molten metal thing)
---in-line text mods/comments should use ansi standard
+--pen.mgk table
 --add new table to penman to house all gameplay-first functionality
---there should be inherent consistency with "info" (context-spesific parameters of a distinct object) and "data" (a group of parameters applicable to a function) variable names
+--in-line text mods/comments should use ansi standard
+--upgrade vector class to matrix one (build a custom one based on matrix.lua that works both as vector and matrix)
+--check polytools
+--setfenv( 1, getfenv()) to isolate global spamming functions (thanks to ImmortalDamned)
+--sule-based lua context independent gateway (and steal ModMagicNumbersFileAdd from init.lua via it)
+
+--documentation (https://github.com/LuaLS/lua-language-server/wiki/Annotations)
 --palette png file with all the color names spelled in corresponding color
+--setup automatic versioning by putting version from commit message and adding commit hash (https://github.com/logankilpatrick/TODO-List-Updater)
+--investigate gui shaders
+--periodically executed functions (coroutine-based sequencer that accepts a table of events, use varstorage to preserve the state between restarts)
+--a system that converts images into a pixel table to be drawn in settings.lua or assembled in real time
+--some kind of message system (check how MQTT works)
+--add pen.animate/pen.estimate debugging that plots/demos motion/scaling in self-aligning grid
+
+--[TODO]
+--jit.flush() for realtime lua updates
+--custom penman-based dialog system
+--matter file builder that allows for matter types (molten_metal or poison_liquid); make sure one can apply several at once (so stuff like "molten" and "metal" assemble into a proper molten metal thing)
+--there should be inherent consistency with "info" (context-spesific parameters of a distinct object) and "data" (a group of parameters applicable to a function) variable names
 --rebrand power words
 --play around with running everything (mnee + vector + index) from within penman's init (still should work if is installed independently)
-
---setup automatic versioning by putting version from commit message and adding commit hash (https://github.com/logankilpatrick/TODO-List-Updater)
 --very basic mod order editor with inherent mod cat support (part of unsafe index capability; allow doing custom pause menu)
 --test performance of key penman funcs
 --rhytm addon for mrshll (get song bpms; two modes: buff, if any song is playing then every shot made on bit will deal extra damage, and challenge, where shooting without a song playing or not on beat deals damage to the player)
 --mrshll ABIDING pack that features classical and 1930s music
 --add this https://github.com/TakWolf/fusion-pixel-font
 --make custom monospace highres and pixelated fonts
-
---[TODO]
 --schedule based profiler that operates on globals and allows cross-context evaluation as well as graphing and execution order
 --make sure player.png in pics is up to date with latest spritesheet pipeline
 --check if globals in settings are accessible across all files (and if so make penman autoinject the lib)
---investigate gui shaders
---periodically executed functions (coroutine-based sequencer that accepts a table of events, use varstorage to preserve the state between restarts)
---https://github.com/LuaLS/lua-language-server/wiki/Annotations
---check this https://github.com/Copious-Modding-Industries/Noitilities
 --check how file caching works with loadfile, maybe one can edit one lua script at runtime
---basic window container func (Hermes styled by default)
---a system that converts images into a pixel table to be drawn in settings.lua or assembled in real time
---some kind of message system (check how MQTT works)
---add pen.animate/pen.estimate debugging that plots/demos motion/scaling in self-aligning grid
---sule-based lua context independent gateway (and steal ModMagicNumbersFileAdd from init.lua via it)
---in-gui particle system
---extract hybrid gui from 19a and make it better
 --dropdown with search capabilities (combine input with scroller)
 --cached get_terrain via raymarching (https://youtu.be/BNZtUB7yhX4?t=92), cahe updates are triggered by a sparse grid around every entity that calls this
 --GameEntityPlaySound might be able to ignore the sfx limit (thanks to lamia)
@@ -44,12 +46,12 @@ penman_d = penman_d or ModImageMakeEditable
 penman_r = penman_r or ModTextFileGetContent
 penman_w = penman_w or ModTextFileSetContent
 function OnModInit()
-	dofile_once( "mods/penman/_libman.lua" )
+	dofile_once( "mods/penman/_penman.lua" )
 	pen.lib.sprite_builder( "mods/penman/extra/pics/player.xml" )
 end
 
 function OnWorldPostUpdate()
-	dofile_once( "mods/penman/_libman.lua" )
+	dofile_once( "mods/penman/_penman.lua" )
 	
 	pen.init_pipeline()
 	if( not( pen.c.matter_test_file )) then

@@ -1,20 +1,4 @@
-local LOCAL_PATH = "mods/penman/"
-local orig_do_mod_appends = do_mod_appends
-do_mod_appends = function( filename, ... ) --stolen from https://github.com/alex-3141/noita-parallax
-    LOCAL_PATH = filename:match("(.+/)[^/]+")
-    do_mod_appends = orig_do_mod_appends
-    do_mod_appends( filename, ... )
-end
-
--- jit.util.funcinfo(setfenv(1, getfenv())) --thanks to ImmortalDamned
-
-dofile_once( LOCAL_PATH.."_penman.lua" )
-pen.lib = pen.lib or {}; pen.LOCAL_PATH = LOCAL_PATH
-for i,v in ipairs({ "nxml", "csv", "base64", "matrix", "complex", "EZWand" }) do
-	pen.lib[ v ] = dofile_once( table.concat({ pen.LOCAL_PATH, "lib/", v, ".lua" }))
-end
---dialog (modify to be more generalized + transition to penman)
---parallax
+-- third party lib based functionality
 
 if( GameHasFlagRun( pen.FLAG_UPDATE_UTF )) then
 	local the_concept_of_table_itself = dofile_once( "mods/penman/extra/lists/every_character.lua" )
@@ -96,6 +80,8 @@ pen.ANIM_INTERS.frir = function( t, delta, p ) --https://rosettacode.org/wiki/Fa
 	end)
 end
 
+pen.hew = pen.hew or {} -- hybrid gui library
+
 -- pen.magic_draw = pen.magic_draw or function( path, w, h ) --fucking bullshit
 -- 	pen.init_pipeline( pen.INIT_THREADS.DRAWER, { path, string.sub( 10000 + w, -4, -1 )..string.sub( 10000 + h, -4, -1 )})
 -- end
@@ -120,353 +106,9 @@ pen.t2f = pen.t2f or function( name, text )
 	return pen[ name ]
 end
 
-function pen.lib.sprite_builder( path, print_me )
-	-- https://colab.research.google.com/drive/1s1b7Kr97Q5aUpzJrom12YszZQyWGRgsi?usp=sharing
+pen.hew = pen.hew or {}
 
-	local pos_x, pos_y = -1, -1
-	local step, dims, l = 0, { 0, 0 }, 0
-	local xml = pen.lib.nxml.parse( pen.magic_read( path ))
-	pen.t.loop( xml:all_of( "RectAnimation" ), function( i,v )
-		local is_child = v.attr.parent ~= nil
-		if( xml.attr.default_animation == v.attr.name ) then
-			pos_x = tonumber( v.attr.pos_x )
-			pos_y = tonumber( v.attr.pos_y )
-			l = tonumber( v.attr.frames_per_row )
-			dims[1] = tonumber( v.attr.frame_width )
-			dims[2] = tonumber( v.attr.frame_height )
-		elseif( not( is_child ) and pos_x ~= -1 ) then
-			if( step == 0 ) then step = v.attr.pos_y - pos_y end
-			pos_y = pos_y + step
-			v.attr.pos_x = pos_x
-			v.attr.pos_y = pos_y
-			v.attr.frames_per_row = l
-			v.attr.frame_width = dims[1]
-			v.attr.frame_height = dims[2]
-		end
-
-		if( not( is_child )) then return end
-		local p = pen.t.loop( xml:all_of( "RectAnimation" ), function( e,p )
-			if( p.attr.name == v.attr.parent ) then return p end
-		end)
-
-		v.children = p.children
-		pen.t.loop( p.attr, function( k,a ) v.attr[k] = v.attr[k] or a end)
-		v.attr.parent = nil
-	end)
-	if( print_me ) then print( tostring( xml )) end
-	pen.magic_write( path, tostring( xml ))
-end
-
-function pen.lib.font_builder( font, chars, atlas, data ) --search the id at https://symbl.cc/
-	chars, data = chars or {}, data or {}
-
-	local xml = pen.lib.nxml.parse( ModDoesFileExist( font ) and pen.magic_read( font ) or pen.FILE_XML_FONT )
-	if( data.pic ) then xml:first_of( "Texture" ).content = { data.pic } end
-	if( data.height ) then xml:first_of( "LineHeight" ).content = { data.height } end
-	if( data.char_padding ) then xml:first_of( "CharSpace" ).content = { data.char_padding } end
-	if( data.word_padding ) then xml:first_of( "WordSpace" ).content = { data.word_padding } end
-	local pic_id, pic = 0, xml:first_of( "Texture" ):text()
-	local _, pic_w, pic_h = pen.magic_draw( pic, 0, 0 )
-	-- pen.t.loop( xml:all_of( "QuadChar" ), function( i, c )
-	-- 	local new_x = c.attr.rect_x + c.attr.rect_w + 2
-	-- 	if( pic_w < new_x ) then pic_w = new_x end
-	-- 	local new_y = c.attr.rect_y + c.attr.rect_h + 2
-	-- 	if( pic_h < new_y ) then pic_h = new_y end
-	-- end)
-
-	local new_chars, x_memo = {}, pic_w + 1
-	for i,c in pairs( chars ) do
-		local got_some = pen.t.loop( xml:all_of( "QuadChar" ), function( i, c )
-			if( c.attr.id == i ) then return true end
-		end)
-		if( not( got_some )) then
-			chars[ i ].forced = true
-			table.insert( xml.children, {
-				name = "QuadChar",
-				children = {},
-				attr = {
-					id = i, width = 0,
-					offset_x = 0, offset_y = 0,
-					rect_w = 0, rect_h = 0,
-					rect_x = 0, rect_y = 0,
-				},
-			})
-		end
-	end
-	pen.t.loop( xml:all_of( "QuadChar" ), function( i, c )
-		if( chars[ c.attr.id ] == nil ) then return end
-		if( not( chars[ c.attr.id ].forced )) then return end
-		
-		c.attr.rect_x, c.attr.rect_y = x_memo, 0
-		c.attr.width = chars[ c.attr.id ].pos[3] or chars[ c.attr.id ].rect_w
-		table.insert( new_chars, {
-			chars[ c.attr.id ].pos[1], chars[ c.attr.id ].pos[2],
-			c.attr.width, c.attr.rect_x, c.attr.rect_y,
-		})
-		
-		c.attr.rect_w = chars[ c.attr.id ].rect_w
-		c.attr.rect_h = chars[ c.attr.id ].rect_h or pic_h
-		c.attr.offset_x = chars[ c.attr.id ].offset_x or 0
-		c.attr.offset_y = chars[ c.attr.id ].offset_y or 0
-		x_memo = x_memo + c.attr.width + 1
-	end)
-	
-	if( pen.vld( atlas )) then
-		pic_id, pic = pen.pic_builder( pic, pic_w + ( pen.t.count( chars ) + 5 )*10, pic_h )
-		if( not( pen.vld( pic_id ))) then return end
-		xml:first_of( "Texture" ).content = { pic }
-		pen.t.loop( new_chars, function( i, v )
-			pen.pic_paster( pic_id, pen.magic_draw( atlas, 0, 0 ), { v[3], pic_h }, { v[4], v[5]}, { v[1], v[2]})
-		end)
-	end
-	
-	pen.magic_write( font, tostring( xml ))
-end
-
--- Exposure Types: contact, wetting, breathing, effect
--- Default Damage Types: heal, burn, curse, poison, piercing, radiation, corrosion
--- Extra Damage Types: heat, cold, magic, light, pollution, dissolution, purification
--- damage values are total harm per frame per second for a fully submerged entity
-function pen.lib.set_matter_damage( hooman, data )
-	local dmg_tbl = pen.MATTER_EXPOSURES
-
-	local dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
-	if( not( pen.vld( dmg_comp, true ))) then return end
-	local char_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterDataComponent" )
-	if( not( pen.vld( char_comp, true ))) then return end
-
-	data = data or {}
-	data.matter_overrides = data.matter_overrides or {}
-	data.body_matter = data.body_matter or ComponentGetValue2( dmg_comp, "ragdoll_material" )
-	data.blood_matter = data.blood_matter or ComponentGetValue2( dmg_comp, "blood_material" )
-	data.breathing_immune = data.breathing_immune or not( ComponentGetValue2( dmg_comp, "air_needed" ))
-	data.no_burn = data.no_burn or ( ComponentGetValue2( dmg_comp, "fire_damage_amount" ) == 0 )
-
-	--immune to own blood type and body_matter
-	--check reactions with body_matter to apply damage
-
-	local matters, old_matters = ComponentGetValue2( dmg_comp, "materials_that_damage" ), {}
-	for value in string.gmatch( matters, pen.ptrn( "," )) do table.insert( old_matters, value ) end
-	local damages, old_damages = ComponentGetValue2( dmg_comp, "materials_how_much_damage" ), {}
-	for value in string.gmatch( damages, pen.ptrn( "," )) do table.insert( old_damages, tonumber( value )) end
-	matters, damages = "", ""
-
-	local c_min_x = ComponentGetValue2( char_comp, "collision_aabb_min_x" )
-	local c_max_x = ComponentGetValue2( char_comp, "collision_aabb_max_x" )
-	local c_min_y = ComponentGetValue2( char_comp, "collision_aabb_min_y" )
-	local c_max_y = ComponentGetValue2( char_comp, "collision_aabb_max_y" )
-	local k = 25*60*math.abs( c_max_x - c_min_x )*math.abs( c_max_y - c_min_y )
-
-	--define custom damage types in xml
-	local function damage_compiler( name, custom, data )
-		custom = data.matter_overrides[ name ] or pen.t.unarray( pen.t.pack( custom ))
-		if( not( pen.vld( custom ))) then custom = nil end
-		local dmg_data = pen.get_hybrid_table( custom or dmg_tbl[ name ], true )
-		if( not( pen.vld( dmg_data ))) then return 0 end
-
-		local matter_mult = dmg_data[2] or 1
-		dmg_data = dmg_tbl[ dmg_data[1]] or dmg_data
-
-		local total, got_thresholded = 0, false
-		local exposures = { "contact", "wetting", "breathing" }
-		local default_types = { "heal", "burn", "curse", "poison", "piercing", "radiation", "corrosion" }
-		local extra_types = { "heat", "cold", "magic", "light", "pollution", "dissolution", "purification" }
-		pen.t.loop( exposures, function( i, exposure )
-			if( not( data.effect_affected ) and dmg_data.effect ) then return true end
-			if( data[ exposure.."_immune" ]) then return end
-			local e_mult = dmg_data[ exposure ]
-			if( e_mult == nil ) then return end
-
-			pen.t.loop( default_types, function( e, dmg_type )
-				local t_mult = dmg_data[ dmg_type ]
-				if( t_mult == nil ) then return end
-				local dmg = matter_mult*e_mult*t_mult*dmg_data.dmg
-
-				local threshold = data[ "threshold_"..dmg_type ]
-				got_thresholded, threshold = threshold ~= nil, threshold or 0
-				if( threshold < dmg ) then total = total + ( dmg - threshold ) end
-			end)
-
-			pen.t.loop( extra_types, function( e, dmg_type )
-				local t_mult = dmg_data[ dmg_type ]
-				if( t_mult == nil ) then return end
-				local dmg = matter_mult*e_mult*t_mult*dmg_data.dmg
-
-				local threshold = data[ "threshold_"..dmg_type ]
-				got_thresholded, threshold = threshold ~= nil, threshold or dmg
-				if( threshold < dmg ) then total = total + ( dmg - threshold ) end
-			end)
-		end)
-
-		local dmg = nil
-		for i,v in ipairs( old_matters ) do
-			if( v == name ) then old_dmg = old_damages[i]; break end
-		end
-		if( not( data.update_existing ) or got_thresholded ) then
-			return total/k
-		else return dmg or 0 end
-	end
-
-	local xml = pen.lib.nxml.parse( pen.magic_read( "data/materials.xml" ))
-	pen.t.loop( xml.children, function( i,v )
-		if( v.name ~= "CellData" and v.name ~= "CellDataChild" ) then return end
-		local dmg = damage_compiler( v.attr.name, v.attr.dmg_tbl, data )
-		EntitySetDamageFromMaterial( hooman, v.attr.name, dmg )
-	end)
-end
-
-function pen.lib.player_builder( hooman, func )
-	if( ModIsEnabled( "vector_core" )) then
-		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.accel_x = 0.001
-		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.accel_x_air = 0.001
-		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.run_velocity = 0
-	end
-
-	local overrides = pen.GENERIC_CHAR_SETUP
-	pen.t.loop( overrides, function( name, values )
-		local nuke_it = values == true
-		pen.magic_comp( hooman, name, function( comp_id, v_tbl, is_enabled )
-			if( nuke_it ) then EntityRemoveComponent( hooman, comp_id ); return end
-			pen.t.loop( values, function( field, value ) pen.magic_comp( comp_id, field, value ) end)
-		end)
-	end)
-
-	local data = { hooman = hooman }
-	data.arm_id = pen.get_child( hooman, "arm_r" )
-	local inh_comp = EntityGetFirstComponentIncludingDisabled( data.arm_id, "InheritTransformComponent" )
-	ComponentSetValue2( inh_comp, "parent_hotspot_tag", "arm_r" )
-	local hot_comp = EntityGetFirstComponentIncludingDisabled( data.arm_id, "HotspotComponent" )
-	ComponentSetValue2( hot_comp, "sprite_hotspot_name", "" )
-	ComponentSetValue2( hot_comp, "offset", 0, 0 )
-	EntityRemoveComponent( data.arm_id, EntityGetFirstComponentIncludingDisabled( data.arm_id, "SpriteComponent" ))
-	
-	EntityKill( pen.get_child( hooman, "cape" ))
-	EntityKill( pen.get_child( hooman, "no_heal_in_meat_biome" ))
-
-	local player_path = EntityGetFilename( hooman )
-	for i,v in ipairs({ "inventory_quick", "inventory_full" }) do
-		pen.child_play( pen.get_child( hooman, v ), function( parent, child, k )
-			if( EntityGetFilename( child ) == player_path ) then EntityKill( child ) end
-		end)
-	end
-
-	data.sfx_comp = EntityGetFirstComponentIncludingDisabled( hooman, "AudioComponent" )
-	data.char_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterDataComponent" )
-	data.plat_comp = EntityGetFirstComponentIncludingDisabled( hooman, "CharacterPlatformingComponent" )
-	data.dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
-	data.ing_comp = EntityGetFirstComponentIncludingDisabled( hooman, "IngestionComponent" )
-	data.pick_comp = EntityGetFirstComponentIncludingDisabled( hooman, "ItemPickUpperComponent" )
-	data.kick_comp = EntityGetFirstComponentIncludingDisabled( hooman, "KickComponent" )
-	data.bubl_comp = EntityGetFirstComponentIncludingDisabled( hooman, "LiquidDisplacerComponent" )
-	data.suck_comp = EntityGetFirstComponentIncludingDisabled( hooman, "MaterialSuckerComponent" )
-	data.shot_comp = EntityGetFirstComponentIncludingDisabled( hooman, "PlatformShooterPlayerComponent" )
-	data.coll_comp = EntityGetFirstComponentIncludingDisabled( hooman, "PlayerCollisionComponent" )
-	data.inv_comp = EntityGetFirstComponentIncludingDisabled( hooman, "Inventory2Component" )
-	
-	data.pic_char = EntityAddComponent2( hooman, "SpriteComponent", {
-		_tags = "character",
-		rect_animation = "stand", z_index = 0.6,
-		image_file = "mods/penman/extra/pics/player.xml" })
-	data.pic_aim = EntityAddComponent2( hooman, "SpriteComponent", {
-		_tags = "aiming_reticle",
-		image_file = "data/ui_gfx/mouse_cursor.png",
-		emissive = true, visible = false, has_special_scale = true,
-		offset_x = -42.5, offset_y = -25, z_index = -10000 })
-	if( pen.vld( func )) then data = func( hooman, data ) or data end
-	
-	local pic_xml = pen.lib.nxml.parse( pen.magic_read( ComponentGetValue2( data.pic_char, "image_file" )))
-	ComponentSetValue2( data.pic_char, "offset_x", tonumber( pic_xml.attr.offset_x or 0 ))
-	ComponentSetValue2( data.pic_char, "offset_y", tonumber( pic_xml.attr.offset_y or 0 ))
-	EntityRefreshSprite( hooman, data.pic_char )
-	
-	local is_player = pic_xml.attr.is_player ~= nil
-	
-	local char_w, char_h = 0, 0
-	local frame_w, frame_h = 0, 0
-	local collider, hitboxes = {}, {}
-	pen.t.loop( pic_xml:all_of( "RectAnimation" ), function( i,v )
-		if( pic_xml.attr.default_animation == v.attr.name ) then
-			frame_w = tonumber( v.attr.frame_width or 0 )
-			frame_h = tonumber( v.attr.frame_height or 0 )
-		elseif( v.attr.name == "icon" ) then
-			char_w = tonumber( v.attr.frame_width or 0 )
-			char_h = tonumber( v.attr.frame_height or 0 )
-		elseif( v.attr.name == "collider" ) then
-			collider.w = tonumber( v.attr.frame_width or 0 )
-			collider.h = tonumber( v.attr.frame_height or 0 ) + 0.1
-			collider.x = tonumber( v.attr.offset_x or 0 )
-			collider.y = tonumber( v.attr.offset_y or 0 ) - 1
-		elseif( string.find( v.attr.name, "^hitbox" ) ~= nil ) then
-			local tag = ""
-			if( v.attr.name ~= "hitbox" ) then
-				tag = string.gsub( v.attr.name, "^hitbox_", "" )
-			end
-			table.insert( hitboxes, {
-				tag = tag,
-				state = v.attr.state == "true",
-				dmg = tonumber( v.attr.dmg or 1 ),
-				w = tonumber( v.attr.frame_width or 0 ),
-				h = tonumber( v.attr.frame_height or 0 ) + 0.1,
-				x = tonumber( v.attr.offset_x or 0 ),
-				y = tonumber( v.attr.offset_y or 0 ),
-			})
-		end
-	end)
-	
-	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_x", -frame_w/2 )
-	ComponentSetValue2( data.dmg_comp, "ragdoll_offset_y", -frame_h/2 )
-	ComponentSetValue2( data.char_comp, "buoyancy_check_offset_y", tonumber( pic_xml.attr.center_y or 0 ))
-	ComponentSetValue2( data.char_comp, "collision_aabb_max_x", collider.w + collider.x )
-	ComponentSetValue2( data.char_comp, "collision_aabb_max_y", collider.h + collider.y )
-	ComponentSetValue2( data.char_comp, "collision_aabb_min_x", collider.x )
-	ComponentSetValue2( data.char_comp, "collision_aabb_min_y", collider.y )
-	ComponentSetValue2( data.char_comp, "climb_over_y", math.floor( char_h/5 ))
-	ComponentSetValue2( data.char_comp, "eff_hg_size_x", char_w/2 )
-	ComponentSetValue2( data.bubl_comp, "radius", char_w )
-
-	pen.t.loop( hitboxes, function( i,v )
-		EntityAddComponent2( hooman, "HitboxComponent", {
-			_tags = v.tag,
-			_enabled = v.state,
-
-			is_item = false,
-			is_player = is_player,
-			is_enemy = not( is_player ),
-
-			damage_multiplier = v.dmg,
-			aabb_max_x = v.w + v.x, aabb_min_x = v.x,
-			aabb_max_y = v.h + v.y, aabb_min_y = v.y,
-		})
-	end)
-
-	pen.t.loop( pic_xml:all_of( "Hotspot" ), function( i,v )
-		EntityAddComponent2( hooman, "HotspotComponent", {
-			_tags = v.attr.name,
-			sprite_hotspot_name = v.attr.name,
-			transform_with_scale = true,
-		})
-	end)
-	ComponentSetValue2( EntityAddComponent2( hooman, "HotspotComponent", {
-		_tags = "kick_pos",
-		transform_with_scale = true,
-	}), "offset", char_w/2, collider.h + collider.y )
-	ComponentSetValue2( EntityAddComponent2( hooman, "HotspotComponent", {
-		_tags = "crouch_sensor",
-		transform_with_scale = true,
-	}), "offset", 0, -char_h + ( collider.h + collider.y ))
-	
-	return data
-end
-
-function pen.lib.nxml2entity()
-end
-
-function pen.lib.entity2nxml()
-end
-
-pen.h = pen.h or {}
-
-function pen.h.set_transform( entity_id, x, y, s_x, s_y, r )
+function pen.hew.transform( entity_id, x, y, s_x, s_y, r )
 	local trans_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "InheritTransformComponent" )
 	local _x, _y, _s_x, _s_y, _r = ComponentGetValue2( trans_comp, "Transform" )
 	x, y, s_x, s_y, r = x or _x, y or _y, s_x or _s_x, s_y or _s_y, r or _r
@@ -474,7 +116,7 @@ function pen.h.set_transform( entity_id, x, y, s_x, s_y, r )
 	return x, y, s_x, s_y, r
 end
 
-function pen.h.gui_builder( guid, init_func )
+function pen.hew.builder( guid, init_func )
 	guid = "hybrid_gui_"..( guid or "dft" )
 
 	pen.c.hybrid_objects = pen.c.hybrid_objects or {}
@@ -492,14 +134,14 @@ function pen.h.gui_builder( guid, init_func )
 end
 
 --check ui_is_parent
---pen.h.new_button should have button.lua by default, setting can_click to true on image just makes it block inputs
-function pen.h.new_image( uid, x, y, z, pic, data, init_func )
+--pen.hew.button should have button.lua by default, setting can_click to true on image just makes it block inputs
+function pen.hew.image( uid, x, y, z, pic, data, init_func )
 	if( not( pen.vld( pic ))) then return end
 
 	uid = "pic_"..uid
 	data = data or {}
 	
-	local gui_id = pen.h.gui_builder( data.guid )
+	local gui_id = pen.hew.builder( data.guid )
 	local x, y = EntityGetTransform( gui_id )
 	
 	pen.c.hybrid_objects.images = pen.c.hybrid_objects.images or {}
@@ -570,7 +212,7 @@ function pen.h.new_image( uid, x, y, z, pic, data, init_func )
 		EntitySetTransform( pic_id, x, y, math.rad( data.r or 0 ), data.s_x or 1, data.s_y or 1 )
 		local trans_comp = EntityGetFirstComponentIncludingDisabled( pic_id, "InheritTransformComponent" )
 		EntityRemoveComponent( pic_id, trans_comp )
-	else pen.h.set_transform( pic_id, x, y, data.s_x, data.s_y, math.rad( data.r or 0 )) end
+	else pen.hew.transform( pic_id, x, y, data.s_x, data.s_y, math.rad( data.r or 0 )) end
 	
 	if( data.can_click ) then
 		local action = type( data.can_click ) == "string"
@@ -589,14 +231,14 @@ function pen.h.new_image( uid, x, y, z, pic, data, init_func )
 	return pic_id, true
 end
 
-function pen.h.new_glowing( uid, pic_x, pic_y, pic_z, s_x, s_y, color, alpha )
-	return pen.h.new_image( "glowing_"..uid, pic_x, pic_y, z, "mods/penman/extra/pics/glow.png", {
+function pen.hew.glow( uid, pic_x, pic_y, pic_z, s_x, s_y, color, alpha )
+	return pen.hew.image( "glowing_"..uid, pic_x, pic_y, z, "mods/penman/extra/pics/glow.png", {
 		in_gui = true, is_centered = true, s_x = ( s_x or 1 )/256, s_y = ( s_y or 1 )/256, color = color,
 		alpha = alpha, additive = true, smooth = true, emissive = true })
 	-- do procedurally assembled rectangle is s_x or s_y is less than 0
 end
 
--- function pen.h.new_dragger( core_id, uid, sans_info, pic_info, pos_info, extra_action )
+-- function pen.hew.dragger( core_id, uid, sans_info, pic_info, pos_info, extra_action )
 -- 	uid = "dragger_"..uid
 -- 	sans_info = sans_info or {}
 -- 	sans_info.center = sans_info.center or {}
@@ -660,7 +302,7 @@ end
 -- 	return dragger_id
 -- end
 
--- function pen.h.new_focus( core_id, uid, pic_info, pos_info )
+-- function pen.hew.focus( core_id, uid, pic_info, pos_info )
 -- 	pic_info = pic_info or {}
 -- 	pic_info.is_small = pic_info.is_small or false
 -- 	local path = "mods/white_room/files/props/gui/advanced_window/button_focus_"..( pic_info.is_small and "small_" or "" )
@@ -690,7 +332,7 @@ end
 -- 	end), "mods/white_room/files/props/gui/advanced_window/actions/focus_action.lua" )
 -- end
 
--- function pen.h.new_text( core_id, uid, text_info, pos_info, extra_action )
+-- function pen.hew.text( core_id, uid, text_info, pos_info, extra_action )
 -- 	uid = "text_"..uid.."_"
 -- 	text_info = text_info or {}
 -- 	text_info.text = text_info.text or "[NIL]"
@@ -762,7 +404,7 @@ end
 -- 	return text_id
 -- end
 
--- function pen.h.new_scroller( core_id, uid, s_info, pos_info )	
+-- function pen.hew.scroller( core_id, uid, s_info, pos_info )	
 -- 	uid = "childfree_scrllr_"..uid.."_"
 -- 	s_info = s_info or {}
 -- 	s_info.edge = s_info.edge or { -5, 5, }

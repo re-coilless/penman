@@ -1,4 +1,4 @@
-dofile_once( "mods/penman/_libman.lua" )
+dofile_once( "mods/penman/_penman.lua" )
 
 dummy = EntityGetWithName( "penman_dummy" ) or 0
 if( dummy == 0 ) then
@@ -45,17 +45,17 @@ local test_input = {
 function misc_tests()
 
 --[[
-pen.new_pixel( 50 - 0.5, 100 - 0.5, 4, {255,0,0})
-pen.new_image( 50, 100, 5, pen.FILE_PIC_NUL, {
+pen.new.pixel( 50 - 0.5, 100 - 0.5, 4, {255,0,0})
+pen.new.image( 50, 100, 5, pen.FILE_PIC_NUL, {
     alpha = 0.5, s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 0 )})
-pen.new_pixel( 100 - 0.5, 100 - 0.5, 4, {255,0,0})
-pen.new_image( 100, 100, 5, pen.FILE_PIC_NUL, {
+pen.new.pixel( 100 - 0.5, 100 - 0.5, 4, {255,0,0})
+pen.new.image( 100, 100, 5, pen.FILE_PIC_NUL, {
     alpha = 0.5, s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( -30 )})
-pen.new_pixel( 100 - 0.5, 150 - 0.5, 4, {255,0,0})
-pen.new_image( 100, 150, 5, "data/enemies_gfx/player.xml", { anim = "stand", auid = "huh",
+pen.new.pixel( 100 - 0.5, 150 - 0.5, 4, {255,0,0})
+pen.new.image( 100, 150, 5, "data/enemies_gfx/player.xml", { anim = "stand", auid = "huh",
     alpha = 1, s_x = 1, s_y = 1, can_click = true, is_debugging = true, angle = math.rad( 60 )})
-pen.new_pixel( 100 - 0.5, 200 - 0.5, 4, {255,0,0})
-pen.new_image( 100, 200, 5, pen.FILE_PIC_NUL, {
+pen.new.pixel( 100 - 0.5, 200 - 0.5, 4, {255,0,0})
+pen.new.image( 100, 200, 5, pen.FILE_PIC_NUL, {
     alpha = 0.5, s_x = 10, s_y = 10, can_click = true, is_debugging = true, angle = math.rad( 5 )})
 
 local gui = GuiCreate()
@@ -77,12 +77,12 @@ pen.lib.font_builder( "data/fonts/font_pixel_noshadow.xml", {
     },
 }, "data/fonts/font_pixel.png" )
 
-pen.t.print( pen.t.parse( "{[\"main\"]={[\",\"]=0x1.000000p+0,[\"right_alt\"]=0x1.000000p+0}}" ))
+print( pen.t.parse( "{[\"main\"]={[\",\"]=0x1.000000p+0,[\"right_alt\"]=0x1.000000p+0}}" ))
 
 print( pen.t.pack( pen.t.unarray({ ass = 1, balls = 2, hmmm = 3, [5] = 5, [18] = 20 })))
-pen.t.print( pen.t.unarray( pen.t.pack( "|!ass!1!|!balls!2!|!hmmm!3!|!5!5!|!18!20!|" )))
+print( pen.t.unarray( pen.t.pack( "|!ass!1!|!balls!2!|!hmmm!3!|!5!5!|!18!20!|" )))
 print( pen.t.parse({ ass = 1, balls = 2, hmmm = 3, [5] = 5, [18] = 20 }))
-pen.t.print( pen.t.parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
+print( pen.t.parse( "{[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={[0]=\"balls\",[\"2\"]=\"ass\",[3]=-0.5,[4]=false,[\"huh\"]={}},[5]=\"balls\",[\"6\"]=\"ass\",[7]=-0.5,[420]={[0]={[1]=\"balls\"},[\"2\"]={[1]=\"ass\"},[3]={},[4]={[1]=false},[\"huh\"]=5}}" ))
 
 pen.chrono( pen.setting_get, "19_abiding.SCORE_FILTERS" )
 pen.chrono( function()
@@ -104,7 +104,7 @@ pen.chrono( function()
 end)
 
 print( tostring( pen.is_game_restarted()))
-pen.t.print({ GameGetDateAndTimeUTC()})
+print({ GameGetDateAndTimeUTC()})
 
 local dmg_comp = EntityGetFirstComponentIncludingDisabled( hooman, "DamageModelComponent" )
 pen.magic_comp( dmg_comp, "materials_how_much_damage", { "acid", 69 })
@@ -155,7 +155,7 @@ print( tostring( herd.trap.hmmmm ))
 print( tostring( herd.balls.trap ))
 print( tostring( herd.hmmmm.healer ))
 
-pen.t.print({
+print({
     1,
     2,
     7,
@@ -182,9 +182,9 @@ end)
 
 function buttons()
 
-pen.new_pixel( 50, 50, -99, pen.PALETTE.VNL.RED )
+pen.new.pixel( 50, 50, -99, pen.PALETTE.VNL.RED )
 
-pen.new_button( 50, 50, 0,
+pen.new.button( 50, 50, 0,
     pen.FILE_PIC_NUL, {
     auid = "testing_bruh",
     tip = "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!",
@@ -194,22 +194,22 @@ pen.new_button( 50, 50, 0,
     ignore_multihover = true,
 
     lmb_event = function( pic_x, pic_y, pic_z, pic, d )
-        if( not( d.no_anim )) then pen.atimer( d.auid.."l", nil, true ) end
+        if( not( d.no_anim )) then pen.atm( d.auid.."l", nil, true ) end
         return pic_x, pic_y, pic_z, pic, d
     end,
     rmb_event = function( pic_x, pic_y, pic_z, pic, d )
-        if( not( d.no_anim )) then pen.atimer( d.auid.."r", nil, true ) end
+        if( not( d.no_anim )) then pen.atm( d.auid.."r", nil, true ) end
         return pic_x, pic_y, pic_z, pic, d
     end,
     hov_event = function( pic_x, pic_y, pic_z, pic, d )
-        if( pen.vld( d.tip )) then pen.new_tooltip( d.tip, { is_active = true }) end
+        if( pen.vld( d.tip )) then pen.new.tip( d.tip, { is_active = true }) end
         if( d.highlight ) then
             local off_x, off_y = -1, -1
             local s_x = ( d.s_x or 1 )*d.dims[1] + 2
             local s_y = ( d.s_y or 1 )*d.dims[2] + 2
             if( d.is_centered ) then off_x, off_y = -s_x/2, -s_y/2 end
-            off_x, off_y = pen.rotate_offset( off_x, off_y, d.angle )
-            pen.new_pixel( pic_x + off_x, pic_y + off_y, pic_z + 0.001, d.highlight, s_x, s_y, nil, d.angle )
+            off_x, off_y = pen.rot( off_x, off_y, d.angle )
+            pen.new.pixel( pic_x + off_x, pic_y + off_y, pic_z + 0.001, d.highlight, s_x, s_y, nil, d.angle )
         end
 
         return pic_x, pic_y, pic_z, pic, d
@@ -222,7 +222,7 @@ pen.new_button( 50, 50, 0,
         
         if( not( d.is_centered )) then
 			pic_x, pic_y = pic_x + d.dims[1]/2, pic_y + d.dims[2]/2 end
-        return pen.new_image( pic_x, pic_y, pic_z, pic, { is_centered = true,
+        return pen.new.image( pic_x, pic_y, pic_z, pic, { is_centered = true,
             s_x = ( d.s_x or 1 )*( 1 - s_anim[1]), s_y = ( d.s_y or 1 )*( 1 - s_anim[2]), angle = d.angle })
     end,
 })
@@ -241,7 +241,7 @@ end
 for e = 1,2 do
     for i = 1,100 do
         local frame_num = GameGetFrameNum() + i
-        pen.new_pixel( 100 + i, 5 + ( e - 1 )*5, 5, gradient_me( pen.PALETTE.VNL.RED, pen.animate( 1, true, { frames = 100, frame_num = frame_num, type = "sine" }), e == 1 and "hsv" or "okhsv" ), 1, 5 )
+        pen.new.pixel( 100 + i, 5 + ( e - 1 )*5, 5, gradient_me( pen.PALETTE.VNL.RED, pen.animate( 1, true, { frames = 100, frame_num = frame_num, type = "sine" }), e == 1 and "hsv" or "okhsv" ), 1, 5 )
     end
 end
 
@@ -274,9 +274,9 @@ local player_x, player_y = EntityGetTransform( hooman )
 local pic_x, pic_y = pen.world2gui( player_x, player_y )
 local new_x, new_y = pen.gui2world( pic_x, pic_y )
 print( player_x.."="..new_x.." | "..player_y.."="..new_y )
-pen.new_text( pic_x, pic_y - 30, pen.LAYERS.WORLD_UI, "monkey", { is_centered_x = true, color = pen.PALETTE.VNL.RUNIC })
+pen.new.text( pic_x, pic_y - 30, pen.LAYERS.WORLD_UI, "monkey", { is_centered_x = true, color = pen.PALETTE.VNL.RUNIC })
 pic_x, pic_y = pen.get_mouse_pos()
-pen.new_text( pic_x, pic_y, pen.LAYERS.WORLD_UI, "balls", { is_centered_x = true, color = pen.PALETTE.VNL.WARNING })
+pen.new.text( pic_x, pic_y, pen.LAYERS.WORLD_UI, "balls", { is_centered_x = true, color = pen.PALETTE.VNL.WARNING })
 
 end
 
@@ -337,7 +337,7 @@ if( is_real ) then
     if( is_correct == 1 ) then
         if( pen.c.typing_test.state ~= 1 ) then
             local t = GameGetRealWorldTimeSinceStarted()*1000 - pen.c.typing_test.timer
-            GamePrintImportant( "Your WPM: "..pen.rounder( 60000*35/t ))
+            GamePrintImportant( "Your WPM: "..pen.rnd( 60000*35/t ))
         end
         pen.c.typing_test.state = 1
     else pen.c.typing_test.state = is_correct end
@@ -350,7 +350,7 @@ mnee.new_input( "ballz", 100, 175, 5, 200, 55, test_input[5], { jpad = true })
 --     if( pen.vld( f )) then f() end
 -- end
 
-pen.gui_builder( true )
+pen.new.builder( true )
 
 end
 
@@ -363,18 +363,18 @@ if( t_memo == nil ) then
     t_memo = t..t..t..t..t..t..t..t..t..t..t..t..t..t..t
 end
 
-pen.new_pixel( 100, 100, 5, pen.PALETTE.W, 55, 30 )
-pen.new_scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
+pen.new.pixel( 100, 100, 5, pen.PALETTE.W, 55, 30 )
+pen.new.scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
     local scroll_y, scroll_x = unpack( scroll_pos )
-    local dims = pen.new_text( 0, scroll_y, 0, t_memo, { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
+    local dims = pen.new.text( 0, scroll_y, 0, t_memo, { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
     return { dims[2], 1 }
 end)
 pen.debug_print( pen.t.parse( pen.c.scroll_memo[ "balls" ], true ), 200, 90, true )
 
-pen.new_pixel( 100, 200, 5, pen.PALETTE.W, 60, 15 )
-pen.new_scroller( "ass", 100, 200, -5, 60, 15, function( scroll_pos )
+pen.new.pixel( 100, 200, 5, pen.PALETTE.W, 60, 15 )
+pen.new.scroller( "ass", 100, 200, -5, 60, 15, function( scroll_pos )
     local scroll_y, scroll_x = unpack( scroll_pos )
-    local dims = pen.new_text( scroll_x, scroll_y, 0, test_input[1], { fully_featured = true, color = {0,255,0}})
+    local dims = pen.new.text( scroll_x, scroll_y, 0, test_input[1], { fully_featured = true, color = {0,255,0}})
     return { dims[2], dims[1]}
 end)
 pen.debug_print( pen.t.parse( pen.c.scroll_memo[ "ass" ], true ), 200, 190, true )
@@ -382,9 +382,9 @@ pen.debug_print( pen.t.parse( pen.c.scroll_memo[ "ass" ], true ), 200, 190, true
 if( true ) then return end
 
 local item = "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!"
-pen.new_scrolling_text( "hmm", 100, 170, 5, 30, item, { fully_featured = true })
+pen.new.text_srcl( "hmm", 100, 170, 5, 30, item, { fully_featured = true })
 
-pen.new_scrolling_text( "hhmm", 200, 170, 5, { 30, 30 }, item, { fully_featured = true, font_mods = {
+pen.new.text_srcl( "hhmm", 200, 170, 5, { 30, 30 }, item, { fully_featured = true, font_mods = {
     e1 = function( data, pic_x, pic_y, pic_z, char_data, color, indexes )
         return pen.uncutter( function( cut_x, cut_y, cut_w, cut_h )
             pic_x.g, pic_y.g = pic_x.g + cut_x, pic_y.g + cut_y
@@ -394,7 +394,7 @@ pen.new_scrolling_text( "hhmm", 200, 170, 5, { 30, 30 }, item, { fully_featured 
     end,
 }})
 
-pen.new_scrolling_text( "hmjm", 250, 170, 5, { 33, 33 }, "{>rainbow>{The Best Item EVER}<rainbow<}", { fully_featured = true })
+pen.new.text_srcl( "hmjm", 250, 170, 5, { 33, 33 }, "{>rainbow>{The Best Item EVER}<rainbow<}", { fully_featured = true })
 
 
 
@@ -403,7 +403,7 @@ pen.new_scrolling_text( "hmjm", 250, 170, 5, { 33, 33 }, "{>rainbow>{The Best It
 --     GuiOptionsAddForNextWidget( gui, 47 ) --NoSound
 -- 	GuiOptionsAddForNextWidget( gui, 50 ) --ScrollContainer_Smooth
 --     GuiBeginScrollContainer( gui, 1, 200, 200, 50, 50, false, 0, 0)
---     -- pen.new_text( 0, 0, 0, test_input[1], { fully_featured = true, dims = {50,-1}, color = {0,255,0}})
+--     -- pen.new.text( 0, 0, 0, test_input[1], { fully_featured = true, dims = {50,-1}, color = {0,255,0}})
 --     GuiEndScrollContainer( gui )
 -- end
 
@@ -413,13 +413,13 @@ end
 
 function tipping()
 
-local pic_x, pic_y, _, clicked, _, yep = pen.new_dragger( "balls", 400, 100, 100, 100 )
-_, _, yep = pen.new_image( pic_x, pic_y, 5, pen.FILE_PIC_NUL, { s_x = 50, s_y = 50, can_click = true })
--- pen.new_tooltip( test_input[1], { is_active = yep, tid = "bs2", is_over = true })
-pen.new_tooltip( test_input[3], { tid = "bs1" })
--- pen.new_tooltip( test_input[1], { is_active = yep, tid = "bs3", is_left = true })
--- pen.new_tooltip( test_input[2], { is_active = yep, tid = "bs4", is_over = true, is_left = true })
-pen.new_tooltip( "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", {
+local pic_x, pic_y, _, clicked, _, yep = pen.new.dragger( "balls", 400, 100, 100, 100 )
+_, _, yep = pen.new.image( pic_x, pic_y, 5, pen.FILE_PIC_NUL, { s_x = 50, s_y = 50, can_click = true })
+-- pen.new.tip( test_input[1], { is_active = yep, tid = "bs2", is_over = true })
+pen.new.tip( test_input[3], { tid = "bs1" })
+-- pen.new.tip( test_input[1], { is_active = yep, tid = "bs3", is_left = true })
+-- pen.new.tip( test_input[2], { is_active = yep, tid = "bs4", is_over = true, is_left = true })
+pen.new.tip( "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!", {
     is_active = yep, pos = {390,199}, allow_hover = true, do_corrections = true, font_mods = {
         e1 = function( data, pic_x, pic_y, pic_z, char_data, color, indexes )
             return pen.FONT_MODS.tip( data, pic_x, pic_y, pic_z, char_data, color, indexes, "balls", "LESSS GOOOOOO" )
@@ -427,14 +427,14 @@ pen.new_tooltip( "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can D
     }
 })
 
--- pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
+-- pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { ease_int = "jump", ease_in = "sin", ease_out = "flr0", frames = 15 }
 --     end,
 --     color = pen.PALETTE.PRSP.WHITE,
 -- })
-pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
+pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
     range = { 0, 2.5 },
     func = pen.animate,
     input = function( x )
@@ -442,7 +442,7 @@ pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
     end,
     color = pen.PALETTE.PRSP.BLUE,
 })
-pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
+pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
     range = { 0, 2.5 },
     func = pen.animate,
     input = function( x )
@@ -450,28 +450,28 @@ pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
     end,
     color = pen.PALETTE.PRSP.RED,
 })
-pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
+pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
     func = pen.animate,
     input = function( x )
         return 1, 15*x, { ease_in = "sin3", ease_out = "wav1", frames = 15 }
     end,
     color = pen.PALETTE.PRSP.RED,
 })
--- pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
+-- pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { ease_out = {"exp","wav"}, frames = 15 }
 --     end,
 --     color = pen.PALETTE.PRSP.BLUE,
 -- })
--- pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
+-- pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { ease_out = "bnc50", frames = 15 }
 --     end,
 --     color = pen.PALETTE.PRSP.GREEN,
 -- })
--- pen.new_plot( 100, 200, pen.LAYERS.TIPS, {
+-- pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { type = "spke", ease_out = "pow", frames = 15 }
@@ -485,14 +485,14 @@ end
 
 function texting()
 
--- pen.new_text:
+-- pen.new.text:
 -- LUA: 0.014300000002549ms
 -- LUA: 0.020199999999022ms
 -- LUA: 0.0097000000023399ms
 -- LUA: 0.010699999998906ms
 
--- print( "pen.new_text: " ) --0.046200000000645ms
--- pen.chrono( pen.new_text, {
+-- print( "pen.new.text: " ) --0.046200000000645ms
+-- pen.chrono( pen.new.text, {
 --     0, 0, 0, "123456789123456789123456789", { fully_featured = false, dims = {10,0}}
 -- })
 -- local gui = GuiCreate()
@@ -509,7 +509,7 @@ local step_y = 9
 for i = 1,screen_w/step_x do
     for e = 1,screen_h/step_y do
         n = n + 1
-        pen.new_text( step_x*( i - 1 ), step_y*( e - 1 ), 0, "123456789123456789123456789", { fully_featured = false, dims = {step_x,step_y}})
+        pen.new.text( step_x*( i - 1 ), step_y*( e - 1 ), 0, "123456789123456789123456789", { fully_featured = false, dims = {step_x,step_y}})
         -- GuiText( gui, step_x*( i - 1 ), step_y*( e - 1 ), "123" )   
     end
 end
@@ -525,9 +525,9 @@ function fonting()
 -- GamePrint( pen.magic_byte( pen.BYTE2ID[ 237117598 ]))
 -- GamePrint( pen.magic_byte( pen.magic_byte( "∞" )))
 
-pen.new_text( 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })
--- pen.new_image( 98, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
-pen.new_text( 100, 150, 0, test_input[1], {
+pen.new.text( 150, 50, 0, "123456789123456789123456789", { dims = {100,0}, is_centered_x = true })
+-- pen.new.image( 98, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
+pen.new.text( 100, 150, 0, test_input[1], {
     -- is_huge = false,
     fully_featured = true,
     dims = {100, 100},
@@ -556,8 +556,8 @@ if(( pen.cache({ "hyperlink_state", "balls" }) or -1 ) == GameGetFrameNum()) the
     EntityLoad( "data/entities/animals/scavenger_smg.xml", 0, -200 )
 end
 
-pen.new_image( 298, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
-pen.new_text( 300, 150, 0, test_input[1], {
+pen.new.image( 298, 98, 5, pen.FILE_PIC_NUL, { s_x = 52, s_y = 52 })
+pen.new.text( 300, 150, 0, test_input[1], {
     is_huge = false,
     fully_featured = true,
     dims = {100, 100},

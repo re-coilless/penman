@@ -1,1 +1,3 @@
+-- immediately useful props
 -- a baseline collection of advanced universal props + port n40 base entities there
+-- basic window container func (Hermes styled by default)
