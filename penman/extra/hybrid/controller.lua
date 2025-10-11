@@ -41,7 +41,7 @@ pen.child_play_full( root_id, function( child )
 	if( not( no_gui ) and on_action ~= nil ) then
 		local off_x = ComponentGetValue2( pic_comp, "offset_x" )
 		local off_y = ComponentGetValue2( pic_comp, "offset_y" )
-		local z = ComponentGetValue2( pic_comp, "z_index" )
+		local pic_z = ComponentGetValue2( pic_comp, "z_index" )
 
 		if( is_gui ) then
 			x = pen.magic_storage( child, "gui_x", "value_float" )
@@ -57,7 +57,7 @@ pen.child_play_full( root_id, function( child )
 
 		s_x, s_y = pen.world2gui( s_x, s_y, true, true )
 		local clicked, r_clicked, is_hovered = pen.new.interface(
-			x, y, s_x, s_y, z, { angle = r, is_debugging = is_debugging })
+			x, y, s_x, s_y, pic_z, { angle = r, is_debugging = is_debugging })
 		if( pen.vld( on_action ) and ( clicked or r_clicked or is_hovered )) then on_action() end
 	end
 end)
@@ -231,7 +231,7 @@ if( anim_state >= anim_frames and not( EntityHasTag( entity_id, "no_gui" ))) the
 								shared_block.tooltipped = do_tooltip
 								uid = dofile( value )
 							elseif( do_tooltip ) then
-								uid = new_tooltip( this_gui, uid, value, true, ctrl_data[entity_id].tooltip_data.anim )
+								uid = new_tip( this_gui, uid, value, true, ctrl_data[entity_id].tooltip_data.anim )
 							end
 						end
 					end

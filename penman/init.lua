@@ -24,7 +24,7 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --there should be inherent consistency with "info" (context-spesific parameters of a distinct object) and "data" (a group of parameters applicable to a function) variable names
 --rebrand power words
 --play around with running everything (mnee + vector + index) from within penman's init (still should work if is installed independently)
---very basic mod order editor with inherent mod cat support (part of unsafe index capability; allow doing custom pause menu)
+--very basic mod order editor with inherent mod cat support (part of unsafe index capability; do through credible settings; house a database of verified unsafe mods that get no unsafe warning)
 --test performance of key penman funcs
 --rhytm addon for mrshll (get song bpms; two modes: buff, if any song is playing then every shot made on bit will deal extra damage, and challenge, where shooting without a song playing or not on beat deals damage to the player)
 --mrshll ABIDING pack that features classical and 1930s music

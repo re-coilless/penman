@@ -135,7 +135,7 @@ end
 
 --check ui_is_parent
 --pen.hew.button should have button.lua by default, setting can_click to true on image just makes it block inputs
-function pen.hew.image( uid, x, y, z, pic, data, init_func )
+function pen.hew.image( uid, pic_x, pic_y, pic_z, pic, data, init_func )
 	if( not( pen.vld( pic ))) then return end
 
 	uid = "pic_"..uid
@@ -157,11 +157,10 @@ function pen.hew.image( uid, x, y, z, pic, data, init_func )
 	xml_offs = xml_offs or { 0, 0 }
 	
 	if( pen.vld( data.color )) then --thanks Copi
-		z = z or pen.LAYERS.WORLD
 		pic_comp = EntityAddComponent2( pic_id, "SpriteParticleEmitterComponent", {
 			sprite_file = pic,
 			sprite_centered = data.is_centered,
-			z_index = z, delay = 0, lifetime = 0,
+			z_index = pic_z, delay = 0, lifetime = 0,
 			render_back = not( data.emissive ) and z > 0,
 			additive = data.additive or false,
 			emissive = data.emissive or false,
@@ -177,7 +176,7 @@ function pen.hew.image( uid, x, y, z, pic, data, init_func )
 	else
 		if( data.is_centered ) then data.off_x, data.off_y = w/2 - xml_offs[1], h/2 - xml_offs[1] end
 		pic_comp = pen.magic_comp( pic_id, "SpriteComponent", function( comp_id, v, is_enabled )
-			ComponentSetValue2( comp_id, "z_index", z or pen.LAYERS.WORLD )
+			ComponentSetValue2( comp_id, "z_index", pic_z )
 			
 			ComponentSetValue2( comp_id, "image_file", pic )
 			ComponentSetValue2( comp_id, "alpha", data.alpha or 1 )
@@ -204,15 +203,15 @@ function pen.hew.image( uid, x, y, z, pic, data, init_func )
 	if( data.guid == nil or data.in_gui ) then
 		if( data.in_gui ) then
 			pen.magic_storage( pic_id, "is_gui", "value_bool", true )
-			pen.magic_storage( pic_id, "gui_x", "value_float", x )
-			pen.magic_storage( pic_id, "gui_y", "value_float", y )
-			x, y = pen.gui2world( x, y )
+			pen.magic_storage( pic_id, "gui_x", "value_float", pic_x )
+			pen.magic_storage( pic_id, "gui_y", "value_float", pic_y )
+			pic_x, pic_y = pen.gui2world( pic_x, pic_y )
 		end
 		
-		EntitySetTransform( pic_id, x, y, math.rad( data.r or 0 ), data.s_x or 1, data.s_y or 1 )
+		EntitySetTransform( pic_id, pic_x, pic_y, math.rad( data.r or 0 ), data.s_x or 1, data.s_y or 1 )
 		local trans_comp = EntityGetFirstComponentIncludingDisabled( pic_id, "InheritTransformComponent" )
 		EntityRemoveComponent( pic_id, trans_comp )
-	else pen.hew.transform( pic_id, x, y, data.s_x, data.s_y, math.rad( data.r or 0 )) end
+	else pen.hew.transform( pic_id, pic_x, pic_y, data.s_x, data.s_y, math.rad( data.r or 0 )) end
 	
 	if( data.can_click ) then
 		local action = type( data.can_click ) == "string"
@@ -232,7 +231,7 @@ function pen.hew.image( uid, x, y, z, pic, data, init_func )
 end
 
 function pen.hew.glow( uid, pic_x, pic_y, pic_z, s_x, s_y, color, alpha )
-	return pen.hew.image( "glowing_"..uid, pic_x, pic_y, z, "mods/penman/extra/pics/glow.png", {
+	return pen.hew.image( "glowing_"..uid, pic_x, pic_y, pic_z, "mods/penman/extra/pics/glow.png", {
 		in_gui = true, is_centered = true, s_x = ( s_x or 1 )/256, s_y = ( s_y or 1 )/256, color = color,
 		alpha = alpha, additive = true, smooth = true, emissive = true })
 	-- do procedurally assembled rectangle is s_x or s_y is less than 0
