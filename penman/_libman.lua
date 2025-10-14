@@ -243,7 +243,7 @@ end
 -- 	sans_info.center = sans_info.center or {}
 -- 	sans_info.dims = sans_info.dims or {}
 	
--- 	local dragger_id = new_hybrid_pic( core_id, uid, pic_info, pos_info, sans_info.tooltip or 1, extra_action )
+-- 	local dragger_id = new_hybrid_pic( core_id, uid, pic_info, pos_info, sans_info.tip or 1, extra_action )
 -- 	if( dragger_id == nil ) then
 -- 		return
 -- 	end

@@ -182,13 +182,13 @@ end)
 
 function buttons()
 
-pen.new.pixel( 50, 50, -99, pen.PALETTE.VNL.RED )
+pen.new.pixel( 50, 50, -99, pen.P.VNL.RED )
 
 pen.new.button( 50, 50, 0,
     pen.FILE_PIC_NUL, {
     auid = "testing_bruh",
     tip = "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>wave>{things}<wave<} AND {>quake>{stuff}<quake<} and even comes WITH {>cancer>{ass}<cancer<}!!!",
-    no_anim = false, highlight = pen.PALETTE.HRMS.BLUE_3,
+    no_anim = false, highlight = pen.P.HRMS.BLUE_3,
     s_x = 10, s_y = 10, angle = math.rad(45),
     is_centered = true, is_debugging = false,
     ignore_multihover = true,
@@ -241,7 +241,7 @@ end
 for e = 1,2 do
     for i = 1,100 do
         local frame_num = GameGetFrameNum() + i
-        pen.new.pixel( 100 + i, 5 + ( e - 1 )*5, 5, gradient_me( pen.PALETTE.VNL.RED, pen.animate( 1, true, { frames = 100, frame_num = frame_num, type = "sine" }), e == 1 and "hsv" or "okhsv" ), 1, 5 )
+        pen.new.pixel( 100 + i, 5 + ( e - 1 )*5, 5, gradient_me( pen.P.VNL.RED, pen.animate( 1, true, { frames = 100, frame_num = frame_num, type = "sine" }), e == 1 and "hsv" or "okhsv" ), 1, 5 )
     end
 end
 
@@ -274,9 +274,9 @@ local player_x, player_y = EntityGetTransform( hooman )
 local pic_x, pic_y = pen.world2gui( player_x, player_y )
 local new_x, new_y = pen.gui2world( pic_x, pic_y )
 print( player_x.."="..new_x.." | "..player_y.."="..new_y )
-pen.new.text( pic_x, pic_y - 30, pen.LAYERS.WORLD_UI, "monkey", { is_centered_x = true, color = pen.PALETTE.VNL.RUNIC })
+pen.new.text( pic_x, pic_y - 30, pen.Z.WORLD_UI, "monkey", { is_centered_x = true, color = pen.P.VNL.RUNIC })
 pic_x, pic_y = pen.get_mouse_pos()
-pen.new.text( pic_x, pic_y, pen.LAYERS.WORLD_UI, "balls", { is_centered_x = true, color = pen.PALETTE.VNL.WARNING })
+pen.new.text( pic_x, pic_y, pen.Z.WORLD_UI, "balls", { is_centered_x = true, color = pen.P.VNL.WARNING })
 
 end
 
@@ -322,7 +322,7 @@ local state = pen.c.typing_test.state or 0
 
 local out, is_real = mnee.new_input( iid, 100, 100, 5, 200, 37, "", {
     no_wrap = false, is_live = true, --ban_unicode = true, force_numerical = true,
-    color = state ~= 0 and pen.PALETTE.VNL[ state > 0 and "RUNIC" or "WARNING" ] or nil,
+    color = state ~= 0 and pen.P.VNL[ state > 0 and "RUNIC" or "WARNING" ] or nil,
 })
 if( is_real ) then
     pen.c.typing_test.timer = pen.c.typing_test.timer or GameGetRealWorldTimeSinceStarted()*1000
@@ -363,7 +363,7 @@ if( t_memo == nil ) then
     t_memo = t..t..t..t..t..t..t..t..t..t..t..t..t..t..t
 end
 
-pen.new.pixel( 100, 100, 5, pen.PALETTE.W, 55, 30 )
+pen.new.pixel( 100, 100, 5, pen.P.W, 55, 30 )
 pen.new.scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
     local scroll_y, scroll_x = unpack( scroll_pos )
     local dims = pen.new.text( 0, scroll_y, 0, t_memo, { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
@@ -371,7 +371,7 @@ pen.new.scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
 end)
 pen.debug_print( pen.t.parse( pen.c.scroll_memo[ "balls" ], true ), 200, 90, true )
 
-pen.new.pixel( 100, 200, 5, pen.PALETTE.W, 60, 15 )
+pen.new.pixel( 100, 200, 5, pen.P.W, 60, 15 )
 pen.new.scroller( "ass", 100, 200, -5, 60, 15, function( scroll_pos )
     local scroll_y, scroll_x = unpack( scroll_pos )
     local dims = pen.new.text( scroll_x, scroll_y, 0, test_input[1], { fully_featured = true, color = {0,255,0}})
@@ -427,56 +427,56 @@ pen.new.tip( "{>e1>{{>rainbow>{The Best Item Ever}<rainbow<}}<e1<}\nIT can DO {>
     }
 })
 
--- pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
+-- pen.new.plot( 100, 200, pen.Z.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { ease_int = "jump", ease_in = "sin", ease_out = "flr0", frames = 15 }
 --     end,
---     color = pen.PALETTE.PRSP.WHITE,
+--     color = pen.P.PRSP.WHITE,
 -- })
-pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
+pen.new.plot( 100, 200, pen.Z.TIPS, {
     range = { 0, 2.5 },
     func = pen.animate,
     input = function( x )
         return 1, 15*x, { type = "emap", frames = 15 }
     end,
-    color = pen.PALETTE.PRSP.BLUE,
+    color = pen.P.PRSP.BLUE,
 })
-pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
+pen.new.plot( 100, 200, pen.Z.TIPS, {
     range = { 0, 2.5 },
     func = pen.animate,
     input = function( x )
         return 1, true, { ease_in = "log1.1", ease_out = "bck2", frames = 15 }
     end,
-    color = pen.PALETTE.PRSP.RED,
+    color = pen.P.PRSP.RED,
 })
-pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
+pen.new.plot( 100, 200, pen.Z.TIPS, {
     func = pen.animate,
     input = function( x )
         return 1, 15*x, { ease_in = "sin3", ease_out = "wav1", frames = 15 }
     end,
-    color = pen.PALETTE.PRSP.RED,
+    color = pen.P.PRSP.RED,
 })
--- pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
+-- pen.new.plot( 100, 200, pen.Z.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { ease_out = {"exp","wav"}, frames = 15 }
 --     end,
---     color = pen.PALETTE.PRSP.BLUE,
+--     color = pen.P.PRSP.BLUE,
 -- })
--- pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
+-- pen.new.plot( 100, 200, pen.Z.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { ease_out = "bnc50", frames = 15 }
 --     end,
---     color = pen.PALETTE.PRSP.GREEN,
+--     color = pen.P.PRSP.GREEN,
 -- })
--- pen.new.plot( 100, 200, pen.LAYERS.TIPS, {
+-- pen.new.plot( 100, 200, pen.Z.TIPS, {
 --     func = pen.animate,
 --     input = function( x )
 --         return 1, 15*x, { type = "spke", ease_out = "pow", frames = 15 }
 --     end,
---     color = pen.PALETTE.PRSP.GREY,
+--     color = pen.P.PRSP.GREY,
 -- })
 
 end
@@ -544,7 +544,7 @@ pen.new.text( 100, 150, 0, test_input[1], {
             return pic_x.l, pic_y.l, {0,255,0,0.5}
         end,
         c2 = function( data, pic_x, pic_y, pic_z, char_data, color, indexes )
-            return pic_x.l, pic_y.l, pen.PALETTE.PRSP.RED
+            return pic_x.l, pic_y.l, pen.P.PRSP.RED
         end,
         
         e1 = function( data, pic_x, pic_y, pic_z, char_data, color, indexes )
