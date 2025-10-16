@@ -1,5 +1,6 @@
 ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 
+--pen.is_culled for all pen.new funcs
 --pen.mgk table
 --add new table to penman to house all gameplay-first functionality
 --in-line text mods/comments should use ansi standard
@@ -16,6 +17,7 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --a system that converts images into a pixel table to be drawn in settings.lua or assembled in real time
 --some kind of message system (check how MQTT works)
 --add pen.animate/pen.estimate debugging that plots/demos motion/scaling in self-aligning grid
+--"Health:\nass\nballs" seems to explode pen.new.tip
 
 --[TODO]
 --jit.flush() for realtime lua updates

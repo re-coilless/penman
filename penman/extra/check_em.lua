@@ -363,7 +363,7 @@ if( t_memo == nil ) then
     t_memo = t..t..t..t..t..t..t..t..t..t..t..t..t..t..t
 end
 
-pen.new.pixel( 100, 100, 5, pen.P.W, 55, 30 )
+pen.new.pixel( 100, 100, 5, pen.P.WHITE, 55, 30 )
 pen.new.scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
     local scroll_y, scroll_x = unpack( scroll_pos )
     local dims = pen.new.text( 0, scroll_y, 0, t_memo, { fully_featured = true, dims = {50,-1}, color = {255,0,0}})
@@ -371,7 +371,7 @@ pen.new.scroller( "balls", 100, 100, -5, 55, 30, function( scroll_pos )
 end)
 pen.debug_print( pen.t.parse( pen.c.scroll_memo[ "balls" ], true ), 200, 90, true )
 
-pen.new.pixel( 100, 200, 5, pen.P.W, 60, 15 )
+pen.new.pixel( 100, 200, 5, pen.P.WHITE, 60, 15 )
 pen.new.scroller( "ass", 100, 200, -5, 60, 15, function( scroll_pos )
     local scroll_y, scroll_x = unpack( scroll_pos )
     local dims = pen.new.text( scroll_x, scroll_y, 0, test_input[1], { fully_featured = true, color = {0,255,0}})
