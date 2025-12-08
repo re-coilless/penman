@@ -75,3 +75,13 @@ function OnWorldPostUpdate()
 
 	dofile( "mods/penman/extra/check_em.lua" )
 end
+
+-- function huh()
+-- 	print(GameGetFrameNum( true ))
+-- end
+-- function OnWorldPreUpdate()
+-- 	huh()
+-- end
+-- function OnPausePreUpdate()
+-- 	huh()
+-- end
