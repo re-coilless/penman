@@ -25,8 +25,9 @@ if( pen.c.testing_done ) then
         -- fonting()
         -- cloner()
         -- text2func()
+        vector()
 
-        pen.c.testing_done = 10
+        pen.c.testing_done = 1--0
         return
     end
 end
@@ -797,5 +798,57 @@ if(( pen.balls or 0 ) == 0 ) then
 		pen.balls = 1
 	end
 end
+
+end
+
+-- *************************************************************************
+
+function vector()
+if( not( ModIsEnabled( "mnee" ))) then return end
+if( not( ModIsEnabled( "vector_core" ))) then return end
+dofile_once( "mods/mnee/lib.lua" )
+
+pen.magic_write( "mods/vector_core/test.lua", [[
+return function( guide )
+    guide["test"] = {
+        order_id = 5,
+        name = "Main Test",
+        is_active = true,
+        steps = {
+            {
+                is_done = function() return true end,
+                name = "Test",
+                desc = "just checking idk, also lots of text and stuff",
+                zone_xy = function() return { 50, 100 } end,
+                zone_wh = { 30, 10 },
+            },
+            {
+                is_done = true,
+                name = "Test2",
+                desc = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+                zone_xy = { 200, 75 },
+                zone_wh = { 100, 100 },
+
+                func = function( x, y, z, name, desc, is_done )
+                    
+                end,
+            },
+            {
+                is_pause = true,
+                is_checkpoint = true,
+                is_done = function() return false end,
+            },
+        },
+    }
+    guide["checking"] = {
+        order_id = 1,
+        name = "Also Test",
+        is_active = function() return false end,
+    }
+    return guide
+end
+]])
+
+GlobalsSetValue( "VECTOR_TUTORIAL_LIST", GlobalsGetValue( "VECTOR_TUTORIAL_LIST", pen.DIV_1 ).."mods/vector_core/test.lua"..pen.DIV_1 )
 
 end
