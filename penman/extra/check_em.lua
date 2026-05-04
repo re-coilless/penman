@@ -819,18 +819,33 @@ return function( guide )
                 is_done = function() return true end,
                 name = "Test",
                 desc = "just checking idk, also lots of text and stuff",
-                zone_xy = function() return { 50, 100 } end,
-                zone_wh = { 30, 10 },
+                zone_xy = function( screen_x, screen_y ) return { 50, 100 } end,
+                zone_wh = { 30, 15 },
+            },
+            {
+                is_done = function() return true end,
+                name = "Test2",
+                desc = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+                zone_xy = function( screen_x, screen_y ) return { screen_x/2 - 15, 2 } end,
+                zone_wh = { 30, 15 },
+                fog = 0.9,
+            },
+            {
+                is_done = function() return true end,
+                name = "Test3",
+                desc = "Large-type.com lets you display & share text in a very large font directly from your browser. Whoa! That's handy whenever you need to read something on your screen from further away—for example, phone numbers and passwords. Nice! Even better, when you share text with large-type.com only the person with the link sees your text. Rendering happens locally on your browser and your text is not transmitted to any servers. How cool!",
+                zone_xy = function( screen_x, screen_y ) return { 20, screen_y - 50 } end,
+                zone_wh = { 300, 40 },
             },
             {
                 is_done = true,
-                name = "Test2",
-                desc = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
                 zone_xy = { 200, 75 },
                 zone_wh = { 100, 100 },
 
-                func = function( x, y, z, name, desc, is_done )
-                    
+                func = function( pic_x, pic_y, zone_w, zone_h, screen_x, screen_y, alpha, fog, is_done, module, step )
+                    fog( pic_x, pic_y, zone_w, zone_h, screen_x, screen_y, alpha )
+                    return mnee.new_button( pic_x, pic_y + zone_h + 3, pen.Z.TUTORIAL_TIPS,
+                        "mods/mnee/files/pics/key_right.png", { auid = "vector_tutorial_next", jpad = true })
                 end,
             },
             {
