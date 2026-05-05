@@ -25,7 +25,7 @@ if( pen.c.testing_done ) then
         -- fonting()
         -- cloner()
         -- text2func()
-        vector()
+        -- vector()
 
         pen.c.testing_done = 1--0
         return
@@ -836,6 +836,13 @@ return function( guide )
                 desc = "Large-type.com lets you display & share text in a very large font directly from your browser. Whoa! That's handy whenever you need to read something on your screen from further away—for example, phone numbers and passwords. Nice! Even better, when you share text with large-type.com only the person with the link sees your text. Rendering happens locally on your browser and your text is not transmitted to any servers. How cool!",
                 zone_xy = function( screen_x, screen_y ) return { 20, screen_y - 50 } end,
                 zone_wh = { 300, 40 },
+            },
+            {
+                is_done = function() return true end,
+                name = "Test4",
+                desc = "An eternal jungle ripped straight from a Death World and overran with Tyranid remnants. Its depths contain a violent space-time tear through which a mighty Chaos Citadel rears its horrific geometry.",
+                zone_xy = function( screen_x, screen_y ) return { screen_x - 50, screen_y - 50 } end,
+                zone_wh = { 40, 15 },
             },
             {
                 is_done = true,

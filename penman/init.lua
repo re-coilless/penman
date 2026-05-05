@@ -20,6 +20,7 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --"Health:\nass\nballs" seems to explode pen.new.tip
 
 --[TODO]
+--unify the pen.estimate functions so higher multipliers always speed up, and lower always slow down
 --jit.flush() for realtime lua updates
 --custom penman-based dialog system
 --matter file builder that allows for matter types (molten_metal or poison_liquid); make sure one can apply several at once (so stuff like "molten" and "metal" assemble into a proper molten metal thing)
