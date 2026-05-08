@@ -1,5 +1,7 @@
 ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 
+--mrshll bg music module with energy (multitrack events with crossfading)
+
 --pen.is_culled for all pen.new funcs
 --pen.mgk table
 --add new table to penman to house all gameplay-first functionality
@@ -30,7 +32,6 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --very basic mod order editor with inherent mod cat support (part of unsafe index capability; do through credible settings; house a database of verified unsafe mods that get no unsafe warning)
 --test performance of key penman funcs
 --rhytm addon for mrshll (get song bpms; two modes: buff, if any song is playing then every shot made on bit will deal extra damage, and challenge, where shooting without a song playing or not on beat deals damage to the player)
---mrshll ABIDING pack that features classical and 1930s music
 --add this https://github.com/TakWolf/fusion-pixel-font
 --make custom monospace highres and pixelated fonts
 --schedule based profiler that operates on globals and allows cross-context evaluation as well as graphing and execution order

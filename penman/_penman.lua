@@ -8827,6 +8827,8 @@ function pen.lib.player_builder( hooman, func )
 		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.accel_x = 0.001
 		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.accel_x_air = 0.001
 		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.run_velocity = 0
+		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.jump_velocity_x = 0
+		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.jump_velocity_y = -60
 	end
 	
 	pen.t.loop( pen.GENERIC_CHAR_SETUP, function( name, values )
