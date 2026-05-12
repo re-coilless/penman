@@ -2381,7 +2381,7 @@ function pen.debug_vector( x, y, l, r, is_line )
 	end
 end
 
-function pen.debug_print( text, x, y, color )
+function pen.debug_print( text, x, y, color ) --make sure text can never go offscreen
 	if( pen.vld( x ) and pen.vld( y )) then
 		local pic_x, pic_y = x, y
 		local is_guied = color == true

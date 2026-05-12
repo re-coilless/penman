@@ -1,7 +1,5 @@
 ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 
---mrshll bg music module with energy (multitrack events with crossfading)
-
 --pen.is_culled for all pen.new funcs
 --pen.mgk table
 --add new table to penman to house all gameplay-first functionality
@@ -24,7 +22,6 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --[TODO]
 --unify the pen.estimate functions so higher multipliers always speed up, and lower always slow down
 --jit.flush() for realtime lua updates
---custom penman-based dialog system
 --matter file builder that allows for matter types (molten_metal or poison_liquid); make sure one can apply several at once (so stuff like "molten" and "metal" assemble into a proper molten metal thing)
 --there should be inherent consistency with "info" (context-spesific parameters of a distinct object) and "data" (a group of parameters applicable to a function) variable names
 --rebrand power words
@@ -39,7 +36,7 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --check if globals in settings are accessible across all files (and if so make penman autoinject the lib)
 --check how file caching works with loadfile, maybe one can edit one lua script at runtime
 --dropdown with search capabilities (combine input with scroller)
---cached get_terrain via raymarching (https://youtu.be/BNZtUB7yhX4?t=92), cahe updates are triggered by a sparse grid around every entity that calls this
+--cached get_terrain via raymarching (https://youtu.be/BNZtUB7yhX4?t=92), cache updates are triggered by a sparse grid around every entity that calls this
 --GameEntityPlaySound might be able to ignore the sfx limit (thanks to lamia)
 --add sfxes (separate banks for hermes and trigger)
 --testing environment that has full in-world function simulation

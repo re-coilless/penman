@@ -26,6 +26,7 @@ if( pen.c.testing_done ) then
         -- cloner()
         -- text2func()
         -- vector()
+        ost()
 
         pen.c.testing_done = 1--0
         return
@@ -872,5 +873,32 @@ end
 ]])
 
 GlobalsSetValue( "VECTOR_TUTORIAL_LIST", GlobalsGetValue( "VECTOR_TUTORIAL_LIST", pen.DIV_1 ).."mods/vector_core/test.lua"..pen.DIV_1 )
+
+end
+
+-- *************************************************************************
+
+function ost()
+if( not( ModIsEnabled( "mrshll_core" ))) then return end
+
+pen.magic_write( "mods/mrshll_core/test.lua", [[
+return function( playlist )
+    table.append( playlist, {
+        is_active = true, --this is a func
+        order_id = 5,
+        name = "Test",
+        energy = { 0, 1 },
+        biome_name = "",
+        biome_file = "", --this takes priority if is provided
+        event = {
+            "",
+            "",
+        },
+    })
+    return playlist
+end
+]])
+
+GlobalsSetValue( "MRSHLL_OST_QUEUE", GlobalsGetValue( "MRSHLL_OST_QUEUE", pen.DIV_1 ).."mods/mrshll_core/test.lua"..pen.DIV_1 )
 
 end
