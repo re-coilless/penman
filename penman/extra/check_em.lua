@@ -880,19 +880,33 @@ end
 
 function ost()
 if( not( ModIsEnabled( "mrshll_core" ))) then return end
+if( not( ModIsEnabled( "mrshll_pack_abiding" ))) then return end
 
 pen.magic_write( "mods/mrshll_core/test.lua", [[
 return function( playlist )
-    table.append( playlist, {
+    table.insert( playlist, {
         is_active = true, --this is a func
         order_id = 5,
         name = "Test",
         energy = { 0, 1 },
-        biome_name = "",
-        biome_file = "", --this takes priority if is provided
+        biome_name = "$biome_coalmine",
+        biome_file = "coalmine",
         event = {
-            "",
-            "",
+            "mods/mrshll_pack_abiding/abiding.bank",
+            "abiding/18",
+            12490, --set this to true for looping tracks
+        },
+    })
+    table.insert( playlist, {
+        is_active = true, --this is a func
+        order_id = 1,
+        name = "Test",
+        energy = { 0, 1 },
+        biome_name = "_EMPTY_",
+        event = {
+            "mods/mrshll_pack_abiding/abiding.bank",
+            "abiding/15",
+            true,
         },
     })
     return playlist

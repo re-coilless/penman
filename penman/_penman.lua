@@ -44,7 +44,7 @@ function pen.vld( v, is_ecs )
 	if( v == nil ) then return false end
 	local t, out = type( v ), true
 	if( t == "number" ) then
-		out = v == v and v ~= math.inf
+		out = v == v and v ~= math.huge
 		if( out and is_ecs ) then out = v > 0 end
 	elseif( t == "string" ) then
 		out = v ~= pen.DIV_1 and v ~= "" and v ~= " " and v ~= "\0"
