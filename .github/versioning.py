@@ -1,6 +1,5 @@
 import os
 import re
-#https://github.com/logankilpatrick/TODO-List-Updater/tree/master
 
 from pathlib import Path
 repo_root = Path(__file__).resolve().parents[2]
@@ -12,7 +11,7 @@ with open( file_path, "r", encoding = "utf-8" ) as file:
 import subprocess
 message = re.search( r"\(vol\s+([0-9.]+)\)", os.getenv( "COMMIT_MESSAGE", "" ))
 message = message.group(1) if message else "unknown"
-commit = os.getenv( "COMMIT_HASH", "" )
+commit = os.getenv( "COMMIT_HASH", "" ).strip()
 
 lines = content.splitlines()
 body = "\n".join(lines[15:])
