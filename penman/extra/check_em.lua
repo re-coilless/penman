@@ -26,7 +26,8 @@ if( pen.c.testing_done ) then
         -- cloner()
         -- text2func()
         -- vector()
-        ost()
+        -- ost()
+        -- cloud()
 
         pen.c.testing_done = 1--0
         return
@@ -914,5 +915,19 @@ end
 ]])
 
 GlobalsSetValue( "MRSHLL_OST_QUEUE", GlobalsGetValue( "MRSHLL_OST_QUEUE", pen.DIV_1 ).."mods/mrshll_core/test.lua"..pen.DIV_1 )
+
+end
+
+-- *************************************************************************
+
+function cloud()
+
+pen.new.cloud( 50, 50, 0, {
+    { x = 0, y = 0, w = 5, h = 1, c = pen.P.HEIR.CORE_1 },
+    { x = 0, y = 1, w = 5, h = 1, c = pen.P.HEIR.CORE_2 },
+    { x = 0, y = 2, w = 5, h = 1, c = pen.P.HEIR.CORE_3 },
+    { x = 0, y = 3, w = 5, h = 1, c = pen.P.HEIR.CORE_4 },
+    { x = 0, y = 4, w = 5, h = 1, c = pen.P.HEIR.CORE_5 },
+})
 
 end

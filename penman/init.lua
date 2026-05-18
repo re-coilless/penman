@@ -10,11 +10,8 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --sule-based lua context independent gateway (and steal ModMagicNumbersFileAdd from init.lua via it)
 
 --documentation (https://github.com/LuaLS/lua-language-server/wiki/Annotations)
---palette png file with all the color names spelled in corresponding color
---setup automatic versioning by putting version from commit message and adding commit hash (https://github.com/logankilpatrick/TODO-List-Updater)
 --investigate gui shaders
 --periodically executed functions (coroutine-based sequencer that accepts a table of events, use varstorage to preserve the state between restarts)
---a system that converts images into a pixel table to be drawn in settings.lua or assembled in real time
 --some kind of message system (check how MQTT works)
 --add pen.animate/pen.estimate debugging that plots/demos motion/scaling in self-aligning grid
 --"Health:\nass\nballs" seems to explode pen.new.tip

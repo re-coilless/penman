@@ -6,7 +6,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 33.25 -- 70f8380
+pen.VERSION = 33.3 -- 0b1d031
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -145,7 +145,7 @@ function pen.pid( pid, delta, k ) --https://www.robotsforroboticists.com/pid-con
 	-- The k.i and k.d gains are first set to zero.
 	-- The proportional gain is increased until it reaches the ultimate gain, KU, at which the output of the loop starts to oscillate.
 	-- KU and the oscillation period PU are used to set the gains as shown: k.p = 0.6*KU; k.i = 2*k.p/PU; k.d = k.p*PU/8
-	
+
 	local time = 1
 	local int = pen.c.pid_memo[ pid ][2] + delta*time
 	local der = ( delta - pen.c.pid_memo[ pid ][1])/time
@@ -3635,6 +3635,11 @@ function pen.magic_rgb( c, to_rbg, mode )
 	end, { reset_frame = pen.CACHE_RESET_DELAY }))}
 end
 
+function pen.magic_cloud( pic )
+	--pen.magic_draw(  )
+	--ModImageGetPixel( old_id, old_xy[1] + i, old_xy[2] + e )
+end
+
 function pen.colourer( gui, c, alpha )
 	if( not( pen.vld( c ) or pen.vld( alpha ))) then return end
 	c = pen.ght( c, true )
@@ -5010,6 +5015,18 @@ function pen.new.pager( pic_x, pic_y, pic_z, data )
 	return data.page, max_page, sfx_type
 end
 
+function pen.new.cloud( pic_x, pic_y, pic_z, data )
+	if( not( pen.vld( data ))) then return end
+
+	local _,_,_,orig_gui = pen.new.builder( GuiCreate())
+	for i,blob in ipairs( data ) do
+		local pos_x, pos_y = pic_x + blob.x, pic_y + blob.y
+		pen.new.pixel( pos_x, pos_y, pic_z, blob.c, blob.w, blob.h )
+	end
+	pen.new.builder( false )
+	if( orig_gui ) then pen.new.builder( orig_gui ) end
+end
+
 function pen.new.plot( pic_x, pic_y, pic_z, data )
 	data = data or {}
 	data.scale = { 100, 100 }
@@ -5273,12 +5290,12 @@ pen.P = {
 		PURPLE = {179,141,232}, _="ffb38de8",
 	},
 	N40 = { --ammo types, classes, misc colors
-		HOLO_1 = {182,213,60}, _="ffb6d53c",
+		HOLO_1 = {121,140,42}, _="ff798c2a",
 		HOLO_2 = {144,168,49}, _="ff90a831",
-		HOLO_3 = {121,140,42}, _="ff798c2a",
-		HOLO_RED_1 = {195,3,3}, _="ffc30303",
+		HOLO_3 = {182,213,60}, _="ffb6d53c",
+		HOLO_RED_1 = {62,0,10}, _="ff3e000a",
 		HOLO_RED_2 = {136,0,21}, _="ff880015",
-		HOLO_RED_3 = {62,0,10}, _="ff3e000a",
+		HOLO_RED_3 = {195,3,3}, _="ffc30303",
 	},
 	NCRS = {
 		GREY_1 = {21,29,40}, _="ff151d28",
