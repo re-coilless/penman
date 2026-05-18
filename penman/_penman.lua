@@ -6,7 +6,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = "[VERSION_GOES_HERE]" -- [COMMIT_GOES_HERE]
+pen.VERSION = unknown -- c82db5e3e664d4ba37d872bde35bc93965654c0f
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------

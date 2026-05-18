@@ -2,8 +2,7 @@ import os
 import re
 
 from pathlib import Path
-repo_root = Path(__file__).resolve().parents[2]
-file_path = repo_root / os.getenv( "VERSIONING_PATH" )
+file_path = Path.cwd() / os.getenv( "VERSIONING_PATH" )
 
 with open( file_path, "r", encoding = "utf-8" ) as file:
     content = file.read()
