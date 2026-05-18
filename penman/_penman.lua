@@ -6,7 +6,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = unknown -- c82db5e3e664d4ba37d872bde35bc93965654c0f
+pen.VERSION = 33.25 -- 70f8380
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -145,7 +145,7 @@ function pen.pid( pid, delta, k ) --https://www.robotsforroboticists.com/pid-con
 	-- The k.i and k.d gains are first set to zero.
 	-- The proportional gain is increased until it reaches the ultimate gain, KU, at which the output of the loop starts to oscillate.
 	-- KU and the oscillation period PU are used to set the gains as shown: k.p = 0.6*KU; k.i = 2*k.p/PU; k.d = k.p*PU/8
-
+	
 	local time = 1
 	local int = pen.c.pid_memo[ pid ][2] + delta*time
 	local der = ( delta - pen.c.pid_memo[ pid ][1])/time
