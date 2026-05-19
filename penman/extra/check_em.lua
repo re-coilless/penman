@@ -18,7 +18,7 @@ if( pen.c.testing_done ) then
         -- world2gui()
         -- filing()
         -- raters()
-        -- input()
+        input()
         -- scrolling()
         -- tipping()
         -- texting()
@@ -29,7 +29,7 @@ if( pen.c.testing_done ) then
         -- ost()
         -- cloud()
 
-        pen.c.testing_done = 1--0
+        pen.c.testing_done = 10
         return
     end
 end

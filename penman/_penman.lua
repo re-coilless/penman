@@ -6,7 +6,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 33.3 -- 0b1d031
+pen.VERSION = 33.4 -- b361093
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -4830,7 +4830,7 @@ function pen.new.text_srcl( sid, pic_x, pic_y, pic_z, dims, text, data )
 		local target, buffer, spacing = w - dims[1], 15, 5
 		local is_right = pen.c.scrolling_text_memo[ sid ] == 0
 		local shift = pen.estimate( sid.."_anim",
-			is_right and ( target + buffer ) or -buffer, "exp"..tostring( 1000*speed ), 0.1, 0.75 )
+			is_right and ( target + buffer ) or -buffer, "exp"..tostring( 1/( 1000*speed )), 0.1, 0.75 )
 		if( shift > ( target + spacing ) or shift < -spacing ) then pen.c.scrolling_text_memo[ sid ] = is_right and 1 or 0 end
 		pen.new.text( -shift, h/2, pic_z, text, data )
 	end
@@ -5855,16 +5855,18 @@ pen.ANIM_INTERS = {
 }
 pen.ESTIM_ALGS = { --huge thanks to Nathan
 	exp = function( t, v, p )
-		return ( t - v )/( p or 10 )
+		return ( p or 0.1 )*( t - v )
 	end,
 	ixp = function( t, v, p )
 		return math.tanh(( p or 10 )*( t - v ))
 	end,
 	hmd = function( t, v, p )
-		return (( p or 2 )*v*t )/( t + v ) - v
+		local h = ( 2*v*t )/( t + v )
+		return ( p or 0.1 )*( h - v )
 	end,
 	gmp = function( t, v, p ) --only for t,v > 0
-		return math.pow( t*v, 1/( p or 2 )) - v
+		local g = math.sqrt( t*v )
+		return ( p or 0.1 )*( g - v )*math.abs( math.log( t/v ))
 	end,
 	lsm = function( t, v, p ) --only for relatively similar values
 		v = math.max( v, 0.001 )

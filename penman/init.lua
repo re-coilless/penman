@@ -1,5 +1,7 @@
 ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 
+--spritesheet baker (transform the xml and rearrage the png itself) that incorporates eba's uv gen
+
 --pen.is_culled for all pen.new funcs
 --pen.mgk table
 --add new table to penman to house all gameplay-first functionality
@@ -17,7 +19,6 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --"Health:\nass\nballs" seems to explode pen.new.tip
 
 --[TODO]
---unify the pen.estimate functions so higher multipliers always speed up, and lower always slow down
 --jit.flush() for realtime lua updates
 --matter file builder that allows for matter types (molten_metal or poison_liquid); make sure one can apply several at once (so stuff like "molten" and "metal" assemble into a proper molten metal thing)
 --there should be inherent consistency with "info" (context-spesific parameters of a distinct object) and "data" (a group of parameters applicable to a function) variable names
