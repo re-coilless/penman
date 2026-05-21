@@ -15,7 +15,6 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --investigate gui shaders
 --periodically executed functions (coroutine-based sequencer that accepts a table of events, use varstorage to preserve the state between restarts)
 --some kind of message system (check how MQTT works)
---add pen.animate/pen.estimate debugging that plots/demos motion/scaling in self-aligning grid
 --"Health:\nass\nballs" seems to explode pen.new.tip
 
 --[TODO]

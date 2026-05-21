@@ -8,7 +8,7 @@ with open( file_path, "r", encoding = "utf-8" ) as file:
     content = file.read()
 
 import subprocess
-message = re.search( r"\(vol\s+([0-9.]+)\)", os.getenv( "COMMIT_MESSAGE", "" ))
+message = re.search( r"\(vol\s+([0-9.]+).*\)", os.getenv( "COMMIT_MESSAGE", "" ))
 message = message.group(1) if message else "unknown"
 commit = os.getenv( "COMMIT_HASH", "" ).strip()
 

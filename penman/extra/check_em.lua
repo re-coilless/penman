@@ -18,7 +18,7 @@ if( pen.c.testing_done ) then
         -- world2gui()
         -- filing()
         -- raters()
-        input()
+        -- input()
         -- scrolling()
         -- tipping()
         -- texting()
@@ -28,6 +28,7 @@ if( pen.c.testing_done ) then
         -- vector()
         -- ost()
         -- cloud()
+        anims()
 
         pen.c.testing_done = 10
         return
@@ -929,5 +930,52 @@ pen.new.cloud( 50, 50, 0, {
     { x = 0, y = 3, w = 5, h = 1, c = pen.P.HEIR.CORE_4 },
     { x = 0, y = 4, w = 5, h = 1, c = pen.P.HEIR.CORE_5 },
 })
+
+end
+
+-- *************************************************************************
+
+function anims()
+
+local l = 100
+local scale = 1000
+local task, dft = { 0, l/scale }, 1/20
+local pic_x, pic_y = 50, 50; temp = pic_x
+temp = scale*pen.estimate( "test1", task, { "exp",
+    pen.new.slider( "test1", pic_x, pic_y, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
+pen.debug_print( temp, pic_x + l + 20, pic_y, true )
+pen.new.pixel( pic_x + temp, pic_y, 0, pen.P.HRMS.GREEN_1, 5, 5 )
+temp = scale*pen.estimate( "test2", task, { "wgt",
+    pen.new.slider( "test2", pic_x, pic_y + 15, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
+pen.debug_print( temp, pic_x + l + 20, pic_y + 15, true )
+pen.new.pixel( pic_x + temp, pic_y + 15, 0, pen.P.HRMS.GREEN_1, 5, 5 )
+temp = scale*pen.estimate( "test3", task, { "ixp",
+    pen.new.slider( "test3", pic_x, pic_y + 30, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
+pen.debug_print( temp, pic_x + l + 20, pic_y + 30, true )
+pen.new.pixel( pic_x + temp, pic_y + 30, 0, pen.P.HRMS.GREEN_1, 5, 5 )
+temp = scale*pen.estimate( "test4", task, { "lsm",
+    pen.new.slider( "test4", pic_x, pic_y + 45, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
+pen.debug_print( temp, pic_x + l + 20, pic_y + 45, true )
+pen.new.pixel( pic_x + temp, pic_y + 45, 0, pen.P.HRMS.GREEN_1, 5, 5 )
+temp = scale*pen.estimate( "test5", task, { "hmd",
+    pen.new.slider( "test5", pic_x, pic_y + 60, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
+pen.debug_print( temp, pic_x + l + 20, pic_y + 60, true )
+pen.new.pixel( pic_x + temp, pic_y + 60, 0, pen.P.HRMS.GREEN_1, 5, 5 )
+temp = scale*pen.estimate( "test6", task, { "gmp",
+    pen.new.slider( "test6", pic_x, pic_y + 75, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
+pen.debug_print( temp, pic_x + l + 20, pic_y + 75, true )
+pen.new.pixel( pic_x + temp, pic_y + 75, 0, pen.P.HRMS.GREEN_1, 5, 5 )
+
+pen.new.pixel( 30, 50, 0, pen.P.WHITE, 10, 10 )
+if( pen.new.interface( 30, 50, 10, 10, 0 )) then
+    pen.c.estimator_memo[ "test1" ] = nil
+    pen.c.estimator_memo[ "test2" ] = nil
+    pen.c.estimator_memo[ "test3" ] = nil
+    pen.c.estimator_memo[ "test4" ] = nil
+    pen.c.estimator_memo[ "test5" ] = nil
+    pen.c.estimator_memo[ "test6" ] = nil
+end
+
+pen.new.builder( true )
 
 end

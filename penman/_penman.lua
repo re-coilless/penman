@@ -6,7 +6,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 33.4 -- b361093
+pen.VERSION = 33.45 -- 8b0f6b3
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -157,16 +157,23 @@ end
 
 ---asymptotic animation
 function pen.estimate( eid, target, alg, min_delta, max_delta ) --thanks Nathan
-	alg = alg or "exp"
 	target = pen.ght( target )
+	alg = pen.ght( alg or "exp" )
 	min_delta = math.max( min_delta or 0.01, 0.0001 )
+
 	pen.c.estimator_memo = pen.c.estimator_memo or {}
-	if( target[3]) then pen.c.estimator_memo[ eid ] = nil end
+	pen.c.estimator_vlct = pen.c.estimator_vlct or {}
+	if( target[1] == true or target[3]) then
+		pen.c.estimator_memo[ eid ] = nil
+		pen.c.estimator_vlct[ eid ] = nil
+		if( target[1] == true ) then return end
+	end
 	pen.c.estimator_memo[ eid ] = pen.c.estimator_memo[ eid ] or target[2] or target[1]
-	
+	pen.c.estimator_vlct[ eid ] = pen.c.estimator_vlct[ eid ] or 0
+
 	local value = pen.c.estimator_memo[ eid ]
 	if( not( pen.epc( value, target[1], 1.05*min_delta ))) then
-		local delta = pen.ESTIM_ALGS[ string.sub( alg, 1, 3 )]( target[1], value, tonumber( string.sub( alg, 4, -1 )))
+		local delta = pen.ESTIM_ALGS[ alg[1]]( target[1], value, alg[2], eid )
 		max_delta = math.min( math.abs( max_delta or delta ), math.abs( target[1] - value ))
 		pen.c.estimator_memo[ eid ] = value + pen.lmt( pen.lmt( delta, max_delta ), min_delta, true )
 	else pen.c.estimator_memo[ eid ] = target[1] end
@@ -2588,11 +2595,11 @@ function pen.bladesim( sword_id, data )
 	
 	local anim_done = false
 	local d_r, d_x, d_y = 0, 0, 0
-	local alg, mult = data.a or "wgt2", data.m or 1
+	local alg, mult = data.a or { "wgt", 2 }, data.m or 1
 	if( got_anim ) then
 		local k = pen.c.sword_state[ sword_id ].k or 1
 		local anim = data.drift[1] == nil and { data.drift } or data.drift
-		alg, mult = anim[k].a or "ixp", anim[k].m or 1
+		alg, mult = anim[k].a or { "gmp", 1 }, anim[k].m or 1
 		
 		d_r = pen.sgn( s_x )*math.rad( anim[k].r or 0 )
 		local got_r = pen.epc( pen.c.estimator_memo[ eid_r ], t_r + d_r, math.rad( 3 ))
@@ -4490,7 +4497,7 @@ function pen.new.scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 
 		local eid_y = sid.."_anim_y"
 		progress_y = math.min( math.max(( new_y - ( pic_y + 3 ))/bar_y, -buffer ), 1 + buffer )
-		progress_y = pen.estimate( eid_y, progress_y, "wgt0.75", 0.001, 0.02*step_y )
+		progress_y = pen.estimate( eid_y, progress_y, { "wgt", 0.75 }, 0.001, 0.02*step_y )
 		pen.c.scroll_memo[ sid ].py = math.min( math.max( progress_y, 0 ), 1 )
 		is_static = out_y[1][2] ~= 2 or pen.epc( new_y, pos_y )
 		if( not( progress_y >= 0 and progress_y <= 1 )) then
@@ -4548,7 +4555,7 @@ function pen.new.scroller( sid, pic_x, pic_y, pic_z, size_x, size_y, func, data 
 
 		local eid_x = sid.."_anim_x"
 		progress_x = math.min( math.max(( new_x - ( pic_x + 3 ))/bar_x, -buffer ), 1 + buffer )
-		progress_x = pen.estimate( eid_x, progress_x, "wgt0.75", 0.001, 0.02*step_x )
+		progress_x = pen.estimate( eid_x, progress_x, { "wgt", 0.75 }, 0.001, 0.02*step_x )
 		pen.c.scroll_memo[ sid ].px = math.min( math.max( progress_x, 0 ), 1 )
 		is_static = out_x[1][2] ~= 2 or pen.epc( new_x, pos_x )
 		if( not( progress_x >= 0 and progress_x <= 1 )) then
@@ -4830,7 +4837,7 @@ function pen.new.text_srcl( sid, pic_x, pic_y, pic_z, dims, text, data )
 		local target, buffer, spacing = w - dims[1], 15, 5
 		local is_right = pen.c.scrolling_text_memo[ sid ] == 0
 		local shift = pen.estimate( sid.."_anim",
-			is_right and ( target + buffer ) or -buffer, "exp"..tostring( 1/( 1000*speed )), 0.1, 0.75 )
+			is_right and ( target + buffer ) or -buffer, { "exp", 1/( 1000*speed )}, 0.1, 0.75 )
 		if( shift > ( target + spacing ) or shift < -spacing ) then pen.c.scrolling_text_memo[ sid ] = is_right and 1 or 0 end
 		pen.new.text( -shift, h/2, pic_z, text, data )
 	end
@@ -5854,27 +5861,98 @@ pen.ANIM_INTERS = {
 	end,
 }
 pen.ESTIM_ALGS = { --huge thanks to Nathan
-	exp = function( t, v, p )
+	exp = function( t, v, p, eid )
 		return ( p or 0.1 )*( t - v )
 	end,
-	ixp = function( t, v, p )
-		return math.tanh(( p or 10 )*( t - v ))
-	end,
-	hmd = function( t, v, p )
-		local h = ( 2*v*t )/( t + v )
-		return ( p or 0.1 )*( h - v )
-	end,
-	gmp = function( t, v, p ) --only for t,v > 0
-		local g = math.sqrt( t*v )
-		return ( p or 0.1 )*( g - v )*math.abs( math.log( t/v ))
-	end,
-	lsm = function( t, v, p ) --only for relatively similar values
-		v = math.max( v, 0.001 )
-		return ( p or 0.1 )*v*( 1 - v/math.max( t, 0.001 ))
-	end,
-	wgt = function( t, v, p )
-		local w = p or 1.5
+	wgt = function( t, v, p, eid )
+		local w = p or 0.5
 		return ( v + w*t )/( 1 + w ) - v
+	end,
+	ixp = function( t, v, p, eid )
+		-- if( t < v ) then return -pen.ESTIM_ALGS.ixp( i - t, i - v, p, i ) end
+		-- local a, d = 12*( p or 0.2 ), t - v
+		-- return a*math.tanh( d/a )*math.sqrt( math.abs( d )/( math.abs( d ) + a ))
+		local params = pen.ght( p )
+
+		local gain = ( params[1] or 2 )/100
+		local curve = params[2] or 2
+		local soften = params[3] or 10
+		local stop_radius = params[4] or 0.5
+	
+		local vel = pen.c.estimator_vlct[ eid ]
+		local d = t - v
+
+		local mag = math.abs( d )
+		local dir = d < 0 and -1 or 1
+
+		-- nonlinear attraction
+		local far = mag^curve
+		local near = math.sqrt( mag )
+
+		local blend = mag/( mag + soften )
+
+		local force =
+			dir*( near*( 1 - blend ) + far*blend )*gain
+
+		vel = vel + force
+
+		-- baseline drag
+		vel = vel*0.985
+
+		-- braking only if velocity is moving toward target
+		if( mag < stop_radius and vel*d > 0 ) then
+
+			local stop_blend = mag/stop_radius
+
+			-- strong terminal damping
+			vel = vel*( stop_blend*0.8 + 0.2 )
+		end
+
+		-- sleep
+		if(
+			mag < stop_radius and
+			math.abs( vel ) < 0.001
+		) then
+			vel = 0
+		end
+
+		pen.c.estimator_vlct[ eid ] = vel
+		return vel
+	end,
+	lsm = function( t, v, p, eid )
+		-- if( t < v ) then return -pen.ESTIM_ALGS.lsm( i - t, i - v, p, i ) end
+		-- v = math.max( v, 0.001 )
+		-- return 2*( p or 0.1 )*v*( 1 - v/math.max( t, 0.001 ))
+
+		local params = pen.ght( p )
+		local vel = pen.c.estimator_vlct[ eid ]
+		local a = params[1]*( t - v ) - ( params[2] or 0.5 )*vel
+		pen.c.estimator_vlct[ eid ] = vel + a
+		return v + pen.c.estimator_vlct[ eid ]
+	end,
+	hmd = function( t, v, p, eid )
+		-- local total = math.abs( t - i )
+		-- local prog = math.max( math.abs( v - i ), 0.001 )
+		-- local h = ( 2*prog*total )/( prog + total )
+		-- local r = 2*( p or 0.1 )*( h - prog )
+		-- return ( t >= i ) and r or -r
+
+		local d = t - v
+		local k = p or 8
+		local x = math.abs( d )/100
+		local y = 1/( 1 + math.exp( -k*( x - 0.5 )))
+		y = ( y - 0.5 )*2
+		return pen.sgn( d )*y*100
+	end,
+	gmp = function( t, v, p, eid )
+		-- local a = p or 0.5
+		-- local total = math.abs( t - i )
+		-- local prog = math.max( math.abs( v - i ), 0.001 )
+		-- local r = math.pow( total, a )*math.pow( prog, 1 - a ) - prog
+		-- return ( t >= i ) and r or -r
+		local d = t - v
+		local a = p or 0.5
+		return pen.sgn( d )*math.pow( math.abs( d ), a )
 	end,
 }
 
