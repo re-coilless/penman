@@ -6,7 +6,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 33.45 -- 8b0f6b3
+pen.VERSION = 33.451 -- a6f7417
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -5868,7 +5868,7 @@ pen.ESTIM_ALGS = { --huge thanks to Nathan
 		local w = p or 0.5
 		return ( v + w*t )/( 1 + w ) - v
 	end,
-	ixp = function( t, v, p, eid )
+	ixp = function( t, v, p, eid ) --velocity anim is the answer!
 		-- if( t < v ) then return -pen.ESTIM_ALGS.ixp( i - t, i - v, p, i ) end
 		-- local a, d = 12*( p or 0.2 ), t - v
 		-- return a*math.tanh( d/a )*math.sqrt( math.abs( d )/( math.abs( d ) + a ))
