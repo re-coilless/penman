@@ -6,7 +6,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 33.451 -- a6f7417
+pen.VERSION = 33.452 -- 9a186c2
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -5868,54 +5868,22 @@ pen.ESTIM_ALGS = { --huge thanks to Nathan
 		local w = p or 0.5
 		return ( v + w*t )/( 1 + w ) - v
 	end,
-	ixp = function( t, v, p, eid ) --velocity anim is the answer!
-		-- if( t < v ) then return -pen.ESTIM_ALGS.ixp( i - t, i - v, p, i ) end
-		-- local a, d = 12*( p or 0.2 ), t - v
+	ixp = function( t, v, p, eid ) --minimal viable
 		-- return a*math.tanh( d/a )*math.sqrt( math.abs( d )/( math.abs( d ) + a ))
 		local params = pen.ght( p )
 
-		local gain = ( params[1] or 2 )/100
-		local curve = params[2] or 2
-		local soften = params[3] or 10
-		local stop_radius = params[4] or 0.5
-	
+		local stiffness = p[1] or 0.1
+		local damping = p[2] or 0.1
+		local redirect = p[3] or 0.1
+
 		local vel = pen.c.estimator_vlct[ eid ]
+	
 		local d = t - v
 
-		local mag = math.abs( d )
-		local dir = d < 0 and -1 or 1
-
-		-- nonlinear attraction
-		local far = mag^curve
-		local near = math.sqrt( mag )
-
-		local blend = mag/( mag + soften )
-
-		local force =
-			dir*( near*( 1 - blend ) + far*blend )*gain
-
-		vel = vel + force
-
-		-- baseline drag
-		vel = vel*0.985
-
-		-- braking only if velocity is moving toward target
-		if( mag < stop_radius and vel*d > 0 ) then
-
-			local stop_blend = mag/stop_radius
-
-			-- strong terminal damping
-			vel = vel*( stop_blend*0.8 + 0.2 )
-		end
-
-		-- sleep
-		if(
-			mag < stop_radius and
-			math.abs( vel ) < 0.001
-		) then
-			vel = 0
-		end
-
+		vel = vel + 0.01*pen.sgn( d )*stiffness*math.sqrt( math.abs( d )) --try tanh
+		local drag = ( 0.02 + 0.2/( 1 + math.abs( d )))*vel*math.abs( vel )*damping
+		vel = vel + drag
+		if( vel*d < 0 ) then vel = vel*( 1 - redirect ) end
 		pen.c.estimator_vlct[ eid ] = vel
 		return vel
 	end,

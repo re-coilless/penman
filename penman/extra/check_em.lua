@@ -949,8 +949,10 @@ temp = scale*pen.estimate( "test2", task, { "wgt",
     pen.new.slider( "test2", pic_x, pic_y + 15, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
 pen.debug_print( temp, pic_x + l + 20, pic_y + 15, true )
 pen.new.pixel( pic_x + temp, pic_y + 15, 0, pen.P.HRMS.GREEN_1, 5, 5 )
-temp = scale*pen.estimate( "test3", task, { "ixp",
-    pen.new.slider( "test3", pic_x, pic_y + 30, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
+temp = scale*pen.estimate( "test3", task, { "ixp", {
+    pen.new.slider( "testA", 200, 50, 5, 100, { default = 0.05 })/10,
+    pen.new.slider( "testB", 200, 75, 5, 100, { default = 0.09 })/10,
+    pen.new.slider( "testC", 200, 100, 5, 100, { default = 0.01 })/10 }}, 1/( 100*scale ), l )
 pen.debug_print( temp, pic_x + l + 20, pic_y + 30, true )
 pen.new.pixel( pic_x + temp, pic_y + 30, 0, pen.P.HRMS.GREEN_1, 5, 5 )
 temp = scale*pen.estimate( "test4", task, { "lsm",
@@ -968,12 +970,12 @@ pen.new.pixel( pic_x + temp, pic_y + 75, 0, pen.P.HRMS.GREEN_1, 5, 5 )
 
 pen.new.pixel( 30, 50, 0, pen.P.WHITE, 10, 10 )
 if( pen.new.interface( 30, 50, 10, 10, 0 )) then
-    pen.c.estimator_memo[ "test1" ] = nil
-    pen.c.estimator_memo[ "test2" ] = nil
-    pen.c.estimator_memo[ "test3" ] = nil
-    pen.c.estimator_memo[ "test4" ] = nil
-    pen.c.estimator_memo[ "test5" ] = nil
-    pen.c.estimator_memo[ "test6" ] = nil
+    pen.estimate( "test1", true )
+    pen.estimate( "test2", true )
+    pen.estimate( "test3", true )
+    pen.estimate( "test4", true )
+    pen.estimate( "test5", true )
+    pen.estimate( "test6", true )
 end
 
 pen.new.builder( true )
