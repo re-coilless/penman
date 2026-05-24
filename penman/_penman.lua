@@ -6,7 +6,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 33.452 -- 9a186c2
+pen.VERSION = 33.5 -- cf7cc56
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -161,22 +161,28 @@ function pen.estimate( eid, target, alg, min_delta, max_delta ) --thanks Nathan
 	alg = pen.ght( alg or "exp" )
 	min_delta = math.max( min_delta or 0.01, 0.0001 )
 
+	pen.c.estimator_prev = pen.c.estimator_prev or {}
 	pen.c.estimator_memo = pen.c.estimator_memo or {}
 	pen.c.estimator_vlct = pen.c.estimator_vlct or {}
 	if( target[1] == true or target[3]) then
-		pen.c.estimator_memo[ eid ] = nil
-		pen.c.estimator_vlct[ eid ] = nil
-		if( target[1] == true ) then return end
+		pen.c.estimator_memo[ eid ], pen.c.estimator_vlct[ eid ] = nil,nil
+		if( not( target[3] )) then return end
+	elseif( alg[3] and pen.c.estimator_prev[ eid ] ~= pen.t.pack({ alg[1], alg[2]})) then
+		pen.c.estimator_vlct[ eid ], pen.c.estimator_prev[ eid ] = nil, nil
 	end
+
 	pen.c.estimator_memo[ eid ] = pen.c.estimator_memo[ eid ] or target[2] or target[1]
 	pen.c.estimator_vlct[ eid ] = pen.c.estimator_vlct[ eid ] or 0
+	if( pen.c.estimator_prev[ eid ] == nil ) then
+		pen.c.estimator_prev[ eid ] = pen.t.pack({ alg[1], alg[2]})
+	end
 
 	local value = pen.c.estimator_memo[ eid ]
 	if( not( pen.epc( value, target[1], 1.05*min_delta ))) then
 		local delta = pen.ESTIM_ALGS[ alg[1]]( target[1], value, alg[2], eid )
 		max_delta = math.min( math.abs( max_delta or delta ), math.abs( target[1] - value ))
 		pen.c.estimator_memo[ eid ] = value + pen.lmt( pen.lmt( delta, max_delta ), min_delta, true )
-	else pen.c.estimator_memo[ eid ] = target[1] end
+	else pen.c.estimator_memo[ eid ], pen.c.estimator_vlct[ eid ] = target[1], 0 end
 	return pen.c.estimator_memo[ eid ]
 end
 
@@ -2587,7 +2593,7 @@ function pen.bladesim( sword_id, data )
 	if( got_anim ) then aim = r - ( s_x < 0 and pen.sgn( r )*math.rad( 180 ) or 0 ) end
 	
 	local t_r = aim + math.rad( rest_pos[1])
-	pen.c.estimator_memo[ eid_r ] = pen.c.estimator_memo[ eid_r ] or t_r
+	pen.c.estimator_memo[ eid_r ] = pen.c.estimator_memo[ eid_r ] or math.deg( t_r )
 	local t_x = pen.sgn( s_x )*rest_pos[2]
 	pen.c.estimator_memo[ eid_x ] = pen.c.estimator_memo[ eid_x ] or t_x
 	local t_y = pen.sgn( s_y )*rest_pos[3]
@@ -2599,10 +2605,10 @@ function pen.bladesim( sword_id, data )
 	if( got_anim ) then
 		local k = pen.c.sword_state[ sword_id ].k or 1
 		local anim = data.drift[1] == nil and { data.drift } or data.drift
-		alg, mult = anim[k].a or { "gmp", 1 }, anim[k].m or 1
+		alg, mult = anim[k].a or { "drg", { 1, 0.1 }, true }, anim[k].m or 1
 		
 		d_r = pen.sgn( s_x )*math.rad( anim[k].r or 0 )
-		local got_r = pen.epc( pen.c.estimator_memo[ eid_r ], t_r + d_r, math.rad( 3 ))
+		local got_r = pen.epc( math.rad( pen.c.estimator_memo[ eid_r ]), t_r + d_r, math.rad( 3 ))
 		d_x = pen.sgn( s_x )*( anim[k].x or 0 )
 		local got_x = pen.epc( pen.c.estimator_memo[ eid_x ], t_x + d_x, 0.1 )
 		d_y = pen.sgn( s_y )*( anim[k].y or 0 )
@@ -2611,8 +2617,8 @@ function pen.bladesim( sword_id, data )
 		if( got_r and got_x and got_y ) then
 			pen.c.sword_state[ sword_id ].k, anim_done = math.min( k + 1, #anim ), true end
 	else pen.c.sword_state[ sword_id ].k = 1 end
-
-	d_r = pen.estimate( eid_r, t_r + d_r, alg, 0.1, 1*mult )
+	
+	d_r = math.rad( pen.estimate( eid_r, math.deg( t_r + d_r ), alg, 0.1, 45*mult ))
 	d_x = pen.estimate( eid_x, t_x + d_x, alg, 0.01, 2*mult )
 	d_y = pen.estimate( eid_y, t_y + d_y, alg, 0.01, 2*mult )
 	EntitySetTransform( sword_id, x + d_x, y + d_y, d_r )
@@ -5868,60 +5874,77 @@ pen.ESTIM_ALGS = { --huge thanks to Nathan
 		local w = p or 0.5
 		return ( v + w*t )/( 1 + w ) - v
 	end,
-	ixp = function( t, v, p, eid ) --minimal viable
-		-- return a*math.tanh( d/a )*math.sqrt( math.abs( d )/( math.abs( d ) + a ))
-		local params = pen.ght( p )
-
-		local stiffness = p[1] or 0.1
-		local damping = p[2] or 0.1
-		local redirect = p[3] or 0.1
-
-		local vel = pen.c.estimator_vlct[ eid ]
-	
+	drg = function( t, v, p, eid )
 		local d = t - v
-
-		vel = vel + 0.01*pen.sgn( d )*stiffness*math.sqrt( math.abs( d )) --try tanh
-		local drag = ( 0.02 + 0.2/( 1 + math.abs( d )))*vel*math.abs( vel )*damping
-		vel = vel + drag
-		if( vel*d < 0 ) then vel = vel*( 1 - redirect ) end
+		local params = pen.ght( p )
+		local vel = pen.c.estimator_vlct[ eid ] + ( params[2] or 0.1 )*math.tanh( d )
+		vel = vel + ( 5 + 10/( 1 + math.abs( d )))*vel*math.abs( vel )*( params[1] or 1 )^2
+		if( vel*d < 0 ) then vel = d/2 end
 		pen.c.estimator_vlct[ eid ] = vel
 		return vel
 	end,
-	lsm = function( t, v, p, eid )
-		-- if( t < v ) then return -pen.ESTIM_ALGS.lsm( i - t, i - v, p, i ) end
-		-- v = math.max( v, 0.001 )
-		-- return 2*( p or 0.1 )*v*( 1 - v/math.max( t, 0.001 ))
-
-		local params = pen.ght( p )
-		local vel = pen.c.estimator_vlct[ eid ]
-		local a = params[1]*( t - v ) - ( params[2] or 0.5 )*vel
-		pen.c.estimator_vlct[ eid ] = vel + a
-		return v + pen.c.estimator_vlct[ eid ]
-	end,
-	hmd = function( t, v, p, eid )
-		-- local total = math.abs( t - i )
-		-- local prog = math.max( math.abs( v - i ), 0.001 )
-		-- local h = ( 2*prog*total )/( prog + total )
-		-- local r = 2*( p or 0.1 )*( h - prog )
-		-- return ( t >= i ) and r or -r
-
+	sgm = function( t, v, p, eid )
+		p = p or 0.25
 		local d = t - v
-		local k = p or 8
-		local x = math.abs( d )/100
-		local y = 1/( 1 + math.exp( -k*( x - 0.5 )))
-		y = ( y - 0.5 )*2
-		return pen.sgn( d )*y*100
+		local mag = math.abs( d )
+		local near = math.tanh( d )/10000
+		local far = 0.2*pen.sgn( d )*math.log( 1 + mag )
+		local phase = 1/( 1 + math.exp( -5*( mag/100 - 0.5 )))
+		local force = near*( 1 - phase ) + far*phase
+		
+		local vel = pen.c.estimator_vlct[ eid ] + force*p
+		vel = vel/( 1 + math.abs( vel )*p/100 )
+		if( vel*d < 0 ) then vel = d/2 end
+		pen.c.estimator_vlct[ eid ] = vel
+
+		return vel
 	end,
-	gmp = function( t, v, p, eid )
-		-- local a = p or 0.5
-		-- local total = math.abs( t - i )
-		-- local prog = math.max( math.abs( v - i ), 0.001 )
-		-- local r = math.pow( total, a )*math.pow( prog, 1 - a ) - prog
-		-- return ( t >= i ) and r or -r
-		local d = t - v
-		local a = p or 0.5
-		return pen.sgn( d )*math.pow( math.abs( d ), a )
-	end,
+	-- wyr = function( t, v, p, eid )
+	-- 	local d = t - v
+	-- 	local mag = math.abs( d )
+	-- 	local vel = pen.c.estimator_vlct[ eid ]
+
+	-- 	local phase = 1/( 1 + mag/25 )
+	-- 	local pulse = math.sin( 0.2*mag + 2*vel )
+	-- 	local base = pen.sgn( d )*math.log( 1 + mag )
+	-- 	local force = base*( 1 - phase ) - pulse*phase*20
+	-- 	if( vel*d < 0 ) then force = force*0.1 end
+		
+	-- 	p = 2*( p or 0.1 )
+	-- 	vel = vel + force*p/50
+	-- 	vel = vel/( 1 + math.abs( vel )*0.02 )
+	-- 	vel = vel + 0.01*math.sin( vel + mag )
+	-- 	pen.c.estimator_vlct[ eid ] = vel
+
+	-- 	return vel
+	-- end,
+	-- ais = function( t, v, p, eid )
+	-- 	p = p or 0.15
+
+	-- 	local d = t - v
+	-- 	local mag = math.abs( d )
+	-- 	local vel = pen.c.estimator_vlct[ eid ]
+		
+	-- 	local anchor = pen.sgn( d )*math.log( 1 + mag )
+	-- 	local phase = 0.02*mag + 0.6*vel + 0.0003*vel*mag
+
+	-- 	local spiral = math.sin( phase )
+	-- 	local curl = math.cos( 1.4*phase + 0.8*math.sin( vel ))
+	-- 	local ripple = math.sin( 0.08*mag - 1.5*vel + math.cos( mag/30 ))
+
+	-- 	local commitment = 0.5 + 0.5*math.sin( phase + 0.5*curl )
+	-- 	local drag = 0.008 + 0.015*math.abs( math.sin( phase + spiral ))
+	-- 	local force = anchor*math.min(( 0.6 + 0.4*spiral ) + commitment*vel*0.05 - ripple*math.tanh( vel )*2, d )
+	-- 	if( force*d < 0 ) then force = force/4 end
+
+	-- 	vel = vel + force*p/100
+	-- 	vel = vel/( 1 + math.abs( vel )*drag )
+	-- 	vel = vel + math.min( 0.001*math.sin( 2*phase + curl ), d/100 )
+	-- 	if( vel*d < 0 ) then vel = vel*0.75 end
+	-- 	pen.c.estimator_vlct[ eid ] = vel
+		
+	-- 	return vel
+	-- end,
 }
 
 pen.SDF = { --https://iquilezles.org/articles/distfunctions2d/

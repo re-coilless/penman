@@ -28,7 +28,7 @@ if( pen.c.testing_done ) then
         -- vector()
         -- ost()
         -- cloud()
-        anims()
+        -- anims()
 
         pen.c.testing_done = 10
         return
@@ -938,7 +938,7 @@ end
 function anims()
 
 local l = 100
-local scale = 1000
+local scale = 1
 local task, dft = { 0, l/scale }, 1/20
 local pic_x, pic_y = 50, 50; temp = pic_x
 temp = scale*pen.estimate( "test1", task, { "exp",
@@ -949,24 +949,23 @@ temp = scale*pen.estimate( "test2", task, { "wgt",
     pen.new.slider( "test2", pic_x, pic_y + 15, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
 pen.debug_print( temp, pic_x + l + 20, pic_y + 15, true )
 pen.new.pixel( pic_x + temp, pic_y + 15, 0, pen.P.HRMS.GREEN_1, 5, 5 )
-temp = scale*pen.estimate( "test3", task, { "ixp", {
-    pen.new.slider( "testA", 200, 50, 5, 100, { default = 0.05 })/10,
-    pen.new.slider( "testB", 200, 75, 5, 100, { default = 0.09 })/10,
-    pen.new.slider( "testC", 200, 100, 5, 100, { default = 0.01 })/10 }}, 1/( 100*scale ), l )
+temp = scale*pen.estimate( "test3", task, { "drg", {
+    pen.new.slider( "test3", pic_x + 30, pic_y + 30, 5, 20, { default = dft })/10,
+    pen.new.slider( "test3_", pic_x, pic_y + 30, 5, 20, { default = dft })/10 }}, 1/( 100*scale ), l )
 pen.debug_print( temp, pic_x + l + 20, pic_y + 30, true )
 pen.new.pixel( pic_x + temp, pic_y + 30, 0, pen.P.HRMS.GREEN_1, 5, 5 )
-temp = scale*pen.estimate( "test4", task, { "lsm",
+temp = scale*pen.estimate( "test4", task, { "sgm",
     pen.new.slider( "test4", pic_x, pic_y + 45, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
 pen.debug_print( temp, pic_x + l + 20, pic_y + 45, true )
 pen.new.pixel( pic_x + temp, pic_y + 45, 0, pen.P.HRMS.GREEN_1, 5, 5 )
-temp = scale*pen.estimate( "test5", task, { "hmd",
-    pen.new.slider( "test5", pic_x, pic_y + 60, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
-pen.debug_print( temp, pic_x + l + 20, pic_y + 60, true )
-pen.new.pixel( pic_x + temp, pic_y + 60, 0, pen.P.HRMS.GREEN_1, 5, 5 )
-temp = scale*pen.estimate( "test6", task, { "gmp",
-    pen.new.slider( "test6", pic_x, pic_y + 75, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
-pen.debug_print( temp, pic_x + l + 20, pic_y + 75, true )
-pen.new.pixel( pic_x + temp, pic_y + 75, 0, pen.P.HRMS.GREEN_1, 5, 5 )
+-- temp = scale*pen.estimate( "test5", task, { "wyr",
+--     pen.new.slider( "test5", pic_x, pic_y + 60, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
+-- pen.debug_print( temp, pic_x + l + 20, pic_y + 60, true )
+-- pen.new.pixel( pic_x + temp, pic_y + 60, 0, pen.P.HRMS.GREEN_1, 5, 5 )
+-- temp = scale*pen.estimate( "test6", task, { "ais",
+--     pen.new.slider( "test6", pic_x, pic_y + 75, 5, 20, { default = dft })/10 }, 1/( 100*scale ), l )
+-- pen.debug_print( temp, pic_x + l + 20, pic_y + 75, true )
+-- pen.new.pixel( pic_x + temp, pic_y + 75, 0, pen.P.HRMS.GREEN_1, 5, 5 )
 
 pen.new.pixel( 30, 50, 0, pen.P.WHITE, 10, 10 )
 if( pen.new.interface( 30, 50, 10, 10, 0 )) then
