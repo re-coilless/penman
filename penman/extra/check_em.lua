@@ -18,7 +18,7 @@ if( pen.c.testing_done ) then
         -- world2gui()
         -- filing()
         -- raters()
-        -- input()
+        input()
         -- scrolling()
         -- tipping()
         -- texting()
