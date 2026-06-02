@@ -6,7 +6,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = unknown -- 28df6ee
+pen.VERSION = 33.51 -- 8cd68d0
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -1927,7 +1927,7 @@ function pen.get_tinker_state( hooman, x, y )
 	end) or false
 end
 
-function pen.get_spell_data( spell_id )
+function pen.get_spell_info( spell_id )
 	local function clean_my_gun()
 		ACTION_MANA_DRAIN_DEFAULT, ACTION_DRAW_RELOAD_TIME_INCREASE = 10, 0
 		ACTION_UNIDENTIFIED_SPRITE_DEFAULT = "data/ui_gfx/gun_actions/unidentified.png"
@@ -1950,11 +1950,11 @@ function pen.get_spell_data( spell_id )
 	dofile_once( "data/scripts/gun/gun.lua" )
 	dofile_once( "data/scripts/gun/gun_enums.lua" )
 	dofile_once( "data/scripts/gun/gun_actions.lua" )
-	return pen.cache({ "spell_data", spell_id }, function()
+	return pen.cache({ "spell_info", spell_id }, function()
 		clean_my_gun()
-
-		local spell_data = pen.t.clone( pen.t.get( actions, spell_id, nil, nil, {}), nil )
-		if( spell_data.action == nil ) then return spell_data end
+		
+		local spell_info = pen.t.clone( pen.t.get( actions, spell_id, nil, nil, {}), nil )
+		if( spell_info.action == nil ) then return spell_info end
 		
 		-- thanks Lamia
 		-- local functions_to_shadow = {
@@ -2003,13 +2003,13 @@ function pen.get_spell_data( spell_id )
 
 		local metadata = create_shot()
 		c, metadata.state_proj = metadata.state, { damage = {}, explosion = {}, crit = {}, lightning = {}}
-		set_current_action( spell_data )
+		set_current_action( spell_info )
 		c.draw_many, c.projs = 0, {}
 		
-		pcall( spell_data.action )
-		if( spell_data.tip_data ~= nil ) then spell_data.tip_data() end
+		pcall( spell_info.action )
+		if( spell_info.tip_data ~= nil ) then spell_info.tip_data() end
 		if( math.abs( current_reload_time ) > 1e6 ) then
-			spell_data.is_chainsaw = true
+			spell_info.is_chainsaw = true
 			current_reload_time = current_reload_time + ACTION_DRAW_RELOAD_TIME_INCREASE end --shouldn't this be a minus?
 		metadata.state.reload_time, metadata.shot_effects = current_reload_time, pen.t.clone( shot_effects )
 		
@@ -2159,8 +2159,8 @@ function pen.get_spell_data( spell_id )
 		EntityLoad = real_EntityLoad
 		clean_my_gun()
 
-		spell_data.meta = pen.t.clone( metadata )
-		return spell_data
+		spell_info.meta = pen.t.clone( metadata )
+		return spell_info
 	end, { reset_count = 0 })
 end
 
@@ -2401,7 +2401,7 @@ function pen.debug_print( text, x, y, color ) --make sure text can never go offs
 		if( not( is_guied )) then
 			pic_x, pic_y = pen.world2gui( x, y ) else color = nil end
 		pen.new.text_shad( pic_x, pic_y, ( is_guied and 1 or -1 )*pen.Z.DEBUG, text, {
-			alpha = 0.5, is_centered_x = true, is_centered_y = true, color = color or pen.P.VNL.WARNING })
+			alpha = 0.5, is_centered_x = false, is_centered_y = true, color = color or pen.P.VNL.WARNING })
 	else --stolen from fairmod + thanks Nathan
 		color = color or pen.P.VNL.WARNING
 		if( ModIsEnabled( "index_core" )) then
@@ -5664,7 +5664,7 @@ pen.FONT_MODS = {
 		end
 		
 		if( idt.last_lin ~= index.lin ) then
-			if( idt.drift.hl ) then idt.hdata[3] = idt.hdata[3] or { idt.pos.l, idt.pos.c } end
+			if( idt.drift.hl ) then idt.hdata[2] = idt.hdata[2] or { idt.pos.l, idt.pos.c } end
 			
 			local prev_lin = math.abs( idt.last_lin )
 			if( idt.drift.l and idt.pos.l == index.lin ) then
@@ -5692,7 +5692,7 @@ pen.FONT_MODS = {
 				end
 			end
 
-			if( idt.drift.hl ) then idt.hdata[4] = { idt.pos.l, idt.pos.c } end
+			if( idt.drift.hl ) then idt.hdata[3] = { idt.pos.l, idt.pos.c } end
 			
 			idt.last_last_lin = math.abs( idt.last_lin )
 		end
@@ -5724,9 +5724,9 @@ pen.FONT_MODS = {
 			if( char_data.char == " " ) then idt.is_space = true end
 		end
 
-		if( pen.vld(( idt.hdata or {})[3])) then
-			local _pos_id = 10000*( idt.hdata[3][1] or -1 ) + ( idt.hdata[3][2] or -1 )
-			local h_pos_id = 10000*( idt.hdata[4][1] or -1 ) + ( idt.hdata[4][2] or -1 )
+		if( pen.vld(( idt.hdata or {})[2])) then
+			local _pos_id = 10000*( idt.hdata[2][1] or -1 ) + ( idt.hdata[2][2] or -1 )
+			local h_pos_id = 10000*( idt.hdata[3][1] or -1 ) + ( idt.hdata[3][2] or -1 )
 			if( _pos_id > h_pos_id ) then local temp = _pos_id; _pos_id = h_pos_id; h_pos_id = temp end
 			local this_pos_id = 10000*index.lin + index.chr
 			if( this_pos_id >= _pos_id and this_pos_id <= h_pos_id ) then
