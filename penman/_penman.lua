@@ -6,7 +6,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 33.51 -- 8cd68d0
+pen.VERSION = 33.52 -- 008e974
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -2649,7 +2649,7 @@ function pen.get_delta_time( id )
     local this_time = GameGetRealWorldTimeSinceStarted()*1000
     pen.c.delta_time_memo[ id ] = this_time
 
-    return ( this_time - last_time )/( 1000/60 )
+    return this_time - last_time
 end
 
 function pen.ricochet( v, p_angle, n_angle, r_angles )
