@@ -1,3 +1,5 @@
+if( pen ~= nil ) then return end
+
 pen = pen or {}
 pen.t = pen.t or {} -- table funcs
 pen.c = pen.c or {} -- cache table
@@ -6,7 +8,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 33.52 -- 008e974
+pen.VERSION = 33.53 -- c1bdead
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -161,6 +163,7 @@ function pen.estimate( eid, target, alg, min_delta, max_delta ) --thanks Nathan
 	alg = pen.ght( alg or "exp" )
 	min_delta = math.max( min_delta or 0.01, 0.0001 )
 
+	--not providing pen.estimate id should not do the memorization
 	pen.c.estimator_prev = pen.c.estimator_prev or {}
 	pen.c.estimator_memo = pen.c.estimator_memo or {}
 	pen.c.estimator_vlct = pen.c.estimator_vlct or {}
@@ -488,7 +491,7 @@ function pen.t.loop( tbl, func, return_tbl )
 
 	local function iter( i, v )
 		local is_fine, out = pcall( func, i, v )
-		if( not( is_fine )) then error( "[LOOP="..tostring( i ).."; "..tostring( v ).."]\n"..out ) else return out end
+		if( not( is_fine )) then error( "[LOOP = "..tostring( i )..";"..tostring( v ).."]\n"..out ) else return out end
 	end
 
 	local sorter = false
@@ -8688,11 +8691,8 @@ print = function( ... )
 	_print( table.concat( out, "\n\t" ))
 end
 
---not providing pen.estimate id should not do the memorization
-
-_GameGetFrameNum = GameGetFrameNum
-GameGetFrameNum = function( is_advanced )
-	local frame_num = _GameGetFrameNum()
+PenGetFrameNum = function( is_advanced )
+	local frame_num = GameGetFrameNum()
 	if( not( is_advanced )) then return frame_num end
 	local is_still = ( pen.c.last_frame or -1 ) == frame_num
 	pen.c.last_frame = frame_num
