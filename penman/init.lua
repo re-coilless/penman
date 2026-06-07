@@ -12,7 +12,6 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --sule-based lua context independent gateway (and steal ModMagicNumbersFileAdd from init.lua via it)
 
 --documentation (https://github.com/LuaLS/lua-language-server/wiki/Annotations)
---investigate gui shaders
 --periodically executed functions (coroutine-based sequencer that accepts a table of events, use varstorage to preserve the state between restarts)
 --some kind of message system (check how MQTT works)
 --"Health:\nass\nballs" seems to explode pen.new.tip
