@@ -1,0 +1,1 @@
+--analytical solution for 2 joints (maybe merge two single joint solutions?)
