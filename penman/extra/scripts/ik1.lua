@@ -12,36 +12,41 @@ c_x, c_y = c_x - base_x, c_y - base_y
 local lmt_1A, lmt_1B, lmt_15, lmt_2A, lmt_2B, lmt_25 = unpack(
 	pen.t.pack( pen.magic_storage( limb_id, "limits", "value_string" )))
 local is_active = pen.magic_storage( limb_id, "is_active", "value_bool" )
+local speed = pen.magic_storage( limb_id, "speed", "value_float" )
 local may_flip = pen.magic_storage( limb_id, "may_flip", "value_bool" )
 local max_length = pen.magic_storage( limb_id, "max_length", "value_float" )
 local morph_length = pen.magic_storage( limb_id, "morph_length", "value_float" )
 
-local t_x, t_y = -5*base_s_x, 1
+local t_x, t_y = -7*base_s_x, 2.5
 if( is_active ) then
 	t_x = pen.magic_storage( limb_id, "target_x", "value_float" )
 	t_y = pen.magic_storage( limb_id, "target_y", "value_float" )
 	if( pen.magic_storage( limb_id, "absolute_mode", "value_bool" )) then
 		t_x, t_y = t_x - base_x, t_y - base_y
 	end
-end
+else speed = 5*speed end
 
+local is_going = is_active
 local length = math.max( math.sqrt( t_x^2 + t_y^2 ), 0.1 )
 if( length > max_length ) then
 	local angle = math.atan2( t_y, t_x )
 	t_x = math.cos( angle )*max_length
 	t_y = math.sin( angle )*max_length
 	length = max_length
+	is_going = false
 end
 
-local speed = pen.magic_storage( limb_id, "speed", "value_float" )
 if( speed > 0 ) then
 	c_x = pen.estimate( "", { t_x, c_x }, { "wgt", speed })
 	c_y = pen.estimate( "", { t_y, c_y }, { "wgt", speed })
 else c_x, c_y = t_x, t_y end
 
-local d_x, d_y = t_x - c_x, t_y - c_y
-local accuracy = 5/( is_active and 2 or 1 )
-pen.magic_storage( limb_id, "is_going", "value_bool", math.sqrt( d_x^2 + d_y^2 ) > accuracy )
+if( is_going ) then
+	local accuracy = 2.5
+	local d_x, d_y = t_x - c_x, t_y - c_y
+	is_going = math.sqrt( d_x^2 + d_y^2 ) > accuracy
+end
+pen.magic_storage( limb_id, "is_going", "value_bool", is_going )
 
 --if lmt_1B or lmt_2B are negative, stretch A instead of shifting B pos
 

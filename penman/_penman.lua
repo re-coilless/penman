@@ -8,7 +8,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 34.51 -- 30acc93
+pen.VERSION = 34.52 -- c44f9ab
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -2254,7 +2254,16 @@ function pen.get_strength( hooman )
 	return coef*strength
 end
 
-function pen.get_speed( entity_id ) --should work for everything
+function pen.get_gravity( entity_id )
+	local gravity1, gravity2 = 0, 0
+	local char_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterDataComponent" )
+	if( pen.vld( char_comp, true )) then gravity1 = ComponentGetValue2( char_comp, "gravity" ) end
+	local plat_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterPlatformingComponent" )
+	if( pen.vld( plat_comp, true )) then gravity2 = ComponentGetValue2( plat_comp, "pixel_gravity" )/60 end
+	if( gravity2 == 0 ) then return gravity1, true else return gravity2, false end
+end
+
+function pen.get_speed( entity_id ) --broken; should work for everything
 	local v_x, v_y = 0, 0
 	local char_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterDataComponent" )
 	local plat_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterPlatformingComponent" )
@@ -8943,7 +8952,6 @@ function pen.lib.set_matter_damage( hooman, data )
 	for value in string.gmatch( matters, pen.ptrn( "," )) do table.insert( old_matters, value ) end
 	local damages, old_damages = ComponentGetValue2( dmg_comp, "materials_how_much_damage" ), {}
 	for value in string.gmatch( damages, pen.ptrn( "," )) do table.insert( old_damages, tonumber( value )) end
-	matters, damages = "", ""
 
 	local c_min_x = ComponentGetValue2( char_comp, "collision_aabb_min_x" )
 	local c_max_x = ComponentGetValue2( char_comp, "collision_aabb_max_x" )
@@ -9013,8 +9021,10 @@ function pen.lib.player_builder( hooman, func )
 	if( not( pen.vld( pen.lib.nxml ))) then return end
 
 	if( ModIsEnabled( "vector_core" )) then
+		pen.GENERIC_CHAR_SETUP.CharacterDataComponent.gravity = 8.5
 		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.accel_x = 0.001
 		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.accel_x_air = 0.001
+		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.pixel_gravity = 0
 		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.run_velocity = 0
 		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.jump_velocity_x = 0
 		pen.GENERIC_CHAR_SETUP.CharacterPlatformingComponent.jump_velocity_y = -60
