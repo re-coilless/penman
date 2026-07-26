@@ -8,7 +8,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 34.52 -- c44f9ab
+pen.VERSION = 34.6 -- 41b1983
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -747,8 +747,10 @@ end
 
 -------------------------------------------------------     [TEXT]     -------------------------------------------------------
 
-function pen.ptrn( id )
-	return table.concat({ "([^", type( id ) == "number" and pen[ "DIV_"..( id or 1 )] or tostring( id ), "]+)" }) --special thanks to Copi
+function pen.ptrn( id, core_only ) --special thanks to Copi
+	local core = type( id ) == "number" and pen[ "DIV_"..( id or 1 )] or tostring( id )
+	if( core_only ) then return core end
+	return table.concat({ "([^", core, "]+)" })
 end
 function pen.ctrn( str, marker, is_unarrayed )
 	local t = {}
@@ -758,6 +760,24 @@ function pen.ctrn( str, marker, is_unarrayed )
 		else t[ word ] = 1 end
 	end
 	return t
+end
+function pen.ftrn( str, marker, is_unarrayed )
+	local t, pos = {}, 1
+	local function append( t, v )
+		if( is_unarrayed ) then t[ v ] = 1 else table.insert( t, pen.t2t( v, true )) end
+	end
+
+	local ptrn = pen.ptrn( marker, true )
+    while( true ) do
+        local a, b = string.find( str, ptrn, pos )
+        
+        if( a == nil ) then
+            append( t, string.sub( str, pos )); break end
+		append( t, string.sub( str, pos, a - 1 ))
+        pos = b + 1
+    end
+
+    return t
 end
 
 function pen.capitalizer( str )
@@ -1174,24 +1194,25 @@ function pen.add_herds( new_file, default, overrides )
 	return herd
 end
 
-function pen.add_shaders( shader_path ) --this should be much more flexible
+function pen.add_shaders( shader_new )
 	local shader_old = "data/shaders/post_final.frag"
-	local file_old = pen.magic_read( shader_old )
-	local markers_old = {
+	local markers = {
+		"",
 		--[[UNIFORMS]]"// %-*\r\n// utilities",
 		--[[FUNCTIONS]]"// trip \"fractals\" effect. this is based on some code from ShaderToy, which I can't find anymore.",
 		--[[WORLD]]"#ifdef TRIPPY\r\n	// drunk doublevision",
 		--[[OVERLAY]]"// ============================================================================================================\r\n// additive overlay ===========================================================================================",
 		--[[OUTPUT]]"// ============================================================================================================\r\n// output =====================================================================================================\r\n\r\n//color%.r = tex_coord_warped_lerp;\r\ngl_FragColor%.rgb  = color;\r\ngl_FragColor%.a = 1%.0;"
 	}
-
-	local file_new = pen.magic_read( shader_path ).."\n\n******[EOF]******\n"
-	for i,segment in ipairs( pen.ctrn( file_new, "******[%S-]******" )) do
-		if( pen.vld( string.gsub( segment, "%s", "" )) and markers_old[i] ~= nil ) then
-			file = string.gsub( file, markers_old[i], table.concat({ markers_old[i], "\n", segment }))
+	
+	local file_old, file_new = pen.magic_read( shader_old ), pen.magic_read( shader_new )
+	for i,segment in ipairs( pen.ftrn( file_new, "******%[%S-%]******" )) do
+		if( string.find( segment, "%a" ) ~= nil ) then
+			file_old = string.gsub( file_old, markers[i], table.concat({ segment, "\n", markers[i]}))
 		end
 	end
-	if( pen.magic_write ) then pen.magic_write( shader_old, file ) end
+
+	if( pen.magic_write ) then pen.magic_write( shader_old, file_old ) end
 end
 
 function pen.add_translations( path )
@@ -3957,6 +3978,11 @@ end
 
 function pen.gui2world( pic_x, pic_y, is_raw )
     return pen.world2gui( pic_x, pic_y, is_raw, nil, true )
+end
+
+function pen.set_uniform( name, x, y, w, h )
+	if( x == nil ) then return GameUnsetPostFxParameter( name ) end
+	GameSetPostFxParameter( name, x or 0, y or 0, w or 0, h or 0 )
 end
 
 function pen.pic_wiper( pic_id, wh )

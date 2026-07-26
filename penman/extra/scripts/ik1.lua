@@ -17,7 +17,7 @@ local may_flip = pen.magic_storage( limb_id, "may_flip", "value_bool" )
 local max_length = pen.magic_storage( limb_id, "max_length", "value_float" )
 local morph_length = pen.magic_storage( limb_id, "morph_length", "value_float" )
 
-local t_x, t_y = -7*base_s_x, 2.5
+local t_x, t_y = -6*base_s_x, 5
 if( is_active ) then
 	t_x = pen.magic_storage( limb_id, "target_x", "value_float" )
 	t_y = pen.magic_storage( limb_id, "target_y", "value_float" )
