@@ -29,8 +29,9 @@ if( pen.c.testing_done ) then
         -- ost()
         -- cloud()
         -- anims()
+        wand_puppet()
 
-        pen.c.testing_done = 1--0
+        pen.c.testing_done = 10
         return
     end
 end
@@ -978,5 +979,25 @@ if( pen.new.interface( 30, 50, 10, 10, 0 )) then
 end
 
 pen.new.builder( true )
+
+end
+
+-- *************************************************************************
+
+function wand_puppet()
+
+if( GameGetFrameNum() < 100 ) then return end
+
+local m_x, m_y = DEBUG_GetMouseWorld()
+pen.c.wp_pos = pen.c.wp_pos or { m_x, m_y }
+r = math.atan2(( m_y - pen.c.wp_pos[2]), ( m_x - pen.c.wp_pos[1]))
+local puppet_id, is_new = pen.lib.wand_puppet( "wp_test", InputIsKeyDown( 20 ) --[[q]], r, m_x, m_y )
+pen.c.wp_pos = { m_x, m_y }
+
+if( is_new ) then pen.c.wp_wand = EntityLoad( "data/entities/items/wand_daily_01.xml", m_x, m_y ) end
+
+if( GameGetFrameNum() < 150 ) then return end
+
+pen.lib.wand_puppet( puppet_id, pen.c.wp_wand )
 
 end

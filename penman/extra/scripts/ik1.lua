@@ -1,4 +1,4 @@
-dofile_once( "mods/Noita40K/files/_lib.lua" )
+dofile_once( "mods/penman/_penman.lua" )
 
 local limb_id = GetUpdatedEntityID()
 local hooman = EntityGetRootEntity( limb_id )

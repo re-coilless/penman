@@ -509,6 +509,47 @@ end
 -- 	return core_id
 -- end
 
+function pen.lib.wand_puppet( id, may_fire, r, x, y )
+	if( type( id ) == "number" ) then
+		if( may_fire ~= false ) then
+			local real_id = pen.get_active_item( id )
+			if( real_id ~= may_fire ) then
+				GameDropAllItems( id )
+				local pick_comp = EntityGetFirstComponentIncludingDisabled( id, "ItemPickUpperComponent" )
+				local item_comp = EntityGetFirstComponentIncludingDisabled( may_fire, "ItemComponent" )
+				ComponentSetValue2( pick_comp, "only_pick_this_entity", may_fire )
+				ComponentSetValue2( item_comp, "npc_next_frame_pickable", 0 )
+				GamePickUpInventoryItem( id, may_fire, false )
+			end
+		else GameDropAllItems( id ) end
+		return
+	end
+	
+	pen.c.wand_puppet = pen.c.wand_puppet or {}
+	local puppet_id, is_new = pen.life_support(
+		pen.c.wand_puppet, id, "mods/penman/extra/props/wand_puppet.xml", x, y, 0 )
+	local ctrl_comp = EntityGetFirstComponentIncludingDisabled( puppet_id, "ControlsComponent" )
+	local pick_comp = EntityGetFirstComponentIncludingDisabled( puppet_id, "ItemPickUpperComponent" )
+	local shot_comp = EntityGetFirstComponentIncludingDisabled( puppet_id, "PlatformShooterPlayerComponent" )
+	
+	if( is_new ) then
+		local init_id = EntityLoad( "mods/penman/extra/props/wand_puppet_init.xml", x, y )
+		local item_comp = EntityGetFirstComponentIncludingDisabled( init_id, "ItemComponent" )
+		ComponentSetValue2( pick_comp, "only_pick_this_entity", init_id )
+		ComponentSetValue2( item_comp, "npc_next_frame_pickable", 0 )
+	end
+
+	if( r ~= nil ) then
+		local aim_l = 1000
+		local aim_x, aim_y = math.cos( r ), math.sin( r )
+		ComponentSetValueVector2( ctrl_comp, "mAimingVector", aim_x, aim_y )
+		ComponentSetValue2( ctrl_comp, "mMousePosition", aim_x*aim_l, aim_y*aim_l )
+	end
+	ComponentSetValue2( shot_comp, "mForceFireOnNextUpdate", may_fire )
+
+	return puppet_id, is_new
+end
+
 --[SAFE] ^^^^^^^^^^^^
 if( io == nil ) then return end
 --[UNSAFE] vvvvvvvvvv

@@ -8,7 +8,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 34.6 -- 41b1983
+pen.VERSION = 35 -- 865db27
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -1379,6 +1379,7 @@ end
 
 function pen.magic_storage( entity_id, name, field, value, default )
 	if( default == nil ) then default = value ~= nil end
+
 	local storages = EntityGetComponentIncludingDisabled( entity_id, "VariableStorageComponent" )
 	local out = pen.t.loop( storages, function( i, comp )
 		if( ComponentGetValue2( comp, "name" ) == name ) then return comp end
@@ -1389,7 +1390,9 @@ function pen.magic_storage( entity_id, name, field, value, default )
 		if( field ~= nil and type( default ) ~= "boolean" ) then v[ field ] = default end
 		out = EntityAddComponent2( entity_id, "VariableStorageComponent", v )
 	end
-	if( field ~= nil and pen.vld( out, true )) then return pen.magic_comp( out, field, value ) end
+
+	if( field ~= nil and pen.vld( out, true )) then
+		return pen.magic_comp( out, field, value ) end
 	return out
 end
 
@@ -1551,12 +1554,13 @@ function pen.get_effect( entity_id, name, id )
 
 	local comp = nil
 	return pen.child_play( entity_id, function( parent, child )
+		comp = EntityGetFirstComponentIncludingDisabled( child, "GameEffectComponent" )
+		
 		if( id == nil ) then
 			local gotcha = EntityGetName( child ) == name
 			if( gotcha ) then return child else return end
 		end
 
-		comp = EntityGetFirstComponentIncludingDisabled( child, "GameEffectComponent" )
 		if( pen.vld( comp, true ) and (
 			ComponentGetValue2( comp, "effect" ) == name or
 			ComponentGetValue2( comp, "causing_status_effect" ) == id or
@@ -1786,30 +1790,22 @@ function pen.get_creature_head( entity_id )
 end
 
 --change this to get_dimensions that works for everything
-function pen.get_creature_dimensions( entity_id, is_simple ) --this should work with phys bodies
+function pen.get_creature_dimensions( entity_id, is_visual )
 	local borders = { min_x = 0, max_x = 0, min_y = 0, max_y = 0 }
+	
+	--add an option to bake in the vis dims into spritesheet's xml (sprite_builder fills a global with pairs of filenames and vis dims)
+	local hit_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "HitboxComponent" )
 	local char_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "CharacterDataComponent" )
-	local has_collision = pen.vld( char_comp, true )
-	if( has_collision ) then
+	if( not( is_visual ) and pen.vld( char_comp, true )) then --this should work with phys bodies
 		borders.min_x = ComponentGetValue2( char_comp, "collision_aabb_min_x" )
 		borders.max_x = ComponentGetValue2( char_comp, "collision_aabb_max_x" )
 		borders.min_y = ComponentGetValue2( char_comp, "collision_aabb_min_y" )
 		borders.max_y = ComponentGetValue2( char_comp, "collision_aabb_max_y" )
-	end
-
-	local sprite_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "SpriteComponent", "character" )
-	if( not( is_simple ) and pen.vld( sprite_comp, true )) then
-		local offset_x = ComponentGetValue2( sprite_comp, "offset_x" )
-		local offset_y = ComponentGetValue2( sprite_comp, "offset_y" )
-		if( offset_x == 0 ) then offset_x = has_collision and ( math.abs( borders.min_x ) + math.abs( borders.max_x ))/2 or 3 end
-		if( offset_y == 0 ) then offset_y = has_collision and borders.min_y or 3 end
-
-		local temp = { min_x = -offset_x, max_x = offset_x, min_y = -offset_y, max_y = offset_y }
-		for i,v in pairs( borders ) do
-			if( has_collision ) then
-				borders[i] = ( temp[i] + v )/2
-			else borders[i] = temp[i]*( i == "max_y" and 0.5 or 1 ) end
-		end
+	elseif( pen.vld( hit_comp, true )) then
+		borders.min_x = ComponentGetValue2( hit_comp, "aabb_min_x" )
+		borders.max_x = ComponentGetValue2( hit_comp, "aabb_max_x" )
+		borders.min_y = ComponentGetValue2( hit_comp, "aabb_min_y" )
+		borders.max_y = ComponentGetValue2( hit_comp, "aabb_max_y" )
 	end
 
 	return borders
@@ -2504,7 +2500,8 @@ function pen.life_support( memo, id, path, x, y, r, s_x, s_y )
 	if( not( EntityGetIsAlive( entity_id ))) then
 		is_new = true
 		entity_id = pen.vld( path ) and EntityLoad( path, x or 0, y or 0 ) or EntityCreateNew( "dummy" ) end
-	if( x ~= nil ) then EntitySetTransform( entity_id, x, y, r or 0, s_x or 1, s_y or 1 ) end
+	local _x, _y, _r = EntityGetTransform( entity_id )
+	EntitySetTransform( entity_id, x or _x, y or _y, r or _r, s_x or 1, s_y or 1 )
 	memo[ id ] = entity_id
 	
 	local life_comp = EntityGetFirstComponentIncludingDisabled( entity_id, "LifetimeComponent" )
@@ -2981,11 +2978,12 @@ function pen.check_point( arrow, barrier )
 end
 
 function pen.scale_emitter( entity_id, emit_comp )
-	local borders = pen.get_creature_dimensions( entity_id )
+	local borders = pen.get_creature_dimensions( entity_id, true )
 	ComponentSetValue2( emit_comp, "x_pos_offset_min", borders.min_x )
 	ComponentSetValue2( emit_comp, "x_pos_offset_max", borders.max_x )
 	ComponentSetValue2( emit_comp, "y_pos_offset_min", borders.min_y )
 	ComponentSetValue2( emit_comp, "y_pos_offset_max", borders.max_y )
+	return borders
 end
 
 function pen.matter_fabricator( x, y, data )
@@ -5409,7 +5407,7 @@ pen.P = {
 		WHITE = {238,226,206}, _="ffeee2ce",
 		PURPLE = {179,141,232}, _="ffb38de8",
 	},
-	N40 = { --ammo types, classes, misc colors
+	N40K = { --ammo types, classes, misc colors
 		HOLO_1 = {121,140,42}, _="ff798c2a",
 		HOLO_2 = {144,168,49}, _="ff90a831",
 		HOLO_3 = {182,213,60}, _="ffb6d53c",

@@ -5,23 +5,10 @@
 		execute_on_added="1"
 	></LuaComponent>
 	
-	<VariableStorageComponent
-		name="no_gui"
-		value_bool="0"
-	></VariableStorageComponent>
-	<VariableStorageComponent
-		name="is_going"
-		value_bool="1"
-	></VariableStorageComponent>
-	<VariableStorageComponent
-		name="will_unload"
-		value_bool="1"
-	></VariableStorageComponent>
-	<VariableStorageComponent
-		name="is_debugging"
-		value_bool="0"
-	></VariableStorageComponent>
-
+	<VariableStorageComponent name="no_gui" value_bool="0" />
+	<VariableStorageComponent name="is_going" value_bool="1" />
+	<VariableStorageComponent name="will_unload" value_bool="1" />
+	<VariableStorageComponent name="is_debugging" value_bool="0" />
 	<Entity name="root" > <InheritTransformComponent/> </Entity>
 	<Entity name="data" />
 </Entity>

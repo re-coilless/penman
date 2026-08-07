@@ -32,7 +32,7 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 --check if globals in settings are accessible across all files (and if so make penman autoinject the lib)
 --check how file caching works with loadfile, maybe one can edit one lua script at runtime
 --dropdown with search capabilities (combine input with scroller)
---cached get_terrain via raymarching (https://youtu.be/BNZtUB7yhX4?t=92), cache updates are triggered by a sparse grid around every entity that calls this
+--cached get_terrain via per-cell raycasts, cache updates are triggered by a sparse grid around every entity that calls this; store this in a global with custom parsing format (separate globals for each metachunk)
 --GameEntityPlaySound might be able to ignore the sfx limit (thanks to lamia)
 --add sfxes (separate banks for hermes and trigger)
 --testing environment that has full in-world function simulation
