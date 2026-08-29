@@ -4,8 +4,7 @@ ModMagicNumbersFileAdd( "mods/penman/extra/magic_numbers.xml" )
 
 --pen.is_culled for all pen.new funcs
 --pen.mgk table
---add new table to penman to house all gameplay-first functionality
---in-line text mods/comments should use ansi standard
+--add new table (gme) to penman to house all gameplay-first functionality
 --upgrade vector class to matrix one (build a custom one based on matrix.lua that works both as vector and matrix)
 --check polytools
 --setfenv( 1, getfenv()) to isolate global spamming functions (thanks to ImmortalDamned)

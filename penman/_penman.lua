@@ -8,7 +8,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 35 -- 865db27
+pen.VERSION = 35.01 -- d84f275
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -548,7 +548,8 @@ function pen.t.get( tbl, id, custom_key, will_nuke, default )
 		end
 	end
 	
-	if( not( will_nuke )) then return is_multi and out or ( out[1] or default ), tbl_id end
+	if( not( will_nuke )) then
+		return is_multi and out or ( out[1] or default ), tbl_id end
 	for i = #out,1,-1 do table.remove( tbl, out[i]) end
 end
 
@@ -825,7 +826,7 @@ function pen.get_short_num( num, no_subzero, force_sign )
 			num = string.sub( sstr, 1, #sstr - ender[1])..ender[2]
 		else num = string.gsub( string.format( "%.3f", real_num ), "%.*0+$", "" ) end
 	elseif( num < 9e99 ) then
-		num = tostring( string.format("%e", real_num ))
+		num = tostring( string.format( "%e", real_num ))
 		local _,pos = string.find( num, "+", 1, true )
 		num = table.concat({
 			string.sub( num, string.find( num, "^%-*%d" )),
@@ -835,6 +836,12 @@ function pen.get_short_num( num, no_subzero, force_sign )
 	else return "∞" end
 
 	return (( force_sign and real_num > 0 ) and "+" or "" )..num
+end
+function pen.get_long_num( num, digits, no_subzero )
+	if( no_subzero ) then num = math.max( num, 0 ) end
+	
+	num = math.min(( 10^digits - 1 ), num )
+	return string.sub( tostring( math.floor( num + 10^digits )), -digits )
 end
 
 function pen.w2c( word, on_char, do_pre, on_iter )
@@ -1603,14 +1610,6 @@ end
 
 -------------------------------------------------------     [UTILS]     -------------------------------------------------------
 
-function pen.random_bool( var )
-	SetRandomSeed( GameGetFrameNum(), var )
-	return Random( 1, 2 ) == 1
-end
-function pen.random_sign( var )
-	return pen.random_bool( var ) and 1 or -1
-end
-
 function pen.setting_set( id, value )
 	-- local setting_set_memo = pen.t.unarray( pen.t.pack( GlobalsGetValue( pen.GLOBAL_SETTINGS_CACHE, "" )))
 	-- setting_set_memo[ id ] = GameGetFrameNum()
@@ -1689,6 +1688,18 @@ function pen.srandom( event_id, mutator, a, b, bidirectional, seed_container )
 
 	math.random();math.random();math.random()
 	return ( bidirectional or false ) and ( math.random( a, b*2 ) - b ) or math.random( a, b )
+end
+
+function pen.vrandom( var, a, b )
+	SetRandomSeed( GameGetFrameNum(), var )
+	return Random( a, b )
+end
+function pen.random_bool( var )
+	SetRandomSeed( GameGetFrameNum(), var )
+	return pen.vrandom( 1, 2 ) == 1
+end
+function pen.random_sign( var )
+	return pen.random_bool( var ) and 1 or -1
 end
 
 function pen.migrate( mod_id, funcs )
@@ -4139,7 +4150,7 @@ end
 
 function pen.new.pixel( pic_x, pic_y, pic_z, c, s_x, s_y, alpha, angle )
 	local gui = pen.new.builder()
-	GuiZSetForNextWidget( gui, pic_z )
+	GuiZSetForNextWidget( gui, pic_z or pen.Z.DEBUG )
 	GuiOptionsAddForNextWidget( gui, 2 ) --NonInteractive
 	pen.c.gui_data.i = pen.c.gui_data.i - 1
 
@@ -6800,7 +6811,6 @@ pen.GENERIC_CHAR_SETUP = {
 	GameLogComponent = true,
 	GameStatsComponent = true,
 	LightComponent = true,
-	WalletComponent = true,
 }
 
 pen.CANCER_COMPS = {

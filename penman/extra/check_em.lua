@@ -29,9 +29,9 @@ if( pen.c.testing_done ) then
         -- ost()
         -- cloud()
         -- anims()
-        wand_puppet()
+        -- wand_puppet()
 
-        pen.c.testing_done = 10
+        pen.c.testing_done = 1--0
         return
     end
 end
