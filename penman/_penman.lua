@@ -8,7 +8,7 @@ if( GameGetWorldStateEntity() > 0 ) then
 	GlobalsSetValue( "HERMES_IS_REAL", "1" )
 end
 
-pen.VERSION = 35.01 -- d84f275
+pen.VERSION = 35.011 -- 74cc3fd
 pen.PATH = string.match( jit.util.funcinfo( function() end ).source, "(.+/)[^/]+" ) --thanks to ImmortalDamned and Alex
 
 -------------------------------------------------------     [IO]     -------------------------------------------------------
@@ -9258,6 +9258,7 @@ pen.THANKS = { -- alphabetical order (github > steam > message)
 	"Copi", --https://github.com/Ramiels
 	"Dexter", --https://github.com/dextercd
 	"Evaisa", --https://github.com/EvaisaDev
+	"Heinermann", --https://github.com/heinermann
 	"Horscht", --https://github.com/TheHorscht
 	"ImmortalDamned", --https://github.com/XM666-Dev
 	"Lamia", --https://github.com/lamia-zamia
